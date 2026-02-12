@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deadlands: The Wasted West — Character Creation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --parchment: #d4c5a9;
+  --parchment-dark: #b8a88a;
+  --ink: #2a1f14;
+  --blood: #8b1a1a;
+  --blood-glow: #c0392b;
+  --ghost-rock: #4ecdc4;
+  --ghost-glow: #2ecc71;
+  --rust: #a0522d;
+  --brass: #b5871e;
+  --brass-light: #d4a843;
+  --shadow: rgba(0,0,0,0.7);
+  --char-bg: #1a1209;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'IM Fell English', serif;
+  background: var(--char-bg);
+  color: var(--parchment);
+  overflow-x: hidden;
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* Vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== HEADER ===== */
+.header {
+  text-align: center;
+  padding: 30px 0 20px;
+  border-bottom: 2px solid var(--rust);
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.header::after {
+  content: '⚙ ✦ ⚙';
+  display: block;
+  font-size: 14px;
+  color: var(--brass);
+  letter-spacing: 20px;
+  margin-top: 10px;
+}
+
+.header h1 {
+  font-family: 'Rye', serif;
+  font-size: clamp(28px, 5vw, 48px);
+  color: var(--brass-light);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(181,135,30,0.3);
+  letter-spacing: 3px;
+  line-height: 1.2;
+}
+
+.header .subtitle {
+  font-family: 'Special Elite', cursive;
+  font-size: clamp(12px, 2vw, 16px);
+  color: var(--rust);
+  margin-top: 8px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+/* ===== PHASE INDICATOR ===== */
+.phases {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.phase {
+  font-family: 'Special Elite', cursive;
+  font-size: 12px;
+  padding: 6px 16px;
+  border: 1px solid var(--rust);
+  color: var(--parchment-dark);
+  opacity: 0.4;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: transparent;
+}
+
+.phase.active {
+  opacity: 1;
+  color: var(--brass-light);
+  border-color: var(--brass);
+  background: rgba(181,135,30,0.1);
+  box-shadow: 0 0 10px rgba(181,135,30,0.2);
+}
+
+.phase.completed {
+  opacity: 0.7;
+  color: var(--ghost-rock);
+  border-color: var(--ghost-rock);
+}
+
+/* ===== PANELS ===== */
+.panel {
+  display: none;
+  animation: fadeIn 0.5s ease;
+}
+
+.panel.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-title {
+  font-family: 'Rye', serif;
+  font-size: 24px;
+  color: var(--brass-light);
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.panel-flavor {
+  font-style: italic;
+  text-align: center;
+  color: var(--parchment-dark);
+  margin-bottom: 25px;
+  font-size: 14px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ===== NAME INPUT ===== */
+.name-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.name-input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--rust);
+  color: var(--parchment);
+  font-family: 'Special Elite', cursive;
+  font-size: 24px;
+  text-align: center;
+  padding: 8px 20px;
+  width: 100%;
+  max-width: 400px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.name-input::placeholder {
+  color: rgba(212,197,169,0.3);
+}
+
+.name-input:focus {
+  border-color: var(--brass-light);
+}
+
+/* ===== ARCHETYPE GRID ===== */
+.archetype-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.archetype-card {
+  border: 1px solid var(--rust);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  background: rgba(42,31,20,0.5);
+  overflow: hidden;
+}
+
+.archetype-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(181,135,30,0.05) 100%);
+  transition: all 0.3s;
+}
+
+.archetype-card:hover {
+  border-color: var(--brass);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.archetype-card:hover::before {
+  background: linear-gradient(135deg, transparent 40%, rgba(181,135,30,0.1) 100%);
+}
+
+.archetype-card.selected {
+  border-color: var(--ghost-rock);
+  box-shadow: 0 0 15px rgba(78,205,196,0.2), inset 0 0 30px rgba(78,205,196,0.05);
+}
+
+.archetype-card.selected::after {
+  content: '✦';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--ghost-rock);
+  font-size: 16px;
+}
+
+.archetype-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.archetype-name {
+  font-family: 'Rye', serif;
+  font-size: 16px;
+  color: var(--brass-light);
+  margin-bottom: 6px;
+}
+
+.archetype-desc {
+  font-size: 13px;
+  color: var(--parchment-dark);
+  line-height: 1.5;
+}
+
+.archetype-bonuses {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ghost-rock);
+  font-family: 'Special Elite', cursive;
+}
+
+/* ===== STATS ===== */
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.points-remaining {
+  font-family: 'Special Elite', cursive;
+  font-size: 18px;
+  color: var(--brass-light);
+}
+
+.points-remaining span {
+  color: var(--ghost-rock);
+  font-size: 24px;
+}
+
+.points-remaining span.low {
+  color: var(--blood-glow);
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(160,82,45,0.2);
+}
+
+.stat-name {
+  font-family: 'Rye', serif;
+  font-size: 14px;
+  color: var(--brass-light);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.stat-desc {
+  font-size: 11px;
+  color: var(--parchment-dark);
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.stat-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.stat-btn {
+  background: transparent;
+  border: 1px solid var(--rust);
+  color: var(--parchment);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-family: 'Special Elite', cursive;
+}
+
+.stat-btn:hover:not(:disabled) {
+  border-color: var(--brass);
+  color: var(--brass-light);
+  background: rgba(181,135,30,0.1);
+}
+
+.stat-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.stat-value {
+  font-family: 'Special Elite', cursive;
+  font-size: 22px;
+  color: var(--ghost-rock);
+  width: 30px;
+  text-align: center;
+}
+
+.stat-bar-container {
+  width: 100px;
+  height: 8px;
+  background: rgba(42,31,20,0.8);
+  border: 1px solid var(--rust);
+  flex-shrink: 0;
+}
+
+.stat-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ghost-rock), var(--ghost-glow));
+  transition: width 0.3s;
+  box-shadow: 0 0 6px rgba(78,205,196,0.3);
+}
+
+/* ===== TRAITS / HINDRANCES ===== */
+.traits-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 700px) {
+  .traits-columns { grid-template-columns: 1fr; }
+  .stat-desc { display: none; }
+  .stat-name { width: 90px; }
+}
+
+.traits-column h3 {
+  font-family: 'Rye', serif;
+  font-size: 16px;
+  color: var(--brass-light);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rust);
+}
+
+.trait-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+
+.trait-item:hover {
+  background: rgba(181,135,30,0.05);
+  border-color: rgba(160,82,45,0.3);
+}
+
+.trait-item.selected {
+  border-color: var(--ghost-rock);
+  background: rgba(78,205,196,0.05);
+}
+
+.trait-item.selected.hindrance {
+  border-color: var(--blood-glow);
+  background: rgba(139,26,26,0.1);
+}
+
+.trait-check {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--rust);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--ghost-rock);
+}
+
+.trait-item.selected .trait-check {
+  border-color: var(--ghost-rock);
+}
+
+.trait-item.selected.hindrance .trait-check {
+  border-color: var(--blood-glow);
+  color: var(--blood-glow);
+}
+
+.trait-info {
+  flex: 1;
+}
+
+.trait-name-row {
+  font-size: 14px;
+  color: var(--parchment);
+}
+
+.trait-effect {
+  font-size: 11px;
+  color: var(--parchment-dark);
+  margin-top: 2px;
+}
+
+.trait-points {
+  font-family: 'Special Elite', cursive;
+  font-size: 13px;
+  color: var(--ghost-rock);
+  flex-shrink: 0;
+}
+
+.hindrance .trait-points {
+  color: var(--blood-glow);
+}
+
+.edge-points-display {
+  text-align: center;
+  font-family: 'Special Elite', cursive;
+  font-size: 16px;
+  color: var(--parchment-dark);
+  margin-bottom: 16px;
+}
+
+.edge-points-display span {
+  color: var(--ghost-rock);
+  font-size: 20px;
+}
+
+/* ===== SUMMARY ===== */
+.summary-sheet {
+  border: 2px solid var(--rust);
+  padding: 30px;
+  background: rgba(42,31,20,0.6);
+  position: relative;
+}
+
+.summary-sheet::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(160,82,45,0.3);
+  pointer-events: none;
+}
+
+.summary-name {
+  font-family: 'Rye', serif;
+  font-size: 28px;
+  color: var(--brass-light);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.summary-archetype {
+  font-family: 'Special Elite', cursive;
+  text-align: center;
+  color: var(--ghost-rock);
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-section {
+  margin-bottom: 20px;
+}
+
+.summary-section h3 {
+  font-family: 'Rye', serif;
+  font-size: 14px;
+  color: var(--brass-light);
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--rust);
+  padding-bottom: 4px;
+}
+
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.2);
+  font-size: 13px;
+}
+
+.summary-stat-name {
+  color: var(--parchment-dark);
+}
+
+.summary-stat-val {
+  color: var(--ghost-rock);
+  font-family: 'Special Elite', cursive;
+}
+
+.summary-traits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.summary-trait-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--ghost-rock);
+  color: var(--ghost-rock);
+  font-family: 'Special Elite', cursive;
+}
+
+.summary-trait-tag.hindrance {
+  border-color: var(--blood-glow);
+  color: var(--blood-glow);
+}
+
+.summary-lore {
+  font-style: italic;
+  color: var(--parchment-dark);
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: center;
+  padding: 15px;
+  border: 1px solid rgba(160,82,45,0.2);
+  background: rgba(0,0,0,0.15);
+  margin-top: 15px;
+}
+
+/* ===== BUTTONS ===== */
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  gap: 12px;
+}
+
+.btn {
+  font-family: 'Rye', serif;
+  font-size: 14px;
+  padding: 12px 30px;
+  border: 1px solid var(--rust);
+  background: transparent;
+  color: var(--parchment);
+  cursor: pointer;
+  transition: all 0.3s;
+  letter-spacing: 1px;
+}
+
+.btn:hover {
+  border-color: var(--brass);
+  color: var(--brass-light);
+  background: rgba(181,135,30,0.1);
+  box-shadow: 0 0 15px rgba(181,135,30,0.15);
+}
+
+.btn.primary {
+  border-color: var(--ghost-rock);
+  color: var(--ghost-rock);
+}
+
+.btn.primary:hover {
+  background: rgba(78,205,196,0.1);
+  box-shadow: 0 0 15px rgba(78,205,196,0.2);
+}
+
+.btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-export {
+  border-color: var(--brass);
+  color: var(--brass-light);
+}
+
+/* ===== AMBIENT FLICKER ===== */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+.header h1 {
+  animation: flicker 5s infinite;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--char-bg); }
+::-webkit-scrollbar-thumb { background: var(--rust); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>Deadlands</h1>
+    <div class="subtitle">The Wasted West — Character Creation</div>
+  </div>
+
+  <!-- PHASE INDICATOR -->
+  <div class="phases">
+    <div class="phase active" data-phase="0">I. Name & Calling</div>
+    <div class="phase" data-phase="1">II. Attributes</div>
+    <div class="phase" data-phase="2">III. Edges & Hindrances</div>
+    <div class="phase" data-phase="3">IV. The Dossier</div>
+  </div>
+
+  <!-- PHASE 0: NAME & ARCHETYPE -->
+  <div class="panel active" id="phase0">
+    <div class="panel-title">Who Are You, Stranger?</div>
+    <div class="panel-flavor">"Every soul that walks the Wasted West has a name and a calling. Some chose their path. Most had it chosen for them by fate, misfortune, or the howling things that came after the Reckoning."</div>
+
+    <div class="name-section">
+      <input type="text" class="name-input" id="charName" placeholder="Enter your name, partner..." maxlength="30">
+    </div>
+
+    <div class="panel-title" style="font-size:18px; margin-bottom:16px;">Choose Your Calling</div>
+
+    <div class="archetype-grid" id="archetypeGrid">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="nav-buttons">
+      <div></div>
+      <button class="btn primary" id="toPhase1" disabled>Onward →</button>
+    </div>
+  </div>
+
+  <!-- PHASE 1: STATS -->
+  <div class="panel" id="phase1">
+    <div class="panel-title">Measure of a Soul</div>
+    <div class="panel-flavor">"Out here, what you know and what you can do are the only things between you and a shallow grave."</div>
+
+    <div class="stats-header">
+      <div class="points-remaining">Attribute Points: <span id="pointsLeft">20</span></div>
+      <button class="btn" id="resetStats" style="padding:6px 14px; font-size:12px;">Reset</button>
+    </div>
+
+    <div id="statsContainer">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn" id="backTo0">← Back</button>
+      <button class="btn primary" id="toPhase2">Onward →</button>
+    </div>
+  </div>
+
+  <!-- PHASE 2: EDGES & HINDRANCES -->
+  <div class="panel" id="phase2">
+    <div class="panel-title">Edges & Hindrances</div>
+    <div class="panel-flavor">"Nobody's perfect — and nobody's without their gifts neither. Pick your blessings and your burdens. Hindrances earn you points to spend on Edges."</div>
+
+    <div class="edge-points-display">
+      Edge Points Available: <span id="edgePoints">0</span>
+    </div>
+
+    <div class="traits-columns">
+      <div class="traits-column">
+        <h3>⚡ Edges</h3>
+        <div id="edgesContainer"></div>
+      </div>
+      <div class="traits-column">
+        <h3>💀 Hindrances</h3>
+        <div id="hindrancesContainer"></div>
+      </div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn" id="backTo1">← Back</button>
+      <button class="btn primary" id="toPhase3">View Your Dossier →</button>
+    </div>
+  </div>
+
+  <!-- PHASE 3: SUMMARY -->
+  <div class="panel" id="phase3">
+    <div class="panel-title">Your Dossier</div>
+    <div class="panel-flavor">"This here's your record, stranger. Everything the Wasted West needs to know about you — and everything it'll use against you."</div>
+
+    <div class="summary-sheet" id="summarySheet">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn" id="backTo2">← Back</button>
+      <button class="btn btn-export" id="exportBtn">⚙ Export JSON</button>
+      <button class="btn primary" id="newChar">✦ New Character</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== GAME DATA =====
+const ARCHETYPES = [
+  {
+    id: 'gunslinger',
+    icon: '🔫',
+    name: 'Gunslinger',
+    desc: 'A dead-eye with a six-shooter and a reputation that walks into the room before they do.',
+    bonuses: '+2 Deftness, +1 Quickness',
+    statBonuses: { deftness: 2, quickness: 1 },
+    lore: 'They say every bullet you fire carves a notch in your soul. You stopped counting notches a long time ago.'
+  },
+  {
+    id: 'huckster',
+    icon: '🃏',
+    name: 'Huckster',
+    desc: 'A hexslinger who gambles with dark spirits for arcane power — and sometimes wins.',
+    bonuses: '+2 Cognition, +1 Spirit',
+    statBonuses: { cognition: 2, spirit: 1 },
+    lore: 'You learned the old ways — dealing with the manitou, playing poker for power. The spirits always want a rematch.'
+  },
+  {
+    id: 'mad_scientist',
+    icon: '⚙',
+    name: 'Mad Scientist',
+    desc: 'A genius inventor powered by ghost rock and questionable sanity. Builds impossible things.',
+    bonuses: '+2 Knowledge, +1 Cognition',
+    statBonuses: { knowledge: 2, cognition: 1 },
+    lore: 'Ghost rock whispers to you in your dreams. It shows you blueprints for machines that shouldn\'t work. But they do.'
+  },
+  {
+    id: 'blessed',
+    icon: '✝',
+    name: 'Blessed',
+    desc: 'A person of faith whose prayers carry real, divine power against the horrors of the Reckoning.',
+    bonuses: '+2 Spirit, +1 Vigor',
+    statBonuses: { spirit: 2, vigor: 1 },
+    lore: 'When the Four Horsemen rode, your faith didn\'t break. It hardened into something the darkness can\'t abide.'
+  },
+  {
+    id: 'law_dog',
+    icon: '⭐',
+    name: 'Law Dog',
+    desc: 'A badge-carrying enforcer of order in a world where order is a memory. Tough and relentless.',
+    bonuses: '+2 Vigor, +1 Mien',
+    statBonuses: { vigor: 2, mien: 1 },
+    lore: 'The law may be dead everywhere else, but it ain\'t dead in you. And you aim to remind folks of that.'
+  },
+  {
+    id: 'drifter',
+    icon: '🌵',
+    name: 'Drifter',
+    desc: 'A wanderer and survivor. No allegiance, no home — just instincts honed by the wasteland.',
+    bonuses: '+1 to three random stats',
+    statBonuses: { nimbleness: 1, quickness: 1, cognition: 1 },
+    lore: 'You\'ve walked the wastes from Tombstone to Deadwood. You don\'t belong anywhere — and that\'s kept you alive.'
+  }
+];
+
+const STATS = [
+  { id: 'deftness', name: 'Deftness', desc: 'Hand-eye coordination, shooting' },
+  { id: 'nimbleness', name: 'Nimbleness', desc: 'Agility, dodging, climbing' },
+  { id: 'strength', name: 'Strength', desc: 'Raw physical power' },
+  { id: 'quickness', name: 'Quickness', desc: 'Reaction speed, initiative' },
+  { id: 'vigor', name: 'Vigor', desc: 'Toughness, health, endurance' },
+  { id: 'cognition', name: 'Cognition', desc: 'Perception, awareness, search' },
+  { id: 'knowledge', name: 'Knowledge', desc: 'Education, science, medicine' },
+  { id: 'mien', name: 'Mien', desc: 'Charisma, persuasion, leadership' },
+  { id: 'spirit', name: 'Spirit', desc: 'Willpower, guts, faith' }
+];
+
+const EDGES = [
+  { id: 'nerves_of_steel', name: 'Nerves of Steel', effect: 'Immune to fear checks below Terror 3', cost: 2 },
+  { id: 'fleet_footed', name: 'Fleet-Footed', effect: '+2 movement speed in combat', cost: 1 },
+  { id: 'thick_skinned', name: 'Thick Skinned', effect: '+2 armor against physical damage', cost: 2 },
+  { id: 'lucky', name: 'The Devil\'s Own Luck', effect: 'Re-roll one failed check per encounter', cost: 3 },
+  { id: 'quick_draw', name: 'Quick Draw', effect: '+3 initiative in first round of combat', cost: 2 },
+  { id: 'ghost_sight', name: 'Ghost Sight', effect: 'Can see invisible/ethereal beings', cost: 2 },
+  { id: 'belongings', name: 'Belongings', effect: 'Start with an extra rare item', cost: 1 },
+  { id: 'veteran', name: 'Veteran o\' the Weird West', effect: '+1 to all stats (max 10)', cost: 4 }
+];
+
+const HINDRANCES = [
+  { id: 'wanted', name: 'Wanted', effect: 'Bounty hunters pursue you regularly', reward: 2 },
+  { id: 'nightmares', name: 'Night Terrors', effect: 'Restless sleep; reduced healing from rest', reward: 1 },
+  { id: 'oath', name: 'Oath', effect: 'Bound to a code you cannot break', reward: 1 },
+  { id: 'haunted', name: 'Haunted', effect: 'A manitou whispers to you. It wants in.', reward: 3 },
+  { id: 'lame', name: 'Lame', effect: '-2 movement speed permanently', reward: 2 },
+  { id: 'bloodthirsty', name: 'Bloodthirsty', effect: 'Must make Spirit check to show mercy', reward: 2 },
+  { id: 'poverty', name: 'Poverty', effect: 'Start with minimal equipment', reward: 1 },
+  { id: 'enemy', name: 'Enemy', effect: 'A powerful foe is hunting you', reward: 2 }
+];
+
+
+// ===== STATE =====
+let state = {
+  phase: 0,
+  name: '',
+  archetype: null,
+  baseStats: {},
+  bonusStats: {},
+  points: 20,
+  selectedEdges: [],
+  selectedHindrances: [],
+  edgePoints: 0
+};
+
+// Initialize base stats
+STATS.forEach(s => state.baseStats[s.id] = 1);
+
+// ===== RENDERING =====
+function renderArchetypes() {
+  const grid = document.getElementById('archetypeGrid');
+  grid.innerHTML = ARCHETYPES.map(a => `
+    <div class="archetype-card ${state.archetype === a.id ? 'selected' : ''}" data-id="${a.id}">
+      <span class="archetype-icon">${a.icon}</span>
+      <div class="archetype-name">${a.name}</div>
+      <div class="archetype-desc">${a.desc}</div>
+      <div class="archetype-bonuses">${a.bonuses}</div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.archetype-card').forEach(card => {
+    card.addEventListener('click', () => {
+      state.archetype = card.dataset.id;
+      const arch = ARCHETYPES.find(a => a.id === state.archetype);
+      state.bonusStats = { ...arch.statBonuses };
+      renderArchetypes();
+      checkPhase0();
+    });
+  });
+}
+
+function getStatTotal(statId) {
+  return (state.baseStats[statId] || 1) + (state.bonusStats[statId] || 0);
+}
+
+function renderStats() {
+  const container = document.getElementById('statsContainer');
+  container.innerHTML = STATS.map(s => {
+    const base = state.baseStats[s.id];
+    const bonus = state.bonusStats[s.id] || 0;
+    const total = base + bonus;
+    const pct = (total / 12) * 100;
+    return `
+      <div class="stat-row">
+        <div class="stat-name">${s.name}</div>
+        <div class="stat-desc">${s.desc}</div>
+        <div class="stat-bar-container">
+          <div class="stat-bar" style="width:${pct}%"></div>
+        </div>
+        <div class="stat-controls">
+          <button class="stat-btn" data-stat="${s.id}" data-dir="-1" ${base <= 1 ? 'disabled' : ''}>−</button>
+          <div class="stat-value">${total}${bonus > 0 ? '' : ''}</div>
+          <button class="stat-btn" data-stat="${s.id}" data-dir="1" ${state.points <= 0 || base >= 10 ? 'disabled' : ''}>+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const pts = document.getElementById('pointsLeft');
+  pts.textContent = state.points;
+  pts.className = state.points <= 3 ? 'low' : '';
+
+  container.querySelectorAll('.stat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const stat = btn.dataset.stat;
+      const dir = parseInt(btn.dataset.dir);
+      if (dir === 1 && state.points > 0 && state.baseStats[stat] < 10) {
+        state.baseStats[stat]++;
+        state.points--;
+      } else if (dir === -1 && state.baseStats[stat] > 1) {
+        state.baseStats[stat]--;
+        state.points++;
+      }
+      renderStats();
+    });
+  });
+}
+
+function renderTraits() {
+  const edgesEl = document.getElementById('edgesContainer');
+  const hindrancesEl = document.getElementById('hindrancesContainer');
+
+  edgesEl.innerHTML = EDGES.map(e => {
+    const selected = state.selectedEdges.includes(e.id);
+    const canAfford = state.edgePoints >= e.cost;
+    return `
+      <div class="trait-item ${selected ? 'selected' : ''} ${!selected && !canAfford ? 'disabled-trait' : ''}" data-id="${e.id}" data-type="edge">
+        <div class="trait-check">${selected ? '✦' : ''}</div>
+        <div class="trait-info">
+          <div class="trait-name-row">${e.name}</div>
+          <div class="trait-effect">${e.effect}</div>
+        </div>
+        <div class="trait-points">-${e.cost}</div>
+      </div>
+    `;
+  }).join('');
+
+  hindrancesEl.innerHTML = HINDRANCES.map(h => {
+    const selected = state.selectedHindrances.includes(h.id);
+    return `
+      <div class="trait-item hindrance ${selected ? 'selected' : ''}" data-id="${h.id}" data-type="hindrance">
+        <div class="trait-check">${selected ? '✦' : ''}</div>
+        <div class="trait-info">
+          <div class="trait-name-row">${h.name}</div>
+          <div class="trait-effect">${h.effect}</div>
+        </div>
+        <div class="trait-points">+${h.reward}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('edgePoints').textContent = state.edgePoints;
+
+  document.querySelectorAll('.trait-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = item.dataset.id;
+      const type = item.dataset.type;
+
+      if (type === 'edge') {
+        const edge = EDGES.find(e => e.id === id);
+        if (state.selectedEdges.includes(id)) {
+          state.selectedEdges = state.selectedEdges.filter(e => e !== id);
+          state.edgePoints += edge.cost;
+        } else if (state.edgePoints >= edge.cost) {
+          state.selectedEdges.push(id);
+          state.edgePoints -= edge.cost;
+        }
+      } else {
+        const hind = HINDRANCES.find(h => h.id === id);
+        if (state.selectedHindrances.includes(id)) {
+          state.selectedHindrances = state.selectedHindrances.filter(h => h !== id);
+          state.edgePoints -= hind.reward;
+          // Remove edges that can no longer be afforded
+          recalcEdges();
+        } else {
+          state.selectedHindrances.push(id);
+          state.edgePoints += hind.reward;
+        }
+      }
+      renderTraits();
+    });
+  });
+}
+
+function recalcEdges() {
+  // If removing a hindrance puts us in negative, remove edges from the end
+  while (state.edgePoints < 0 && state.selectedEdges.length > 0) {
+    const removedId = state.selectedEdges.pop();
+    const edge = EDGES.find(e => e.id === removedId);
+    state.edgePoints += edge.cost;
+  }
+}
+
+function renderSummary() {
+  const arch = ARCHETYPES.find(a => a.id === state.archetype);
+  const sheet = document.getElementById('summarySheet');
+
+  const statsHtml = STATS.map(s => {
+    const total = getStatTotal(s.id);
+    return `<div class="summary-stat">
+      <span class="summary-stat-name">${s.name}</span>
+      <span class="summary-stat-val">${total}</span>
+    </div>`;
+  }).join('');
+
+  const edgeTags = state.selectedEdges.map(id => {
+    const e = EDGES.find(x => x.id === id);
+    return `<span class="summary-trait-tag">${e.name}</span>`;
+  }).join('');
+
+  const hindTags = state.selectedHindrances.map(id => {
+    const h = HINDRANCES.find(x => x.id === id);
+    return `<span class="summary-trait-tag hindrance">${h.name}</span>`;
+  }).join('');
+
+  sheet.innerHTML = `
+    <div class="summary-name">${state.name || 'The Nameless One'}</div>
+    <div class="summary-archetype">${arch ? arch.icon + ' ' + arch.name : 'Unknown'}</div>
+
+    <div class="summary-section">
+      <h3>Attributes</h3>
+      <div class="summary-stats-grid">${statsHtml}</div>
+    </div>
+
+    ${edgeTags || hindTags ? `
+    <div class="summary-section">
+      <h3>Edges & Hindrances</h3>
+      <div class="summary-traits-list">${edgeTags}${hindTags}</div>
+    </div>` : ''}
+
+    <div class="summary-lore">${arch ? arch.lore : ''}</div>
+  `;
+}
+
+// ===== NAVIGATION =====
+function setPhase(n) {
+  state.phase = n;
+  document.querySelectorAll('.panel').forEach((p, i) => {
+    p.classList.toggle('active', i === n);
+  });
+  document.querySelectorAll('.phase').forEach((p, i) => {
+    p.classList.remove('active', 'completed');
+    if (i === n) p.classList.add('active');
+    else if (i < n) p.classList.add('completed');
+  });
+
+  if (n === 1) renderStats();
+  if (n === 2) renderTraits();
+  if (n === 3) renderSummary();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function checkPhase0() {
+  const name = document.getElementById('charName').value.trim();
+  state.name = name;
+  document.getElementById('toPhase1').disabled = !(name && state.archetype);
+}
+
+// ===== INIT =====
+function init() {
+  renderArchetypes();
+
+  document.getElementById('charName').addEventListener('input', checkPhase0);
+
+  document.getElementById('toPhase1').addEventListener('click', () => setPhase(1));
+  document.getElementById('toPhase2').addEventListener('click', () => setPhase(2));
+  document.getElementById('toPhase3').addEventListener('click', () => setPhase(3));
+  document.getElementById('backTo0').addEventListener('click', () => setPhase(0));
+  document.getElementById('backTo1').addEventListener('click', () => setPhase(1));
+  document.getElementById('backTo2').addEventListener('click', () => setPhase(2));
+
+  document.getElementById('resetStats').addEventListener('click', () => {
+    STATS.forEach(s => state.baseStats[s.id] = 1);
+    state.points = 20;
+    renderStats();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const arch = ARCHETYPES.find(a => a.id === state.archetype);
+    const exportData = {
+      name: state.name || 'The Nameless One',
+      archetype: arch ? arch.name : 'Unknown',
+      stats: {},
+      edges: state.selectedEdges.map(id => EDGES.find(e => e.id === id)?.name),
+      hindrances: state.selectedHindrances.map(id => HINDRANCES.find(h => h.id === id)?.name),
+      created: new Date().toISOString()
+    };
+    STATS.forEach(s => exportData.stats[s.name] = getStatTotal(s.id));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(state.name || 'character').toLowerCase().replace(/\s+/g, '_')}_deadlands.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('newChar').addEventListener('click', () => {
+    state = {
+      phase: 0, name: '', archetype: null,
+      baseStats: {}, bonusStats: {},
+      points: 20, selectedEdges: [], selectedHindrances: [], edgePoints: 0
+    };
+    STATS.forEach(s => state.baseStats[s.id] = 1);
+    document.getElementById('charName').value = '';
+    renderArchetypes();
+    setPhase(0);
+  });
+
+  // Phase tabs clickable
+  document.querySelectorAll('.phase').forEach(p => {
+    p.addEventListener('click', () => {
+      const target = parseInt(p.dataset.phase);
+      if (target <= state.phase || (target === state.phase + 1)) {
+        setPhase(target);
+      }
+    });
+  });
+}
+
+init();
+</script>
+
+</body>
+</html>

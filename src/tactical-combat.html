@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deadlands: Tactical — Combat Prototype</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --parchment: #d4c5a9;
+  --parchment-dark: #b8a88a;
+  --ink: #2a1f14;
+  --blood: #8b1a1a;
+  --blood-glow: #c0392b;
+  --ghost-rock: #4ecdc4;
+  --ghost-glow: #2ecc71;
+  --rust: #a0522d;
+  --brass: #b5871e;
+  --brass-light: #d4a843;
+  --char-bg: #1a1209;
+  --tile-base: #2a2018;
+  --tile-hover: #3a3028;
+  --tile-move: rgba(78,205,196,0.15);
+  --tile-attack: rgba(139,26,26,0.25);
+  --cover-full: #5a8a3a;
+  --cover-half: #8a7a3a;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'IM Fell English', serif;
+  background: var(--char-bg);
+  color: var(--parchment);
+  overflow-x: hidden;
+  user-select: none;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.3;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== TOP BAR ===== */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.4);
+  border-bottom: 1px solid var(--rust);
+  flex-shrink: 0;
+}
+
+.game-title {
+  font-family: 'Rye', serif;
+  font-size: 18px;
+  color: var(--brass-light);
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+}
+
+.turn-info {
+  font-family: 'Special Elite', cursive;
+  font-size: 14px;
+  color: var(--ghost-rock);
+}
+
+.turn-info .enemy-turn {
+  color: var(--blood-glow);
+}
+
+/* ===== MAIN LAYOUT ===== */
+.main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== GRID ===== */
+.grid-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  position: relative;
+}
+
+.grid {
+  display: grid;
+  gap: 2px;
+  position: relative;
+}
+
+.tile {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--tile-base);
+  border: 1px solid rgba(160,82,45,0.15);
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tile:hover {
+  background: var(--tile-hover);
+  border-color: rgba(160,82,45,0.4);
+}
+
+.tile.blocked {
+  background: #1a150e;
+  cursor: default;
+}
+
+.tile.cover-full {
+  background: rgba(90,138,58,0.15);
+  border-color: rgba(90,138,58,0.3);
+}
+
+.tile.cover-half {
+  background: rgba(138,122,58,0.12);
+  border-color: rgba(138,122,58,0.25);
+}
+
+.tile.move-range {
+  background: var(--tile-move);
+  border-color: rgba(78,205,196,0.3);
+}
+
+.tile.attack-range {
+  background: var(--tile-attack);
+  border-color: rgba(139,26,26,0.4);
+}
+
+.tile.selected {
+  border: 2px solid var(--ghost-rock);
+  box-shadow: 0 0 8px rgba(78,205,196,0.3);
+}
+
+.tile.targeted {
+  border: 2px solid var(--blood-glow);
+  box-shadow: 0 0 8px rgba(192,57,43,0.4);
+}
+
+/* Units */
+.unit {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.3s;
+  z-index: 2;
+}
+
+.unit.player {
+  background: radial-gradient(circle, rgba(78,205,196,0.3) 0%, rgba(78,205,196,0.1) 70%);
+  border: 2px solid var(--ghost-rock);
+  box-shadow: 0 0 6px rgba(78,205,196,0.3);
+}
+
+.unit.enemy {
+  background: radial-gradient(circle, rgba(139,26,26,0.4) 0%, rgba(139,26,26,0.15) 70%);
+  border: 2px solid var(--blood-glow);
+  box-shadow: 0 0 6px rgba(192,57,43,0.3);
+}
+
+.unit.dead {
+  opacity: 0.3;
+  filter: grayscale(1);
+  border-style: dashed;
+}
+
+/* HP bar on tile */
+.hp-bar-bg {
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+  right: 3px;
+  height: 3px;
+  background: rgba(0,0,0,0.5);
+  z-index: 3;
+}
+
+.hp-bar {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.hp-bar.player-hp { background: var(--ghost-rock); }
+.hp-bar.enemy-hp { background: var(--blood-glow); }
+
+/* Cover indicator */
+.cover-icon {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 9px;
+  z-index: 3;
+}
+
+/* Terrain icons */
+.terrain-icon {
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+/* ===== RIGHT PANEL ===== */
+.side-panel {
+  width: 260px;
+  background: rgba(0,0,0,0.3);
+  border-left: 1px solid var(--rust);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+@media (max-width: 800px) {
+  .main-area { flex-direction: column; }
+  .side-panel { width: 100%; border-left: none; border-top: 1px solid var(--rust); max-height: 200px; }
+}
+
+.panel-section {
+  padding: 12px;
+  border-bottom: 1px solid rgba(160,82,45,0.2);
+}
+
+.panel-section h3 {
+  font-family: 'Rye', serif;
+  font-size: 13px;
+  color: var(--brass-light);
+  margin-bottom: 8px;
+}
+
+/* Unit info */
+.unit-info-name {
+  font-family: 'Rye', serif;
+  font-size: 16px;
+  color: var(--brass-light);
+  margin-bottom: 2px;
+}
+
+.unit-info-class {
+  font-family: 'Special Elite', cursive;
+  font-size: 12px;
+  color: var(--ghost-rock);
+  margin-bottom: 8px;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--parchment-dark);
+}
+
+.stat-line .val {
+  color: var(--parchment);
+  font-family: 'Special Elite', cursive;
+}
+
+.stat-line .val.ap-full { color: var(--ghost-rock); }
+.stat-line .val.ap-low { color: var(--blood-glow); }
+
+/* Actions */
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-btn {
+  font-family: 'Special Elite', cursive;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--rust);
+  color: var(--parchment);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+}
+
+.action-btn:hover:not(:disabled) {
+  border-color: var(--brass);
+  background: rgba(181,135,30,0.1);
+  color: var(--brass-light);
+}
+
+.action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.action-btn.active {
+  border-color: var(--ghost-rock);
+  background: rgba(78,205,196,0.1);
+  color: var(--ghost-rock);
+}
+
+.action-btn .ap-cost {
+  font-size: 11px;
+  color: var(--parchment-dark);
+}
+
+/* Hit chance tooltip */
+.hit-chance {
+  font-family: 'Special Elite', cursive;
+  text-align: center;
+  padding: 6px;
+  font-size: 14px;
+}
+
+.hit-chance .pct {
+  font-size: 22px;
+  color: var(--brass-light);
+}
+
+.hit-chance .detail {
+  font-size: 11px;
+  color: var(--parchment-dark);
+}
+
+/* Log */
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  min-height: 80px;
+}
+
+.log-container h3 {
+  font-family: 'Rye', serif;
+  font-size: 13px;
+  color: var(--brass-light);
+  margin-bottom: 8px;
+}
+
+.log-entry {
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(160,82,45,0.1);
+  color: var(--parchment-dark);
+  line-height: 1.4;
+}
+
+.log-entry.player-action { color: var(--ghost-rock); }
+.log-entry.enemy-action { color: var(--blood-glow); }
+.log-entry.system { color: var(--brass); font-style: italic; }
+
+/* ===== BOTTOM BAR ===== */
+.bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.4);
+  border-top: 1px solid var(--rust);
+  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: 'Rye', serif;
+  font-size: 12px;
+  padding: 8px 18px;
+  border: 1px solid var(--rust);
+  background: transparent;
+  color: var(--parchment);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.btn:hover { border-color: var(--brass); color: var(--brass-light); background: rgba(181,135,30,0.1); }
+.btn.primary { border-color: var(--ghost-rock); color: var(--ghost-rock); }
+.btn.primary:hover { background: rgba(78,205,196,0.1); }
+.btn.danger { border-color: var(--blood-glow); color: var(--blood-glow); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.key-hint {
+  font-family: 'Special Elite', cursive;
+  font-size: 11px;
+  color: var(--parchment-dark);
+}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--char-bg);
+  border: 2px solid var(--rust);
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+}
+
+.modal h2 {
+  font-family: 'Rye', serif;
+  color: var(--brass-light);
+  margin-bottom: 10px;
+}
+
+.modal p {
+  color: var(--parchment-dark);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+/* Damage popup */
+.damage-popup {
+  position: absolute;
+  font-family: 'Rye', serif;
+  font-size: 18px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 100;
+  animation: floatUp 1s ease-out forwards;
+}
+
+.damage-popup.damage { color: var(--blood-glow); }
+.damage-popup.miss { color: var(--parchment-dark); font-size: 14px; }
+.damage-popup.heal { color: var(--ghost-glow); }
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.85; }
+  94% { opacity: 1; }
+}
+
+.game-title { animation: flicker 5s infinite; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="top-bar">
+    <div class="game-title">Deadlands: Tactical</div>
+    <div class="turn-info" id="turnInfo">Turn 1 — Your Move</div>
+  </div>
+
+  <div class="main-area">
+    <div class="grid-container" id="gridContainer">
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="side-panel">
+      <div class="panel-section" id="unitInfoPanel">
+        <div class="unit-info-name" id="uiName">Select a Unit</div>
+        <div class="unit-info-class" id="uiClass">—</div>
+        <div id="uiStats"></div>
+      </div>
+
+      <div class="panel-section" id="actionsPanel" style="display:none;">
+        <h3>Actions</h3>
+        <div class="actions-list" id="actionsList"></div>
+      </div>
+
+      <div class="panel-section" id="hitChancePanel" style="display:none;">
+        <div class="hit-chance" id="hitChanceDisplay"></div>
+      </div>
+
+      <div class="log-container">
+        <h3>Combat Log</h3>
+        <div id="combatLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="key-hint">Click unit → Move/Attack | Tab: cycle units</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" id="btnUndo" disabled>Undo Move</button>
+      <button class="btn primary" id="btnEndTurn">End Turn</button>
+      <button class="btn danger" id="btnRestart">Restart</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">—</h2>
+    <p id="modalText">—</p>
+    <button class="btn primary" id="modalBtn">Continue</button>
+  </div>
+</div>
+
+<script>
+// ========================================
+// DEADLANDS: TACTICAL — CORE ENGINE
+// ========================================
+
+// === CONFIG ===
+const GRID_W = 12;
+const GRID_H = 10;
+const BASE_AP = 4;
+
+// === MAP LEGEND ===
+// 0 = open, 1 = blocked (wall), 2 = full cover, 3 = half cover
+const MAP = [
+  [0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,3,0,0,0,0,3,0,0,0],
+  [0,0,0,0,0,2,2,0,0,0,0,0],
+  [0,3,0,0,0,1,1,0,0,0,3,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,3,0,0,0,1,1,0,0,0,3,0],
+  [0,0,0,0,0,2,2,0,0,0,0,0],
+  [0,0,0,3,0,0,0,0,3,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0],
+];
+
+const TERRAIN_ICONS = { 1: '🪨', 2: '🪵', 3: '🌵' };
+const COVER_DEFENSE = { 0: 0, 2: 40, 3: 20 };
+
+// === UNIT DEFINITIONS ===
+function createUnits() {
+  return {
+    players: [
+      { id: 'p1', name: 'Silas Crowe', cls: 'Gunslinger', icon: '🔫', x: 1, y: 1,
+        hp: 20, maxHp: 20, ap: BASE_AP, maxAp: BASE_AP,
+        stats: { deftness: 8, nimbleness: 5, quickness: 7, vigor: 5, spirit: 4 },
+        weapons: [
+          { name: 'Peacemaker', damage: [4,8], range: 6, apCost: 2, accuracy: 75 },
+          { name: 'Bowie Knife', damage: [3,6], range: 1, apCost: 1, accuracy: 85 }
+        ]
+      },
+      { id: 'p2', name: 'Sister Mara', cls: 'Blessed', icon: '✝', x: 1, y: 4,
+        hp: 16, maxHp: 16, ap: BASE_AP, maxAp: BASE_AP,
+        stats: { deftness: 4, nimbleness: 5, quickness: 5, vigor: 6, spirit: 9 },
+        weapons: [
+          { name: 'Shotgun', damage: [5,10], range: 4, apCost: 2, accuracy: 65 },
+          { name: 'Holy Smite', damage: [3,7], range: 5, apCost: 2, accuracy: 70 }
+        ],
+        abilities: [
+          { name: 'Lay on Hands', type: 'heal', amount: [4,8], range: 3, apCost: 2 }
+        ]
+      },
+      { id: 'p3', name: 'Doc Kettleman', cls: 'Mad Scientist', icon: '⚙', x: 1, y: 7,
+        hp: 14, maxHp: 14, ap: BASE_AP, maxAp: BASE_AP,
+        stats: { deftness: 5, nimbleness: 4, quickness: 5, vigor: 4, spirit: 3 },
+        weapons: [
+          { name: 'Ghost Rock Pistol', damage: [5,12], range: 5, apCost: 2, accuracy: 60 },
+          { name: 'Wrench', damage: [2,5], range: 1, apCost: 1, accuracy: 80 }
+        ],
+        abilities: [
+          { name: 'Turret Deploy', type: 'turret', apCost: 3, range: 3 }
+        ]
+      }
+    ],
+    enemies: [
+      { id: 'e1', name: 'Walkin\' Dead', cls: 'Undead', icon: '💀', x: 10, y: 1,
+        hp: 12, maxHp: 12, ap: 3, maxAp: 3,
+        stats: { deftness: 3, nimbleness: 3, quickness: 3, vigor: 8, spirit: 1 },
+        weapons: [
+          { name: 'Rusty Claws', damage: [3,6], range: 1, apCost: 1, accuracy: 70 }
+        ]
+      },
+      { id: 'e2', name: 'Rattlesnake Bill', cls: 'Outlaw', icon: '🤠', x: 10, y: 4,
+        hp: 16, maxHp: 16, ap: 4, maxAp: 4,
+        stats: { deftness: 7, nimbleness: 6, quickness: 6, vigor: 5, spirit: 4 },
+        weapons: [
+          { name: 'Winchester', damage: [4,9], range: 7, apCost: 2, accuracy: 70 },
+          { name: 'Boot Knife', damage: [2,5], range: 1, apCost: 1, accuracy: 80 }
+        ]
+      },
+      { id: 'e3', name: 'Hellstromme Drone', cls: 'Automaton', icon: '🤖', x: 10, y: 7,
+        hp: 20, maxHp: 20, ap: 3, maxAp: 3,
+        stats: { deftness: 6, nimbleness: 2, quickness: 4, vigor: 10, spirit: 0 },
+        weapons: [
+          { name: 'Steam Cannon', damage: [6,14], range: 5, apCost: 2, accuracy: 55 },
+          { name: 'Crushing Arm', damage: [4,8], range: 1, apCost: 1, accuracy: 75 }
+        ]
+      },
+      { id: 'e4', name: 'Ghost', cls: 'Harrowed', icon: '👻', x: 9, y: 5,
+        hp: 10, maxHp: 10, ap: 5, maxAp: 5,
+        stats: { deftness: 5, nimbleness: 8, quickness: 8, vigor: 3, spirit: 7 },
+        weapons: [
+          { name: 'Spectral Touch', damage: [2,6], range: 1, apCost: 1, accuracy: 80 }
+        ]
+      }
+    ]
+  };
+}
+
+// === GAME STATE ===
+let state = {
+  turn: 1,
+  phase: 'player', // 'player' | 'enemy'
+  units: createUnits(),
+  selected: null,
+  mode: 'select', // 'select' | 'move' | 'attack' | 'ability'
+  activeWeaponIdx: 0,
+  activeAbilityIdx: 0,
+  moveHistory: [], // for undo
+  turrets: []
+};
+
+function allUnits() {
+  return [...state.units.players, ...state.units.enemies];
+}
+
+function livingPlayers() { return state.units.players.filter(u => u.hp > 0); }
+function livingEnemies() { return state.units.enemies.filter(u => u.hp > 0); }
+
+function unitAt(x, y) {
+  return allUnits().find(u => u.x === x && u.y === y && u.hp > 0);
+}
+
+function turretAt(x, y) {
+  return state.turrets.find(t => t.x === x && t.y === y && t.hp > 0);
+}
+
+function dist(x1, y1, x2, y2) {
+  return Math.abs(x1 - x2) + Math.abs(y1 - y2); // Manhattan
+}
+
+// === PATHFINDING (BFS) ===
+function getReachable(unit) {
+  const maxMove = Math.floor(unit.ap / 1); // 1 AP per tile
+  const visited = new Map();
+  const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
+  visited.set(`${unit.x},${unit.y}`, 0);
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.cost >= maxMove) continue;
+
+    for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+      const nx = cur.x + dx;
+      const ny = cur.y + dy;
+      const key = `${nx},${ny}`;
+      if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
+      if (MAP[ny][nx] === 1) continue;
+      if (unitAt(nx, ny)) continue;
+      const newCost = cur.cost + 1;
+      if (!visited.has(key) || visited.get(key) > newCost) {
+        visited.set(key, newCost);
+        queue.push({ x: nx, y: ny, cost: newCost });
+      }
+    }
+  }
+
+  visited.delete(`${unit.x},${unit.y}`);
+  return visited; // Map of "x,y" -> cost
+}
+
+function getAttackTargets(unit, weapon) {
+  const targets = [];
+  const pool = unit.id.startsWith('p') ? livingEnemies() : livingPlayers();
+  for (const enemy of pool) {
+    if (dist(unit.x, unit.y, enemy.x, enemy.y) <= weapon.range) {
+      targets.push(enemy);
+    }
+  }
+  return targets;
+}
+
+// === HIT CALCULATION ===
+function calcHitChance(attacker, weapon, target) {
+  let base = weapon.accuracy;
+  // Deftness bonus
+  base += (attacker.stats.deftness - 5) * 3;
+  // Target nimbleness penalty
+  base -= (target.stats.nimbleness - 5) * 2;
+  // Distance penalty
+  const d = dist(attacker.x, attacker.y, target.x, target.y);
+  if (d > Math.floor(weapon.range * 0.6)) {
+    base -= (d - Math.floor(weapon.range * 0.6)) * 5;
+  }
+  // Cover bonus for target
+  const coverType = MAP[target.y][target.x];
+  base -= COVER_DEFENSE[coverType] || 0;
+
+  return Math.max(5, Math.min(95, base));
+}
+
+function rollDamage(weapon) {
+  const [min, max] = weapon.damage;
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function rollHeal(ability) {
+  const [min, max] = ability.amount;
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+// === RENDERING ===
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const containerW = document.getElementById('gridContainer').clientWidth - 20;
+  const containerH = document.getElementById('gridContainer').clientHeight - 20;
+  const tileSize = Math.floor(Math.min(containerW / GRID_W, containerH / GRID_H));
+
+  grid.style.gridTemplateColumns = `repeat(${GRID_W}, ${tileSize}px)`;
+  grid.style.gridTemplateRows = `repeat(${GRID_H}, ${tileSize}px)`;
+
+  // Get move range if in move mode
+  let reachable = null;
+  if (state.mode === 'move' && state.selected) {
+    reachable = getReachable(state.selected);
+  }
+
+  // Get attack targets
+  let attackTargets = [];
+  if (state.mode === 'attack' && state.selected) {
+    const weapon = state.selected.weapons[state.activeWeaponIdx];
+    attackTargets = getAttackTargets(state.selected, weapon);
+  }
+
+  let healTargets = [];
+  if (state.mode === 'ability' && state.selected && state.selected.abilities) {
+    const ability = state.selected.abilities[state.activeAbilityIdx];
+    if (ability.type === 'heal') {
+      healTargets = livingPlayers().filter(u =>
+        dist(state.selected.x, state.selected.y, u.x, u.y) <= ability.range
+      );
+    }
+  }
+
+  let html = '';
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const terrain = MAP[y][x];
+      let classes = ['tile'];
+      let content = '';
+
+      if (terrain === 1) {
+        classes.push('blocked');
+        content = `<span class="terrain-icon">${TERRAIN_ICONS[1]}</span>`;
+      } else if (terrain === 2) {
+        classes.push('cover-full');
+        content = `<span class="terrain-icon">${TERRAIN_ICONS[2]}</span>`;
+      } else if (terrain === 3) {
+        classes.push('cover-half');
+        content = `<span class="terrain-icon">${TERRAIN_ICONS[3]}</span>`;
+      }
+
+      // Move range highlight
+      if (reachable && reachable.has(`${x},${y}`)) {
+        classes.push('move-range');
+      }
+
+      // Attack range highlight
+      if (attackTargets.find(t => t.x === x && t.y === y)) {
+        classes.push('attack-range');
+      }
+
+      if (healTargets.find(t => t.x === x && t.y === y)) {
+        classes.push('move-range'); // reuse teal for heal
+      }
+
+      // Unit on tile
+      const unit = allUnits().find(u => u.x === x && u.y === y);
+      if (unit) {
+        const isPlayer = unit.id.startsWith('p');
+        const dead = unit.hp <= 0;
+        const hpPct = Math.max(0, (unit.hp / unit.maxHp) * 100);
+
+        if (state.selected && state.selected.id === unit.id) {
+          classes.push('selected');
+        }
+        if (attackTargets.find(t => t.id === unit.id)) {
+          classes.push('targeted');
+        }
+
+        content = `
+          <div class="unit ${isPlayer ? 'player' : 'enemy'} ${dead ? 'dead' : ''}">${unit.icon}</div>
+          <div class="hp-bar-bg"><div class="hp-bar ${isPlayer ? 'player-hp' : 'enemy-hp'}" style="width:${hpPct}%"></div></div>
+          ${MAP[y][x] >= 2 ? `<span class="cover-icon">${MAP[y][x] === 2 ? '🛡' : '½'}</span>` : ''}
+        `;
+      }
+
+      // Turret
+      const turret = turretAt(x, y);
+      if (turret) {
+        const hpPct = Math.max(0, (turret.hp / turret.maxHp) * 100);
+        content = `
+          <div class="unit player">⚙</div>
+          <div class="hp-bar-bg"><div class="hp-bar player-hp" style="width:${hpPct}%"></div></div>
+        `;
+      }
+
+      html += `<div class="${classes.join(' ')}" data-x="${x}" data-y="${y}">${content}</div>`;
+    }
+  }
+  grid.innerHTML = html;
+
+  // Attach click handlers
+  grid.querySelectorAll('.tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const x = parseInt(tile.dataset.x);
+      const y = parseInt(tile.dataset.y);
+      handleTileClick(x, y);
+    });
+  });
+}
+
+function renderUnitInfo(unit) {
+  if (!unit) {
+    document.getElementById('uiName').textContent = 'Select a Unit';
+    document.getElementById('uiClass').textContent = '—';
+    document.getElementById('uiStats').innerHTML = '';
+    document.getElementById('actionsPanel').style.display = 'none';
+    document.getElementById('hitChancePanel').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('uiName').textContent = unit.name;
+  document.getElementById('uiClass').textContent = `${unit.icon} ${unit.cls}`;
+
+  const apClass = unit.ap <= 1 ? 'ap-low' : unit.ap >= unit.maxAp ? 'ap-full' : '';
+
+  document.getElementById('uiStats').innerHTML = `
+    <div class="stat-line"><span>HP</span><span class="val">${unit.hp} / ${unit.maxHp}</span></div>
+    <div class="stat-line"><span>AP</span><span class="val ${apClass}">${unit.ap} / ${unit.maxAp}</span></div>
+    <div class="stat-line"><span>Deftness</span><span class="val">${unit.stats.deftness}</span></div>
+    <div class="stat-line"><span>Nimbleness</span><span class="val">${unit.stats.nimbleness}</span></div>
+    <div class="stat-line"><span>Quickness</span><span class="val">${unit.stats.quickness}</span></div>
+    <div class="stat-line"><span>Vigor</span><span class="val">${unit.stats.vigor}</span></div>
+    <div class="stat-line"><span>Spirit</span><span class="val">${unit.stats.spirit}</span></div>
+    <div class="stat-line"><span>Cover</span><span class="val">${MAP[unit.y][unit.x] === 2 ? 'Full 🛡' : MAP[unit.y][unit.x] === 3 ? 'Half' : 'None'}</span></div>
+  `;
+
+  // Actions (only for player units on player turn)
+  const isPlayerUnit = unit.id.startsWith('p');
+  if (isPlayerUnit && state.phase === 'player' && unit.hp > 0) {
+    document.getElementById('actionsPanel').style.display = 'block';
+    let actionsHtml = '';
+
+    actionsHtml += `<button class="action-btn ${state.mode === 'move' ? 'active' : ''}" data-action="move" ${unit.ap < 1 ? 'disabled' : ''}>
+      Move <span class="ap-cost">1 AP/tile</span>
+    </button>`;
+
+    unit.weapons.forEach((w, i) => {
+      actionsHtml += `<button class="action-btn ${state.mode === 'attack' && state.activeWeaponIdx === i ? 'active' : ''}" data-action="attack" data-idx="${i}" ${unit.ap < w.apCost ? 'disabled' : ''}>
+        ${w.name} (${w.damage[0]}-${w.damage[1]}) <span class="ap-cost">${w.apCost} AP | Rng ${w.range}</span>
+      </button>`;
+    });
+
+    if (unit.abilities) {
+      unit.abilities.forEach((a, i) => {
+        actionsHtml += `<button class="action-btn ${state.mode === 'ability' && state.activeAbilityIdx === i ? 'active' : ''}" data-action="ability" data-idx="${i}" ${unit.ap < a.apCost ? 'disabled' : ''}>
+          ${a.name} <span class="ap-cost">${a.apCost} AP | Rng ${a.range}</span>
+        </button>`;
+      });
+    }
+
+    actionsHtml += `<button class="action-btn" data-action="hunker" ${unit.ap < 2 ? 'disabled' : ''}>
+      Hunker Down <span class="ap-cost">2 AP | +20 Def</span>
+    </button>`;
+
+    actionsHtml += `<button class="action-btn" data-action="overwatch" ${unit.ap < 2 ? 'disabled' : ''}>
+      Overwatch <span class="ap-cost">2 AP</span>
+    </button>`;
+
+    document.getElementById('actionsList').innerHTML = actionsHtml;
+
+    document.querySelectorAll('.action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const action = btn.dataset.action;
+        const idx = parseInt(btn.dataset.idx || 0);
+        handleAction(action, idx);
+      });
+    });
+  } else {
+    document.getElementById('actionsPanel').style.display = 'none';
+  }
+}
+
+// === COMBAT LOG ===
+function log(msg, type = '') {
+  const el = document.getElementById('combatLog');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = msg;
+  el.prepend(entry);
+  // Keep log manageable
+  while (el.children.length > 50) el.removeChild(el.lastChild);
+}
+
+// === DAMAGE POPUP ===
+function showPopup(x, y, text, type = 'damage') {
+  const grid = document.getElementById('grid');
+  const tiles = grid.querySelectorAll('.tile');
+  const tileEl = [...tiles].find(t => t.dataset.x == x && t.dataset.y == y);
+  if (!tileEl) return;
+
+  const popup = document.createElement('div');
+  popup.className = `damage-popup ${type}`;
+  popup.textContent = text;
+  popup.style.left = tileEl.offsetLeft + tileEl.offsetWidth / 2 - 15 + 'px';
+  popup.style.top = tileEl.offsetTop + 'px';
+  grid.appendChild(popup);
+  setTimeout(() => popup.remove(), 1000);
+}
+
+// === INPUT HANDLING ===
+function handleTileClick(x, y) {
+  if (state.phase !== 'player') return;
+
+  const clickedUnit = unitAt(x, y);
+
+  // SELECT mode
+  if (state.mode === 'select') {
+    if (clickedUnit && clickedUnit.id.startsWith('p') && clickedUnit.hp > 0) {
+      state.selected = clickedUnit;
+      state.mode = 'select';
+      render();
+    } else if (clickedUnit && clickedUnit.id.startsWith('e')) {
+      // Just show enemy info
+      renderUnitInfo(clickedUnit);
+    }
+    return;
+  }
+
+  // MOVE mode
+  if (state.mode === 'move' && state.selected) {
+    const reachable = getReachable(state.selected);
+    const key = `${x},${y}`;
+    if (reachable.has(key)) {
+      const cost = reachable.get(key);
+      state.moveHistory.push({
+        unitId: state.selected.id,
+        fromX: state.selected.x, fromY: state.selected.y,
+        apCost: cost
+      });
+      state.selected.x = x;
+      state.selected.y = y;
+      state.selected.ap -= cost;
+      log(`${state.selected.name} moves to (${x},${y}) [-${cost} AP]`, 'player-action');
+      state.mode = 'select';
+      document.getElementById('btnUndo').disabled = false;
+      render();
+    }
+    return;
+  }
+
+  // ATTACK mode
+  if (state.mode === 'attack' && state.selected) {
+    const weapon = state.selected.weapons[state.activeWeaponIdx];
+    if (clickedUnit && !clickedUnit.id.startsWith('p') && clickedUnit.hp > 0) {
+      if (dist(state.selected.x, state.selected.y, x, y) <= weapon.range) {
+        executeAttack(state.selected, weapon, clickedUnit);
+        state.mode = 'select';
+        render();
+      }
+    }
+    return;
+  }
+
+  // ABILITY mode
+  if (state.mode === 'ability' && state.selected && state.selected.abilities) {
+    const ability = state.selected.abilities[state.activeAbilityIdx];
+    if (ability.type === 'heal' && clickedUnit && clickedUnit.id.startsWith('p') && clickedUnit.hp > 0) {
+      if (dist(state.selected.x, state.selected.y, x, y) <= ability.range) {
+        executeHeal(state.selected, ability, clickedUnit);
+        state.mode = 'select';
+        render();
+      }
+    }
+    if (ability.type === 'turret' && !clickedUnit && MAP[y][x] === 0 && !turretAt(x, y)) {
+      if (dist(state.selected.x, state.selected.y, x, y) <= ability.range) {
+        deployTurret(state.selected, ability, x, y);
+        state.mode = 'select';
+        render();
+      }
+    }
+    return;
+  }
+}
+
+function handleAction(action, idx) {
+  if (!state.selected) return;
+
+  if (action === 'move') {
+    state.mode = state.mode === 'move' ? 'select' : 'move';
+  } else if (action === 'attack') {
+    state.activeWeaponIdx = idx;
+    state.mode = state.mode === 'attack' && state.activeWeaponIdx === idx ? 'select' : 'attack';
+  } else if (action === 'ability') {
+    state.activeAbilityIdx = idx;
+    state.mode = state.mode === 'ability' && state.activeAbilityIdx === idx ? 'select' : 'ability';
+  } else if (action === 'hunker') {
+    state.selected.ap -= 2;
+    state.selected.hunkered = true;
+    log(`${state.selected.name} hunkers down [+20 Defense]`, 'player-action');
+    state.mode = 'select';
+  } else if (action === 'overwatch') {
+    state.selected.ap -= 2;
+    state.selected.overwatch = true;
+    log(`${state.selected.name} enters Overwatch`, 'player-action');
+    state.mode = 'select';
+  }
+
+  render();
+}
+
+// === COMBAT ===
+function executeAttack(attacker, weapon, target) {
+  const hitChance = calcHitChance(attacker, weapon, target);
+  const roll = Math.random() * 100;
+  attacker.ap -= weapon.apCost;
+
+  if (roll <= hitChance) {
+    let dmg = rollDamage(weapon);
+    // Vigor reduces damage slightly
+    dmg = Math.max(1, dmg - Math.floor(target.stats.vigor / 4));
+    // Hunker bonus
+    if (target.hunkered) dmg = Math.max(1, dmg - 3);
+
+    target.hp = Math.max(0, target.hp - dmg);
+    log(`${attacker.name} hits ${target.name} with ${weapon.name} for ${dmg} damage! (${hitChance}% chance)`, attacker.id.startsWith('p') ? 'player-action' : 'enemy-action');
+    showPopup(target.x, target.y, `-${dmg}`, 'damage');
+
+    if (target.hp <= 0) {
+      log(`${target.name} is down!`, 'system');
+      checkWinCondition();
+    }
+  } else {
+    log(`${attacker.name} misses ${target.name} with ${weapon.name}! (${hitChance}% chance)`, attacker.id.startsWith('p') ? 'player-action' : 'enemy-action');
+    showPopup(target.x, target.y, 'MISS', 'miss');
+  }
+}
+
+function executeHeal(healer, ability, target) {
+  const amount = rollHeal(ability);
+  target.hp = Math.min(target.maxHp, target.hp + amount);
+  healer.ap -= ability.apCost;
+  log(`${healer.name} heals ${target.name} for ${amount} HP!`, 'player-action');
+  showPopup(target.x, target.y, `+${amount}`, 'heal');
+}
+
+function deployTurret(unit, ability, x, y) {
+  unit.ap -= ability.apCost;
+  state.turrets.push({
+    id: `turret_${Date.now()}`, x, y, hp: 8, maxHp: 8, owner: unit.id,
+    weapon: { name: 'Auto-Gatling', damage: [2,5], range: 4, accuracy: 60 }
+  });
+  log(`${unit.name} deploys a Ghost Rock Turret at (${x},${y})!`, 'player-action');
+}
+
+// === OVERWATCH CHECK ===
+function checkOverwatch(movingUnit) {
+  const watchers = movingUnit.id.startsWith('e') ? livingPlayers() : livingEnemies();
+  for (const watcher of watchers) {
+    if (watcher.overwatch) {
+      const weapon = watcher.weapons[0];
+      if (dist(watcher.x, watcher.y, movingUnit.x, movingUnit.y) <= weapon.range) {
+        log(`${watcher.name} fires on Overwatch!`, 'system');
+        executeAttack(watcher, weapon, movingUnit);
+        watcher.overwatch = false;
+        render();
+        if (movingUnit.hp <= 0) return true; // unit died
+      }
+    }
+  }
+  return false;
+}
+
+// === TURRET FIRE ===
+function turretPhase() {
+  for (const turret of state.turrets.filter(t => t.hp > 0)) {
+    const targets = livingEnemies().filter(e =>
+      dist(turret.x, turret.y, e.x, e.y) <= turret.weapon.range
+    );
+    if (targets.length > 0) {
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      const hitChance = turret.weapon.accuracy;
+      if (Math.random() * 100 <= hitChance) {
+        const dmg = rollDamage(turret.weapon);
+        target.hp = Math.max(0, target.hp - dmg);
+        log(`Turret hits ${target.name} for ${dmg}!`, 'player-action');
+        showPopup(target.x, target.y, `-${dmg}`, 'damage');
+        if (target.hp <= 0) {
+          log(`${target.name} is down!`, 'system');
+        }
+      } else {
+        log(`Turret misses ${target.name}!`, 'player-action');
+        showPopup(target.x, target.y, 'MISS', 'miss');
+      }
+    }
+  }
+}
+
+// === ENEMY AI ===
+function enemyTurn() {
+  state.phase = 'enemy';
+  document.getElementById('turnInfo').innerHTML = `Turn ${state.turn} — <span class="enemy-turn">Enemy Turn</span>`;
+  state.selected = null;
+  render();
+
+  const enemies = livingEnemies();
+  let delay = 500;
+
+  enemies.forEach((enemy, idx) => {
+    setTimeout(() => {
+      if (enemy.hp <= 0) return;
+      enemyAI(enemy);
+      render();
+
+      // Last enemy done
+      if (idx === enemies.length - 1) {
+        setTimeout(() => {
+          turretPhase();
+          startPlayerTurn();
+        }, 600);
+      }
+    }, delay * (idx + 1));
+  });
+
+  if (enemies.length === 0) {
+    setTimeout(startPlayerTurn, 500);
+  }
+}
+
+function enemyAI(enemy) {
+  // Simple AI: find closest player, move toward, attack if in range
+  const targets = livingPlayers();
+  if (targets.length === 0) return;
+
+  // Find closest target
+  let closest = null;
+  let closestDist = Infinity;
+  for (const t of targets) {
+    const d = dist(enemy.x, enemy.y, t.x, t.y);
+    if (d < closestDist) { closestDist = d; closest = t; }
+  }
+
+  // Try to attack first with best weapon in range
+  for (const weapon of enemy.weapons) {
+    if (enemy.ap >= weapon.apCost && dist(enemy.x, enemy.y, closest.x, closest.y) <= weapon.range) {
+      executeAttack(enemy, weapon, closest);
+      render();
+      if (closest.hp <= 0) return;
+      // Attack again if AP allows
+      if (enemy.ap >= weapon.apCost && dist(enemy.x, enemy.y, closest.x, closest.y) <= weapon.range) {
+        executeAttack(enemy, weapon, closest);
+        render();
+      }
+      return;
+    }
+  }
+
+  // Move toward closest target
+  const reachable = getReachable(enemy);
+  let bestPos = null;
+  let bestDist = closestDist;
+
+  for (const [key, cost] of reachable) {
+    const [mx, my] = key.split(',').map(Number);
+    const d = dist(mx, my, closest.x, closest.y);
+    if (d < bestDist) {
+      bestDist = d;
+      bestPos = { x: mx, y: my, cost };
+    }
+  }
+
+  if (bestPos) {
+    enemy.x = bestPos.x;
+    enemy.y = bestPos.y;
+    enemy.ap -= bestPos.cost;
+    log(`${enemy.name} moves to (${bestPos.x},${bestPos.y})`, 'enemy-action');
+    checkOverwatch(enemy);
+    render();
+
+    // Try to attack after moving
+    for (const weapon of enemy.weapons) {
+      if (enemy.ap >= weapon.apCost && dist(enemy.x, enemy.y, closest.x, closest.y) <= weapon.range) {
+        executeAttack(enemy, weapon, closest);
+        render();
+        break;
+      }
+    }
+  }
+}
+
+// === TURN MANAGEMENT ===
+function startPlayerTurn() {
+  state.turn++;
+  state.phase = 'player';
+  state.mode = 'select';
+  state.selected = null;
+  state.moveHistory = [];
+  document.getElementById('btnUndo').disabled = true;
+
+  // Reset AP and clear statuses
+  for (const u of state.units.players) {
+    if (u.hp > 0) {
+      u.ap = u.maxAp;
+      u.hunkered = false;
+      // Overwatch persists until triggered
+    }
+  }
+  for (const u of state.units.enemies) {
+    if (u.hp > 0) {
+      u.ap = u.maxAp;
+      u.hunkered = false;
+    }
+  }
+
+  document.getElementById('turnInfo').textContent = `Turn ${state.turn} — Your Move`;
+  log(`— Turn ${state.turn} begins —`, 'system');
+  render();
+  checkWinCondition();
+}
+
+function endPlayerTurn() {
+  // Clear remaining overwatch for players who didn't use it
+  state.mode = 'select';
+  state.selected = null;
+  enemyTurn();
+}
+
+// === WIN/LOSE ===
+function checkWinCondition() {
+  if (livingEnemies().length === 0) {
+    setTimeout(() => showModal('Victory!', `The dust settles over the Wasted West. Your posse stands victorious.\n\nTurns taken: ${state.turn}`), 300);
+  } else if (livingPlayers().length === 0) {
+    setTimeout(() => showModal('Defeat', 'The Wasted West claims another posse. The darkness grows stronger.'), 300);
+  }
+}
+
+function showModal(title, text) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent = text;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+// === UNDO ===
+function undoLastMove() {
+  if (state.moveHistory.length === 0) return;
+  const last = state.moveHistory.pop();
+  const unit = allUnits().find(u => u.id === last.unitId);
+  if (unit) {
+    unit.x = last.fromX;
+    unit.y = last.fromY;
+    unit.ap += last.apCost;
+    log(`${unit.name} movement undone`, 'system');
+    state.selected = unit;
+    render();
+  }
+  if (state.moveHistory.length === 0) {
+    document.getElementById('btnUndo').disabled = true;
+  }
+}
+
+// === MASTER RENDER ===
+function render() {
+  renderGrid();
+  renderUnitInfo(state.selected);
+
+  // Hit chance display
+  const hcPanel = document.getElementById('hitChancePanel');
+  if (state.mode === 'attack' && state.selected) {
+    const weapon = state.selected.weapons[state.activeWeaponIdx];
+    const targets = getAttackTargets(state.selected, weapon);
+    if (targets.length > 0) {
+      hcPanel.style.display = 'block';
+      const lines = targets.map(t => {
+        const pct = calcHitChance(state.selected, weapon, t);
+        const coverText = MAP[t.y][t.x] === 2 ? ' [Full Cover]' : MAP[t.y][t.x] === 3 ? ' [Half Cover]' : '';
+        return `<div><span class="pct">${pct}%</span> vs ${t.name}${coverText}</div>`;
+      }).join('');
+      document.getElementById('hitChanceDisplay').innerHTML = lines;
+    } else {
+      hcPanel.style.display = 'block';
+      document.getElementById('hitChanceDisplay').innerHTML = '<div class="detail">No targets in range</div>';
+    }
+  } else {
+    hcPanel.style.display = 'none';
+  }
+}
+
+// === KEYBOARD ===
+document.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const players = livingPlayers();
+    if (players.length === 0) return;
+    const curIdx = state.selected ? players.findIndex(p => p.id === state.selected.id) : -1;
+    state.selected = players[(curIdx + 1) % players.length];
+    state.mode = 'select';
+    render();
+  }
+  if (e.key === 'Escape') {
+    state.mode = 'select';
+    render();
+  }
+  if (e.key === 'Enter' || e.key === 'e') {
+    endPlayerTurn();
+  }
+});
+
+// === INIT ===
+function initGame() {
+  document.getElementById('btnEndTurn').addEventListener('click', endPlayerTurn);
+  document.getElementById('btnUndo').addEventListener('click', undoLastMove);
+  document.getElementById('btnRestart').addEventListener('click', () => {
+    state = {
+      turn: 1, phase: 'player', units: createUnits(),
+      selected: null, mode: 'select', activeWeaponIdx: 0,
+      activeAbilityIdx: 0, moveHistory: [], turrets: []
+    };
+    document.getElementById('turnInfo').textContent = 'Turn 1 — Your Move';
+    document.getElementById('combatLog').innerHTML = '';
+    document.getElementById('modalOverlay').classList.remove('active');
+    log('— A new skirmish begins in the Wasted West —', 'system');
+    render();
+  });
+  document.getElementById('modalBtn').addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.remove('active');
+  });
+
+  window.addEventListener('resize', render);
+  log('— A new skirmish begins in the Wasted West —', 'system');
+  log('Select a unit to begin. Tab cycles units.', 'system');
+  render();
+}
+
+initGame();
+</script>
+
+</body>
+</html>
