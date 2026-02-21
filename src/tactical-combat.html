@@ -1014,6 +1014,14 @@ function handleTileClick(x, y) {
       }
     }
     if (ability.type === 'turret' && !clickedUnit && MAP[y][x] === 0 && !turretAt(x, y)) {
+      const maxTurrets = ability.maxTurrets || 1;
+      const activeTurrets = state.turrets.filter(t => t.hp > 0 && t.owner === state.selected.id).length;
+      if (activeTurrets >= maxTurrets) {
+        log(`Can't deploy — turret limit (${maxTurrets}) already reached!`, 'system');
+        state.mode = 'select';
+        render();
+        return;
+      }
       if (dist(state.selected.x, state.selected.y, x, y) <= ability.range) {
         deployTurret(state.selected, ability, x, y);
         state.mode = 'select';
