@@ -160,6 +160,11 @@ body::after {
   border-color: rgba(139,26,26,0.4);
 }
 
+.tile.weapon-range {
+  background: rgba(139,26,26,0.08);
+  border-color: rgba(139,26,26,0.2);
+}
+
 .tile.selected {
   border: 2px solid var(--ghost-rock);
   box-shadow: 0 0 8px rgba(78,205,196,0.3);
@@ -754,11 +759,13 @@ function renderGrid() {
     reachable = getReachable(state.selected);
   }
 
-  // Get attack targets
+  // Get attack targets + weapon range radius
   let attackTargets = [];
+  let weaponRange = 0;
   if (state.mode === 'attack' && state.selected) {
     const weapon = state.selected.weapons[state.activeWeaponIdx];
     attackTargets = getAttackTargets(state.selected, weapon);
+    weaponRange = weapon.range;
   }
 
   let healTargets = [];
@@ -794,7 +801,13 @@ function renderGrid() {
         classes.push('move-range');
       }
 
-      // Attack range highlight
+      // Weapon range radius (full circle, subtle)
+      if (weaponRange > 0 && state.selected && MAP[y][x] !== 1 &&
+          dist(state.selected.x, state.selected.y, x, y) <= weaponRange) {
+        classes.push('weapon-range');
+      }
+
+      // Attack range highlight (enemies in range, brighter)
       if (attackTargets.find(t => t.x === x && t.y === y)) {
         classes.push('attack-range');
       }
