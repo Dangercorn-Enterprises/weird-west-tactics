@@ -165,6 +165,54 @@ body::after {
   border-color: rgba(139,26,26,0.2);
 }
 
+/* === CONTEXT MENU === */
+#contextMenu {
+  position: fixed;
+  z-index: 10000;
+  background: #1a1209;
+  border: 1px solid var(--brass);
+  border-radius: 4px;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.7);
+  font-family: 'Special Elite', cursive;
+  font-size: 0.8rem;
+  display: none;
+}
+#contextMenu .ctx-header {
+  padding: 5px 10px;
+  color: var(--brass-light);
+  font-size: 0.7rem;
+  border-bottom: 1px solid rgba(181,135,30,0.3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+#contextMenu .ctx-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  color: var(--parchment);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+#contextMenu .ctx-item:hover:not(.ctx-disabled) {
+  background: rgba(181,135,30,0.15);
+  color: var(--brass-light);
+}
+#contextMenu .ctx-item.ctx-disabled {
+  color: #5a4f3a;
+  cursor: not-allowed;
+}
+#contextMenu .ctx-item .ctx-ap {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--ghost-rock);
+  opacity: 0.8;
+}
+#contextMenu .ctx-item.ctx-disabled .ctx-ap {
+  color: #4a4030;
+}
+
 .tile.selected {
   border: 2px solid var(--ghost-rock);
   box-shadow: 0 0 8px rgba(78,205,196,0.3);
@@ -501,6 +549,7 @@ body::after {
     <div class="grid-container" id="gridContainer">
       <div class="grid" id="grid"></div>
     </div>
+    <div id="contextMenu"></div>
 
     <div class="side-panel">
       <div class="panel-section" id="unitInfoPanel">
@@ -855,9 +904,15 @@ function renderGrid() {
   // Attach click handlers
   grid.querySelectorAll('.tile').forEach(tile => {
     tile.addEventListener('click', () => {
+      hideContextMenu();
       const x = parseInt(tile.dataset.x);
       const y = parseInt(tile.dataset.y);
       handleTileClick(x, y);
+    });
+    tile.addEventListener('contextmenu', (e) => {
+      const x = parseInt(tile.dataset.x);
+      const y = parseInt(tile.dataset.y);
+      showContextMenu(e, x, y);
     });
   });
 }
@@ -961,6 +1016,151 @@ function showPopup(x, y, text, type = 'damage') {
   grid.appendChild(popup);
   setTimeout(() => popup.remove(), 1000);
 }
+
+// === CONTEXT MENU ===
+const ctxMenu = document.getElementById('contextMenu');
+
+function hideContextMenu() {
+  ctxMenu.style.display = 'none';
+  ctxMenu.innerHTML = '';
+}
+
+function showContextMenu(e, x, y) {
+  e.preventDefault();
+  if (state.phase !== 'player' || !state.selected) return;
+
+  const unit = state.selected;
+  const clickedUnit = unitAt(x, y);
+  const terrain = MAP[y][x];
+  const items = [];
+
+  if (clickedUnit && clickedUnit.id === unit.id) {
+    // Right-clicked own selected unit — no menu needed
+    return;
+  }
+
+  if (clickedUnit && clickedUnit.id.startsWith('e') && clickedUnit.hp > 0) {
+    // === RIGHT-CLICKED AN ENEMY ===
+    items.push({ type: 'header', label: `Attack ${clickedUnit.name}` });
+    unit.weapons.forEach((w, idx) => {
+      const inRange = dist(unit.x, unit.y, x, y) <= w.range;
+      const canAfford = unit.ap >= w.apCost;
+      const pct = inRange ? calcHitChance(unit, w, clickedUnit) : 0;
+      const disabled = !inRange || !canAfford;
+      items.push({
+        type: 'action',
+        icon: '🎯',
+        label: `${w.name}${inRange ? ` (${pct}%)` : ' — out of range'}`,
+        ap: `${w.apCost} AP`,
+        disabled,
+        fn: disabled ? null : () => {
+          executeAttack(unit, w, clickedUnit);
+          state.mode = 'select';
+          render();
+        }
+      });
+    });
+
+  } else if (clickedUnit && clickedUnit.id.startsWith('p') && clickedUnit.hp > 0 && clickedUnit.id !== unit.id) {
+    // === RIGHT-CLICKED A FRIENDLY ===
+    items.push({ type: 'header', label: clickedUnit.name });
+    items.push({
+      type: 'action', icon: '👤', label: 'Select this unit', disabled: false,
+      fn: () => { state.selected = clickedUnit; state.mode = 'select'; render(); }
+    });
+    // Heal option if selected unit has heal ability
+    if (unit.abilities) {
+      const healAbility = unit.abilities.find(a => a.type === 'heal');
+      if (healAbility) {
+        const inRange = dist(unit.x, unit.y, x, y) <= healAbility.range;
+        const canAfford = unit.ap >= healAbility.apCost;
+        const disabled = !inRange || !canAfford;
+        items.push({
+          type: 'action', icon: '💊', label: `Heal${!inRange ? ' — out of range' : ''}`,
+          ap: `${healAbility.apCost} AP`, disabled,
+          fn: disabled ? null : () => {
+            executeHeal(unit, healAbility, clickedUnit);
+            state.mode = 'select'; render();
+          }
+        });
+      }
+    }
+
+  } else if (!clickedUnit && terrain !== 1) {
+    // === RIGHT-CLICKED EMPTY TILE ===
+    items.push({ type: 'header', label: `Tile (${x}, ${y})` });
+
+    // Move here
+    const reachable = getReachable(unit);
+    const canMove = reachable.has(`${x},${y}`);
+    const moveCost = canMove ? reachable.get(`${x},${y}`) : 0;
+    items.push({
+      type: 'action', icon: '👢', label: 'Move Here',
+      ap: canMove ? `${moveCost} AP` : null,
+      disabled: !canMove,
+      fn: canMove ? () => {
+        state.moveHistory.push({ unitId: unit.id, fromX: unit.x, fromY: unit.y, apCost: moveCost });
+        unit.x = x; unit.y = y; unit.ap -= moveCost;
+        log(`${unit.name} moves to (${x},${y}) [-${moveCost} AP]`, 'player-action');
+        state.mode = 'select';
+        document.getElementById('btnUndo').disabled = false;
+        render();
+      } : null
+    });
+
+    // Turret deploy (Tinkerer only)
+    if (unit.abilities) {
+      const turretAbility = unit.abilities.find(a => a.type === 'turret');
+      if (turretAbility) {
+        const inRange = dist(unit.x, unit.y, x, y) <= turretAbility.range;
+        const canAfford = unit.ap >= turretAbility.apCost;
+        const activeTurrets = state.turrets.filter(t => t.hp > 0 && t.owner === unit.id).length;
+        const atLimit = activeTurrets >= (turretAbility.maxTurrets || 1);
+        const noTurretHere = !turretAt(x, y);
+        const disabled = !inRange || !canAfford || atLimit || !noTurretHere;
+        const reason = !inRange ? ' — out of range' : atLimit ? ' — limit reached' : !canAfford ? ' — no AP' : '';
+        items.push({
+          type: 'action', icon: '🔧', label: `Deploy Turret${reason}`,
+          ap: `${turretAbility.apCost} AP`, disabled,
+          fn: disabled ? null : () => {
+            deployTurret(unit, turretAbility, x, y);
+            state.mode = 'select'; render();
+          }
+        });
+      }
+    }
+    // Future throwables hook: add more ability types here (dynamite, etc.)
+  }
+
+  if (items.length === 0) return;
+
+  // Build menu HTML
+  ctxMenu.innerHTML = items.map(item => {
+    if (item.type === 'header') {
+      return `<div class="ctx-header">${item.label}</div>`;
+    }
+    const disClass = item.disabled ? ' ctx-disabled' : '';
+    const apSpan = item.ap ? `<span class="ctx-ap">${item.ap}</span>` : '';
+    return `<div class="ctx-item${disClass}" data-idx="${items.indexOf(item)}">${item.icon} ${item.label}${apSpan}</div>`;
+  }).join('');
+
+  // Attach click handlers to items
+  ctxMenu.querySelectorAll('.ctx-item:not(.ctx-disabled)').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    el.addEventListener('click', () => { items[idx].fn(); hideContextMenu(); });
+  });
+
+  // Position menu near cursor, keep on screen
+  ctxMenu.style.display = 'block';
+  const mw = ctxMenu.offsetWidth, mh = ctxMenu.offsetHeight;
+  const left = Math.min(e.clientX + 4, window.innerWidth - mw - 8);
+  const top = Math.min(e.clientY + 4, window.innerHeight - mh - 8);
+  ctxMenu.style.left = left + 'px';
+  ctxMenu.style.top = top + 'px';
+}
+
+document.addEventListener('click', hideContextMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideContextMenu(); });
 
 // === INPUT HANDLING ===
 function handleTileClick(x, y) {
