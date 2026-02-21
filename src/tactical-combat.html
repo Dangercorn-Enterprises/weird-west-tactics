@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Deadlands: Tactical — Combat Prototype</title>
+<title>Dustfall: The Ashen Frontier — Combat</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
 
@@ -541,7 +541,7 @@ body::after {
 
 <div class="app">
   <div class="top-bar">
-    <div class="game-title">Deadlands: Tactical</div>
+    <div class="game-title">Dustfall: The Ashen Frontier</div>
     <div class="turn-info" id="turnInfo">Turn 1 — Your Move</div>
   </div>
 
@@ -1490,7 +1490,7 @@ function endPlayerTurn() {
 // === WIN/LOSE ===
 function checkWinCondition() {
   if (livingEnemies().length === 0) {
-    setTimeout(() => showModal('Victory!', `The dust settles over the Wasted West. Your posse stands victorious.\n\nTurns taken: ${state.turn}`), 300);
+    setTimeout(() => showModal('Victory!', `The dust settles over the Ashen Frontier. Your posse stands victorious.\n\nTurns taken: ${state.turn}`), 300);
   } else if (livingPlayers().length === 0) {
     setTimeout(() => showModal('Defeat', 'The Wasted West claims another posse. The darkness grows stronger.'), 300);
   }
@@ -1580,7 +1580,7 @@ function initGame() {
     document.getElementById('turnInfo').textContent = 'Turn 1 — Your Move';
     document.getElementById('combatLog').innerHTML = '';
     document.getElementById('modalOverlay').classList.remove('active');
-    log('— A new skirmish begins in the Wasted West —', 'system');
+    log('— A new skirmish begins in the Ashen Frontier —', 'system');
     render();
   });
   document.getElementById('modalBtn').addEventListener('click', () => {
@@ -1588,7 +1588,7 @@ function initGame() {
   });
 
   window.addEventListener('resize', render);
-  log('— A new skirmish begins in the Wasted West —', 'system');
+  log('— A new skirmish begins in the Ashen Frontier —', 'system');
   log('Select a unit to begin. Tab cycles units.', 'system');
   render();
 }

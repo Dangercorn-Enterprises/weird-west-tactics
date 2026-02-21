@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Deadlands: The Wasted West — Character Creation</title>
+<title>Dustfall: The Ashen Frontier — Character Creation</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
 
@@ -656,7 +656,7 @@ body::after {
 
   <!-- HEADER -->
   <div class="header">
-    <h1>Deadlands</h1>
+    <h1>Dustfall</h1>
     <div class="subtitle">The Wasted West — Character Creation</div>
   </div>
 
@@ -1109,7 +1109,7 @@ function init() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(state.name || 'character').toLowerCase().replace(/\s+/g, '_')}_deadlands.json`;
+    a.download = `${(state.name || 'character').toLowerCase().replace(/\s+/g, '_')}_dustfall.json`;
     a.click();
     URL.revokeObjectURL(url);
   });
