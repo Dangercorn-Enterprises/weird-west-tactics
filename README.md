@@ -1,6 +1,6 @@
-# Weird West Tactics
+# Dustfall: The Ashen Frontier
 
-A turn-based tactical RPG set in a supernatural weird western world — inspired by games like XCOM, Fallout Tactics, and the Deadlands tabletop RPG genre.
+A turn-based tactical RPG set in a supernatural weird western world — inspired by games like XCOM, Fallout Tactics, and classic tabletop RPG systems.
 
 **Status:** Early Prototype / Active Development
 
@@ -43,6 +43,10 @@ Pure HTML/CSS/JavaScript — no frameworks, no build tools, no dependencies. Ope
 ## About
 
 This is an active passion project exploring game design and development through iterative prototyping. Built as a proof of concept for a larger tactical RPG vision.
+
+## Part of Dangercorn Enterprises
+
+Built by [Dangercorn Enterprises](https://github.com/Dangercorn-Enterprises).
 
 ## License
 
