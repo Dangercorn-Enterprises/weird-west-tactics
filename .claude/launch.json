@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dustfall",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "src", "-l", "5174", "--no-clipboard"],
+      "port": 5174
+    }
+  ]
+}

@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dustfall: The Ashen Frontier — Combat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Rye&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1A1209;
+    font-family: 'IM Fell English', serif;
+    color: #E8DCC8;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  #game-wrapper { display: flex; flex-direction: column; height: 100vh; }
+  #turn-bar {
+    height: 72px;
+    background: linear-gradient(180deg, #0D0A05 0%, #1A1209 100%);
+    border-bottom: 2px solid #D4A843;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+  }
+  #turn-bar-label {
+    font-family: 'Rye', serif;
+    font-size: 10px;
+    color: #D4A843;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    margin-right: 4px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+  .turn-portrait {
+    width: 52px;
+    height: 58px;
+    border: 2px solid #D4A843;
+    border-radius: 2px;
+    background: #0D0A05;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .turn-portrait.active { border-color: #4ECDC4; box-shadow: 0 0 8px #4ECDC480; }
+  .turn-portrait.enemy  { border-color: #B5452A; }
+  .turn-portrait.enemy.active { border-color: #ff6644; box-shadow: 0 0 8px #ff664480; }
+  .portrait-icon { font-family: 'Rye', serif; font-size: 16px; }
+  .portrait-icon.player { color: #4ECDC4; }
+  .portrait-icon.enemy  { color: #B5452A; }
+  .portrait-name {
+    font-size: 7px; color: #E8DCC8; text-align: center; padding: 1px 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+    font-family: 'IM Fell English', serif;
+  }
+  .portrait-ct-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: #4ECDC4; }
+  .portrait-ct-bar.enemy { background: #B5452A; }
+  #main-area { display: flex; flex: 1; overflow: hidden; }
+  #phaser-container { flex: 1; position: relative; overflow: hidden; }
+  #phaser-container canvas { display: block; }
+  #right-panel {
+    width: 220px;
+    background: linear-gradient(180deg, #0D0A05 0%, #111008 100%);
+    border-left: 2px solid #D4A843;
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+  }
+  #unit-info { padding: 10px; border-bottom: 1px solid #D4A84360; flex-shrink: 0; }
+  #unit-name { font-family: 'Rye', serif; font-size: 13px; color: #D4A843; margin-bottom: 2px; }
+  #unit-class { font-size: 10px; color: #C4A265; margin-bottom: 6px; font-style: italic; }
+  .stat-row { display: flex; align-items: center; margin-bottom: 4px; font-size: 10px; }
+  .stat-label { width: 28px; color: #C4A265; font-family: 'Rye', serif; font-size: 9px; }
+  .hp-bar-bg {
+    flex: 1; height: 10px; background: #1A0A05;
+    border: 1px solid #D4A84360; border-radius: 1px; overflow: hidden; margin-right: 4px;
+  }
+  .hp-bar-fill { height: 100%; background: linear-gradient(90deg, #B5452A, #D4A843); transition: width 0.3s ease; }
+  .hp-val { font-size: 9px; color: #E8DCC8; min-width: 36px; text-align: right; }
+  .ap-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+  .ap-dot { width: 12px; height: 12px; border: 1px solid #D4A843; border-radius: 2px; background: #D4A843; }
+  .ap-dot.empty { background: transparent; }
+  #action-buttons { padding: 8px 10px; border-bottom: 1px solid #D4A84360; flex-shrink: 0; }
+  .action-section-label { font-family: 'Rye', serif; font-size: 9px; color: #D4A843; margin-bottom: 5px; letter-spacing: 1px; }
+  .action-btn {
+    display: flex; align-items: center; width: 100%; padding: 5px 8px; margin-bottom: 3px;
+    background: #1A1209; border: 1px solid #D4A84360; color: #E8DCC8;
+    font-family: 'IM Fell English', serif; font-size: 11px; cursor: pointer;
+    text-align: left; transition: all 0.15s; border-radius: 2px;
+  }
+  .action-btn:hover:not(:disabled) { background: #2A1F0A; border-color: #D4A843; color: #D4A843; }
+  .action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .action-btn.active { background: #2A1F0A; border-color: #4ECDC4; color: #4ECDC4; }
+  .btn-ap {
+    margin-left: auto; font-size: 9px; color: #D4A843;
+    background: #0D0A05; padding: 1px 4px; border-radius: 2px; border: 1px solid #D4A84340;
+  }
+  #hit-preview { padding: 8px 10px; border-bottom: 1px solid #D4A84360; flex-shrink: 0; min-height: 70px; }
+  #hit-preview-title { font-family: 'Rye', serif; font-size: 9px; color: #D4A843; margin-bottom: 4px; }
+  #hit-preview-content { font-size: 10px; color: #C4A265; line-height: 1.6; }
+  #combat-log { flex: 1; overflow-y: auto; padding: 8px 10px; }
+  #combat-log::-webkit-scrollbar { width: 4px; }
+  #combat-log::-webkit-scrollbar-track { background: #0D0A05; }
+  #combat-log::-webkit-scrollbar-thumb { background: #D4A84360; border-radius: 2px; }
+  #log-title { font-family: 'Rye', serif; font-size: 9px; color: #D4A843; margin-bottom: 5px; letter-spacing: 1px; }
+  .log-entry { font-size: 9px; color: #C4A265; margin-bottom: 3px; line-height: 1.4; border-left: 2px solid #D4A84330; padding-left: 5px; }
+  .log-entry.player { border-left-color: #4ECDC4; }
+  .log-entry.enemy   { border-left-color: #B5452A; }
+  .log-entry.system  { border-left-color: #D4A843; color: #D4A843; font-style: italic; }
+  #bottom-bar {
+    height: 30px; background: #0D0A05; border-top: 1px solid #D4A84360;
+    display: flex; align-items: center; padding: 0 12px; font-size: 9px; color: #C4A265; flex-shrink: 0;
+  }
+  #terrain-info { flex: 1; }
+  #game-state-info { color: #D4A843; font-family: 'Rye', serif; font-size: 9px; }
+  #overlay {
+    position: fixed; inset: 0; background: #00000090;
+    display: none; align-items: center; justify-content: center; z-index: 999;
+  }
+  #overlay.active { display: flex; }
+  #overlay-box { background: #1A1209; border: 3px solid #D4A843; padding: 30px 50px; text-align: center; max-width: 400px; }
+  #overlay-title { font-family: 'Rye', serif; font-size: 28px; color: #D4A843; margin-bottom: 10px; }
+  #overlay-sub { font-size: 13px; color: #C4A265; margin-bottom: 20px; }
+  #overlay-btn {
+    background: #D4A843; color: #1A1209; border: none; padding: 10px 24px;
+    font-family: 'Rye', serif; font-size: 14px; cursor: pointer; border-radius: 2px;
+  }
+  #overlay-btn:hover { background: #E8DCC8; }
+  #turn-banner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #1A1209dd; border: 2px solid #D4A843; padding: 14px 40px;
+    font-family: 'Rye', serif; font-size: 22px; color: #D4A843;
+    z-index: 500; display: none; pointer-events: none; text-align: center;
+  }
+  #controls-hint {
+    position: absolute; bottom: 36px; left: 8px; font-size: 9px;
+    color: #7A5A2560; font-family: 'IM Fell English', serif; pointer-events: none;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+  <div id="turn-bar">
+    <div id="turn-bar-label">NEXT</div>
+    <div id="turn-portraits" style="display:flex;gap:4px;align-items:center;"></div>
+  </div>
+  <div id="main-area">
+    <div id="phaser-container">
+      <div id="controls-hint">Drag to pan &nbsp;|&nbsp; Scroll to zoom<br>Click unit to select &nbsp;|&nbsp; Use buttons to act</div>
+    </div>
+    <div id="right-panel">
+      <div id="unit-info">
+        <div id="unit-name">Select a Unit</div>
+        <div id="unit-class"></div>
+        <div class="stat-row">
+          <span class="stat-label">HP</span>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-fill" style="width:100%"></div></div>
+          <span class="hp-val" id="hp-val">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">AP</span>
+          <div class="ap-dots" id="ap-dots"></div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label" style="color:#4ECDC4">SPD</span>
+          <span id="stat-spd" style="font-size:10px">—</span>
+          <span class="stat-label" style="color:#D4A843;margin-left:10px">VIG</span>
+          <span id="stat-vig" style="font-size:10px">—</span>
+          <span class="stat-label" style="color:#B5452A;margin-left:10px">DEX</span>
+          <span id="stat-dex" style="font-size:10px">—</span>
+        </div>
+      </div>
+      <div id="action-buttons">
+        <div class="action-section-label">ACTIONS</div>
+        <button class="action-btn" id="btn-move">Move <span class="btn-ap">1/tile</span></button>
+        <button class="action-btn" id="btn-attack">Attack <span class="btn-ap">2 AP</span></button>
+        <button class="action-btn" id="btn-hunker">Hunker Down <span class="btn-ap">2 AP</span></button>
+        <button class="action-btn" id="btn-overwatch">Overwatch <span class="btn-ap">2 AP</span></button>
+        <button class="action-btn" id="btn-wait">Wait <span class="btn-ap">+10 CT</span></button>
+        <div id="ability-buttons"></div>
+      </div>
+      <div id="hit-preview">
+        <div id="hit-preview-title">TARGETING</div>
+        <div id="hit-preview-content">Select an action.</div>
+      </div>
+      <div id="combat-log">
+        <div id="log-title">COMBAT LOG</div>
+        <div id="log-entries"></div>
+      </div>
+    </div>
+  </div>
+  <div id="bottom-bar">
+    <span id="terrain-info">Hover a tile for terrain info</span>
+    <span id="game-state-info"></span>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="overlay-box">
+    <div id="overlay-title">VICTORY</div>
+    <div id="overlay-sub">The dust settles. Another day in the Ashen Frontier.</div>
+    <button id="overlay-btn" onclick="location.reload()">Play Again</button>
+  </div>
+</div>
+
+<div id="turn-banner"></div>
+
+<script>
+// ============================================================
+// DUSTFALL: THE ASHEN FRONTIER
+// Isometric Tactical Combat Prototype — Phaser 3
+// ============================================================
+
+// ---- PALETTE ----
+const PAL = {
+  sand:      0xC4A265,
+  mesa:      0xB5452A,
+  teal:      0x4ECDC4,
+  brass:     0xD4A843,
+  bone:      0xE8DCC8,
+  dark:      0x1A1209,
+  sandSide:  0x9A7A45,
+  sandDark:  0x7A5A25,
+  sandHigh:  0xD4B275,
+  rockTop:   0x7A3D1A,
+  rockLeft:  0x4A2010,
+  rockRight: 0x5A2E15,
+  halfTop:   0xA05A30,
+  halfLeft:  0x6A3A20,
+  halfRight: 0x804828,
+  ghostTop:  0x2D7A77,
+  ghostLeft: 0x1D5A57,
+  ghostRight:0x1A4A47,
+};
+
+// ---- CONSTANTS ----
+const TILE_W  = 64;
+const TILE_H  = 32;
+const H_STEP  = 16;  // pixels per height level
+const GRID_W  = 12;
+const GRID_H  = 12;
+
+// Tile types
+const T_OPEN  = 0;
+const T_ROCK  = 1;
+const T_COVER = 2;
+const T_HALF  = 3;
+const T_GHOST = 4;
+
+const TERRAIN_NAMES = ['Open Sand','Blocked Rock','Full Cover','Half Cover','Ghost Rock'];
+const TERRAIN_COVER = [0, 0, 40, 20, 0]; // hit penalty
+
+// ---- MAP DATA: [type, height] ----
+const RAW_MAP = [
+  [[0,0],[0,0],[0,1],[1,1],[0,1],[0,0],[0,0],[0,1],[0,2],[0,2],[0,1],[0,0]],
+  [[0,0],[0,0],[0,0],[2,1],[0,0],[0,0],[0,0],[0,0],[0,1],[3,2],[0,1],[0,0]],
+  [[0,0],[3,0],[0,0],[0,0],[0,0],[4,0],[0,0],[0,0],[0,0],[0,1],[0,1],[0,0]],
+  [[0,1],[0,1],[0,0],[0,0],[1,1],[1,2],[1,1],[0,0],[0,0],[0,0],[0,0],[0,0]],
+  [[0,1],[0,1],[0,0],[0,0],[0,0],[2,2],[0,0],[0,0],[4,0],[0,0],[3,0],[0,0]],
+  [[0,2],[0,1],[0,0],[0,0],[0,0],[0,1],[0,1],[0,0],[0,0],[0,0],[0,0],[0,0]],
+  [[0,2],[0,1],[0,0],[4,0],[0,0],[0,1],[0,2],[0,1],[0,0],[0,0],[0,0],[1,1]],
+  [[0,1],[0,0],[0,0],[0,0],[3,0],[0,0],[0,1],[2,1],[0,0],[0,0],[1,1],[1,2]],
+  [[0,0],[0,0],[2,0],[0,0],[0,0],[0,0],[0,0],[0,1],[0,1],[0,0],[0,1],[0,1]],
+  [[0,0],[0,0],[0,0],[0,0],[0,0],[1,1],[0,0],[0,0],[0,1],[0,2],[0,2],[0,1]],
+  [[0,0],[3,0],[0,0],[0,0],[0,0],[1,2],[1,1],[0,0],[0,0],[0,1],[0,2],[0,1]],
+  [[0,0],[0,0],[0,0],[0,0],[0,0],[0,1],[0,0],[0,0],[0,0],[0,0],[0,1],[0,0]],
+];
+
+// ---- UNIT DEFINITIONS ----
+const UNIT_DEFS = [
+  { id:'silas',  name:'Silas Crowe',       cls:'Gunslinger',  team:0, speed:6, maxhp:20, maxap:4, dex:7, vig:4, nim:6,
+    weapon:{name:'Peacemaker', min:4, max:8, range:6, acc:75},                           color:'#4ECDC4', icon:'G', col:1, row:5 },
+  { id:'mara',   name:'Sister Mara',       cls:'Preacher',    team:0, speed:4, maxhp:16, maxap:4, dex:5, vig:5, nim:4,
+    weapon:{name:'Shotgun', min:5, max:10, range:4, acc:65}, ability:{name:'Heal',cost:2,range:2}, color:'#4ECDC4', icon:'P', col:0, row:3 },
+  { id:'doc',    name:'Doc Kettleman',     cls:'Tinkerer',    team:0, speed:5, maxhp:14, maxap:4, dex:6, vig:3, nim:5,
+    weapon:{name:'Arc Pistol', min:5, max:12, range:5, acc:58}, ability:{name:'Deploy Turret',cost:3,range:1}, color:'#4ECDC4', icon:'T', col:2, row:4 },
+  { id:'dead',   name:"Walkin' Dead",      cls:'Undead',      team:1, speed:3, maxhp:12, maxap:3, dex:4, vig:6, nim:2,
+    weapon:{name:'Claws', min:3, max:6, range:1, acc:80},                                color:'#B5452A', icon:'Z', col:10, row:2 },
+  { id:'bill',   name:'Rattlesnake Bill',  cls:'Outlaw',      team:1, speed:5, maxhp:16, maxap:4, dex:6, vig:4, nim:5,
+    weapon:{name:'Rifle', min:4, max:8, range:5, acc:70},                                color:'#B5452A', icon:'R', col:9, row:3 },
+  { id:'sentry', name:'Hellstromme Sentry',cls:'Automaton',   team:1, speed:2, maxhp:24, maxap:3, dex:3, vig:8, nim:2,
+    weapon:{name:'Steam Cannon', min:6, max:10, range:6, acc:60},                        color:'#B5452A', icon:'S', col:11, row:6 },
+  { id:'witch',  name:'Dust Witch',        cls:'Hexmage',     team:1, speed:6, maxhp:10, maxap:4, dex:5, vig:2, nim:7,
+    weapon:{name:'Hex Bolt', min:3, max:7, range:5, acc:70, ignoresCover:true},          color:'#B5452A', icon:'W', col:10, row:9 },
+];
+
+// ============================================================
+// PHASER SCENE
+// ============================================================
+class CombatScene extends Phaser.Scene {
+  constructor() { super({ key: 'CombatScene' }); }
+
+  preload() { /* All graphics procedural */ }
+
+  create() {
+    this.cameras.main.setBackgroundColor(PAL.dark);
+    this._initState();
+    this._buildMap();
+    this._buildUnits();
+    this._setupInput();
+    this._setupButtons();
+    this._startCTLoop();
+    this.updatePanel(null);
+    this.logSys('The battle begins in the Ashen Frontier...');
+  }
+
+  // ================= STATE =================
+  _initState() {
+    this.units = [];
+    this.mapData = [];
+    this.currentUnit = null;
+    this.selectedUnit = null;
+    this.actionMode = null;
+    this.highlights = [];
+    this.hoveredTile = null;
+    this.gameOver = false;
+    this.animBusy = false;
+
+    // Camera
+    this.camX = 0;
+    this.camY = 0;
+    this.camZ = 1.0;
+    this.isDrag = false;
+    this.dragSX = 0; this.dragSY = 0;
+    this.camSX = 0; this.camSY = 0;
+
+    // Map origin (iso anchor at tile 0,0)
+    this.originX = 380;
+    this.originY = 130;
+
+    // Phaser graphics layers
+    this.gTiles  = this.add.graphics().setDepth(0);
+    this.gHigh   = this.add.graphics().setDepth(1);
+    this.gUnits  = this.add.graphics().setDepth(2);
+    this.gFX     = this.add.graphics().setDepth(3);
+
+    // Text objects managed manually
+    this._unitLabels = [];
+  }
+
+  // ================= MAP =================
+  _buildMap() {
+    for (let r = 0; r < GRID_H; r++) {
+      this.mapData[r] = [];
+      for (let c = 0; c < GRID_W; c++) {
+        const [type, height] = RAW_MAP[r][c];
+        this.mapData[r][c] = { type, height, unit: null };
+      }
+    }
+    this._renderMap();
+  }
+
+  // Isometric projection
+  iso(col, row, h) {
+    h = h || 0;
+    const z = this.camZ;
+    const x = this.originX + this.camX + (col - row) * (TILE_W / 2) * z;
+    const y = this.originY + this.camY + (col + row) * (TILE_H / 2) * z - h * H_STEP * z;
+    return { x, y };
+  }
+
+  // Approximate inverse iso
+  isoInv(sx, sy) {
+    const ox = (sx - this.originX - this.camX) / this.camZ;
+    const oy = (sy - this.originY - this.camY) / this.camZ;
+    const col = Math.round((ox / (TILE_W / 2) + oy / (TILE_H / 2)) / 2);
+    const row = Math.round((oy / (TILE_H / 2) - ox / (TILE_W / 2)) / 2);
+    return { col, row };
+  }
+
+  _renderMap() {
+    const g = this.gTiles;
+    g.clear();
+    for (let r = 0; r < GRID_H; r++) {
+      for (let c = 0; c < GRID_W; c++) {
+        this._drawTile(g, c, r);
+      }
+    }
+  }
+
+  _tileColors(type, height) {
+    if (type === T_ROCK || type === T_COVER) {
+      return [PAL.rockTop, PAL.rockLeft, PAL.rockRight];
+    }
+    if (type === T_HALF) {
+      return [PAL.halfTop, PAL.halfLeft, PAL.halfRight];
+    }
+    if (type === T_GHOST) {
+      return [PAL.ghostTop, PAL.ghostLeft, PAL.ghostRight];
+    }
+    // T_OPEN — lighten with height
+    const tops   = [0xC4A265, 0xD4B275, 0xE4C285, 0xF4D295];
+    const lefts  = [0x9A7A45, 0xA48A55, 0xB49A65, 0xC4AA75];
+    const rights = [0x7A5A25, 0x8A6A35, 0x9A7A45, 0xAA8A55];
+    const h = Math.min(height, 3);
+    return [tops[h], lefts[h], rights[h]];
+  }
+
+  _drawTile(g, col, row) {
+    const tile = this.mapData[row][col];
+    const pos = this.iso(col, row, tile.height);
+    const z = this.camZ;
+    const sx = pos.x, sy = pos.y;
+    const hw = (TILE_W / 2) * z;
+    const hh = (TILE_H / 2) * z;
+    const sideH = tile.height * H_STEP * z;
+    const [topC, leftC, rightC] = this._tileColors(tile.type, tile.height);
+
+    // Draw elevated sides
+    if (tile.height > 0) {
+      // Left side face
+      g.fillStyle(leftC, 1);
+      g.fillPoints([
+        { x: sx - hw, y: sy - hh },
+        { x: sx,      y: sy },
+        { x: sx,      y: sy + sideH },
+        { x: sx - hw, y: sy - hh + sideH },
+      ], true);
+      // Right side face
+      g.fillStyle(rightC, 1);
+      g.fillPoints([
+        { x: sx + hw, y: sy - hh },
+        { x: sx,      y: sy },
+        { x: sx,      y: sy + sideH },
+        { x: sx + hw, y: sy - hh + sideH },
+      ], true);
+      // Side edge lines
+      g.lineStyle(0.6 * z, 0x000000, 0.4);
+      g.strokePoints([
+        { x: sx - hw, y: sy - hh + sideH },
+        { x: sx,      y: sy + sideH },
+        { x: sx + hw, y: sy - hh + sideH },
+      ], false);
+    }
+
+    // Top diamond face
+    g.fillStyle(topC, 1);
+    g.fillPoints([
+      { x: sx,      y: sy - 2 * hh },   // top point
+      { x: sx + hw, y: sy - hh },        // right point
+      { x: sx,      y: sy },             // bottom point
+      { x: sx - hw, y: sy - hh },        // left point
+    ], true);
+
+    // Outline
+    g.lineStyle(z * 0.8, 0x000000, 0.35);
+    g.strokePoints([
+      { x: sx,      y: sy - 2 * hh },
+      { x: sx + hw, y: sy - hh },
+      { x: sx,      y: sy },
+      { x: sx - hw, y: sy - hh },
+      { x: sx,      y: sy - 2 * hh },
+    ], false);
+
+    // Ghost rock sparkle dots on top face
+    if (tile.type === T_GHOST) {
+      g.fillStyle(0x4ECDC4, 0.7);
+      const dots = [[0,-3],[3,-1.5],[-3,-1.5],[1.5,-4.5],[-1.5,-4.5]];
+      dots.forEach(([dx, dy]) => {
+        g.fillRect(sx + dx*z - z*0.7, sy - 2*hh + (hh + dy*z) - z*0.7, 1.4*z, 1.4*z);
+      });
+    }
+
+    // Half-cover marker (brass diamond pip on top)
+    if (tile.type === T_HALF) {
+      g.fillStyle(PAL.brass, 0.55);
+      g.fillPoints([
+        { x: sx,     y: sy - 2*hh - 4*z },
+        { x: sx+3*z, y: sy - 2*hh - 1*z },
+        { x: sx,     y: sy - 2*hh + 2*z },
+        { x: sx-3*z, y: sy - 2*hh - 1*z },
+      ], true);
+    }
+  }
+
+  // ================= HIGHLIGHTS =================
+  _renderHighlights() {
+    const g = this.gHigh;
+    g.clear();
+    const z = this.camZ;
+    const hw = (TILE_W / 2) * z;
+    const hh = (TILE_H / 2) * z;
+
+    for (const hl of this.highlights) {
+      const tile = this.mapData[hl.row][hl.col];
+      const { x: sx, y: sy } = this.iso(hl.col, hl.row, tile.height);
+      const color = hl.type === 'attack' ? 0xB5452A : hl.type === 'heal' ? 0x44FF88 : 0x4ECDC4;
+      const alpha = hl.type === 'attack' ? 0.38 : 0.32;
+
+      g.fillStyle(color, alpha);
+      g.fillPoints([
+        { x: sx,     y: sy - 2*hh },
+        { x: sx+hw,  y: sy - hh   },
+        { x: sx,     y: sy         },
+        { x: sx-hw,  y: sy - hh   },
+      ], true);
+      g.lineStyle(1.5 * z, color, 0.85);
+      g.strokePoints([
+        { x: sx,     y: sy - 2*hh },
+        { x: sx+hw,  y: sy - hh   },
+        { x: sx,     y: sy         },
+        { x: sx-hw,  y: sy - hh   },
+        { x: sx,     y: sy - 2*hh },
+      ], false);
+    }
+
+    // Hover outline
+    const ht = this.hoveredTile;
+    if (ht && ht.col >= 0 && ht.col < GRID_W && ht.row >= 0 && ht.row < GRID_H) {
+      const tile = this.mapData[ht.row][ht.col];
+      const { x: sx, y: sy } = this.iso(ht.col, ht.row, tile.height);
+      g.lineStyle(2 * z, 0xFFFFFF, 0.45);
+      g.strokePoints([
+        { x: sx,     y: sy - 2*hh },
+        { x: sx+hw,  y: sy - hh   },
+        { x: sx,     y: sy         },
+        { x: sx-hw,  y: sy - hh   },
+        { x: sx,     y: sy - 2*hh },
+      ], false);
+    }
+  }
+
+  // ================= UNITS =================
+  _buildUnits() {
+    for (const def of UNIT_DEFS) {
+      const unit = {
+        ...def,
+        hp: def.maxhp,
+        ap: def.maxap,
+        ct: Math.floor(Math.random() * 25),
+        hunkered: false,
+        overwatching: false,
+        alive: true,
+      };
+      this.units.push(unit);
+      this.mapData[unit.row][unit.col].unit = unit;
+    }
+    this._renderUnits();
+  }
+
+  _renderUnits() {
+    // Destroy old text labels
+    this._unitLabels.forEach(t => t.destroy());
+    this._unitLabels = [];
+
+    const g = this.gUnits;
+    g.clear();
+
+    // Sort by render order (back-to-front = lower col+row first)
+    const alive = this.units.filter(u => u.alive);
+    alive.sort((a, b) => (a.col + a.row) - (b.col + b.row));
+    for (const u of alive) this._drawUnit(g, u);
+  }
+
+  _drawUnit(g, unit) {
+    const tile = this.mapData[unit.row][unit.col];
+    const { x: sx, y: sy } = this.iso(unit.col, unit.row, tile.height);
+    const z = this.camZ;
+    const baseY = sy - TILE_H * z * 0.5; // foot of unit on tile top
+    const bw = 14 * z;
+    const bh = 20 * z;
+    const bx = sx - bw / 2;
+    const by = baseY - bh;
+
+    const isActive   = this.currentUnit  && this.currentUnit.id  === unit.id;
+    const isSelected = this.selectedUnit && this.selectedUnit.id === unit.id;
+
+    // Shadow ellipse
+    g.fillStyle(0x000000, 0.28);
+    g.fillEllipse(sx, baseY, bw * 1.15, 5 * z);
+
+    // Body rectangle
+    const bodyCol = unit.team === 0 ? PAL.teal : PAL.mesa;
+    g.fillStyle(bodyCol, 1);
+    g.fillRect(bx, by, bw, bh);
+
+    // Inner lighter panel
+    g.fillStyle(unit.team === 0 ? 0x66EEED : 0xCC5533, 0.3);
+    g.fillRect(bx + 2*z, by + 2*z, bw - 4*z, bh * 0.5 - 2*z);
+
+    // Outline
+    const outCol = isActive ? 0xFFD700 : isSelected ? 0xFFFFFF : unit.team === 0 ? 0x2A9D97 : 0x8B2010;
+    const outW   = (isActive || isSelected) ? 2 * z : 1 * z;
+    g.lineStyle(outW, outCol, 1);
+    g.strokeRect(bx, by, bw, bh);
+
+    // HP bar
+    g.fillStyle(0x000000, 0.75);
+    g.fillRect(bx, by - 5*z, bw, 3.5*z);
+    const hpPct = unit.hp / unit.maxhp;
+    const hpCol = hpPct > 0.6 ? 0x44BB44 : hpPct > 0.3 ? 0xBBBB22 : 0xBB2222;
+    g.fillStyle(hpCol, 1);
+    g.fillRect(bx, by - 5*z, bw * hpPct, 3.5*z);
+
+    // Active turn ring
+    if (isActive) {
+      g.lineStyle(2*z, 0xFFD700, 0.9);
+      g.strokeEllipse(sx, baseY, bw * 1.4, 7*z);
+    }
+
+    // Status badges
+    if (unit.hunkered) {
+      g.fillStyle(PAL.brass, 0.9);
+      g.fillRect(bx + bw - 5*z, by, 5*z, 5*z);
+    }
+    if (unit.overwatching) {
+      g.fillStyle(0xFF8800, 0.9);
+      g.fillTriangle(bx+bw/2, by-5*z, bx+bw/2-4*z, by+2*z, bx+bw/2+4*z, by+2*z);
+    }
+
+    // Icon letter (Phaser text object)
+    const label = this.add.text(sx, by + bh * 0.5, unit.icon, {
+      fontSize: Math.max(7, Math.floor(10 * z)) + 'px',
+      fontFamily: 'Rye, serif',
+      color: '#1A1209',
+      stroke: '#00000060',
+      strokeThickness: 1,
+    }).setOrigin(0.5, 0.5).setDepth(5);
+    this._unitLabels.push(label);
+  }
+
+  // ================= INPUT =================
+  _setupInput() {
+    this.input.on('pointerdown', ptr => {
+      if (ptr.rightButtonDown()) return;
+      this.isDrag = false;
+      this.dragSX = ptr.x; this.dragSY = ptr.y;
+      this.camSX = this.camX; this.camSY = this.camY;
+    });
+
+    this.input.on('pointermove', ptr => {
+      // Drag camera
+      if (ptr.isDown && !ptr.rightButtonDown()) {
+        const dx = ptr.x - this.dragSX;
+        const dy = ptr.y - this.dragSY;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) this.isDrag = true;
+        if (this.isDrag) {
+          this.camX = this.camSX + dx;
+          this.camY = this.camSY + dy;
+          this._renderMap();
+          this._renderUnits();
+          this._renderHighlights();
+        }
+      }
+
+      // Hover tile update
+      const { col, row } = this.isoInv(ptr.x, ptr.y);
+      const old = this.hoveredTile;
+      if (!old || old.col !== col || old.row !== row) {
+        this.hoveredTile = { col, row };
+        this._renderHighlights();
+        this._updateTerrainInfo();
+        if (this.actionMode === 'attack' || this.actionMode === 'heal') {
+          this._updateHitPreview({ col, row });
+        }
+      }
+    });
+
+    this.input.on('pointerup', ptr => {
+      if (this.isDrag) { this.isDrag = false; return; }
+      if (this.animBusy || this.gameOver) return;
+      const { col, row } = this.isoInv(ptr.x, ptr.y);
+      this._handleClick(col, row);
+    });
+
+    this.input.on('wheel', (ptr, gos, dx, dy) => {
+      this.camZ = Phaser.Math.Clamp(this.camZ + (dy > 0 ? -0.05 : 0.05), 0.4, 1.8);
+      this._renderAll();
+    });
+  }
+
+  _renderAll() {
+    this._renderMap();
+    this._renderUnits();
+    this._renderHighlights();
+  }
+
+  _setupButtons() {
+    document.getElementById('btn-move').addEventListener('click', () => this.uiAction('move'));
+    document.getElementById('btn-attack').addEventListener('click', () => this.uiAction('attack'));
+    document.getElementById('btn-hunker').addEventListener('click', () => this.uiAction('hunker'));
+    document.getElementById('btn-overwatch').addEventListener('click', () => this.uiAction('overwatch'));
+    document.getElementById('btn-wait').addEventListener('click', () => this.uiAction('wait'));
+  }
+
+  // ================= TILE CLICK =================
+  _handleClick(col, row) {
+    if (col < 0 || col >= GRID_W || row < 0 || row >= GRID_H) return;
+    const tile = this.mapData[row][col];
+
+    if (!this.currentUnit || this.currentUnit.team !== 0) return;
+
+    if (!this.actionMode) {
+      // Select unit
+      if (tile.unit && tile.unit.alive) {
+        this.selectedUnit = tile.unit;
+        this.updatePanel(tile.unit);
+        this._renderUnits();
+      }
+      return;
+    }
+
+    if (this.actionMode === 'move') {
+      if (this.highlights.find(h => h.col === col && h.row === row)) {
+        if (tile.type !== T_ROCK && tile.type !== T_COVER && !tile.unit) {
+          this._doMove(this.currentUnit, col, row);
+        }
+      }
+    } else if (this.actionMode === 'attack') {
+      if (this.highlights.find(h => h.col === col && h.row === row)) {
+        if (tile.unit && tile.unit.team !== this.currentUnit.team && tile.unit.alive) {
+          this._doAttack(this.currentUnit, tile.unit);
+        }
+      }
+    } else if (this.actionMode === 'heal') {
+      if (this.highlights.find(h => h.col === col && h.row === row)) {
+        if (tile.unit && tile.unit.team === this.currentUnit.team && tile.unit.alive) {
+          this._doHeal(this.currentUnit, tile.unit);
+        }
+      }
+    }
+  }
+
+  // ================= ACTION UI =================
+  uiAction(action) {
+    if (!this.currentUnit || this.currentUnit.team !== 0 || this.animBusy || this.gameOver) return;
+    if (this.actionMode === action) { this._cancelAction(); return; }
+
+    const u = this.currentUnit;
+    if (action === 'move') {
+      if (u.ap < 1) { this.logSys('Not enough AP to move.'); return; }
+      this.actionMode = 'move';
+      this._showMoveTiles(u);
+      this._setActiveBtn('move');
+      document.getElementById('hit-preview-content').textContent = 'Click a highlighted tile to move.';
+    } else if (action === 'attack') {
+      if (u.ap < 2) { this.logSys('Not enough AP to attack.'); return; }
+      this.actionMode = 'attack';
+      this._showAttackTiles(u);
+      this._setActiveBtn('attack');
+      document.getElementById('hit-preview-content').textContent = 'Click an enemy to attack.';
+    } else if (action === 'hunker') {
+      if (u.ap < 2) { this.logSys('Not enough AP.'); return; }
+      this._doHunker(u);
+    } else if (action === 'overwatch') {
+      if (u.ap < 2) { this.logSys('Not enough AP.'); return; }
+      this._doOverwatch(u);
+    } else if (action === 'wait') {
+      this._doWait(u);
+    } else if (action === 'heal') {
+      const ability = u.ability;
+      if (!ability || ability.name !== 'Heal') return;
+      if (u.ap < ability.cost) { this.logSys('Not enough AP.'); return; }
+      this.actionMode = 'heal';
+      this._showHealTiles(u);
+      this._setActiveBtn('heal');
+      document.getElementById('hit-preview-content').textContent = 'Click an ally to heal.';
+    } else if (action === 'turret') {
+      if (u.ap < 3) { this.logSys('Not enough AP.'); return; }
+      this._doTurret(u);
+    }
+  }
+
+  _cancelAction() {
+    this.actionMode = null;
+    this.highlights = [];
+    this._renderHighlights();
+    this._setActiveBtn(null);
+    document.getElementById('hit-preview-content').textContent = 'Select an action.';
+  }
+
+  _setActiveBtn(active) {
+    ['move','attack','hunker','overwatch','wait'].forEach(b => {
+      const el = document.getElementById('btn-' + b);
+      if (el) el.classList.toggle('active', b === active);
+    });
+  }
+
+  // ================= RANGE DISPLAY =================
+  _showMoveTiles(unit) {
+    this.highlights = [];
+    const visited = {};
+    const queue = [{ col: unit.col, row: unit.row, dist: 0 }];
+    visited[unit.col + ',' + unit.row] = true;
+    while (queue.length) {
+      const { col, row, dist } = queue.shift();
+      if (dist > 0) {
+        const tile = this.mapData[row][col];
+        if (tile.type === T_ROCK || tile.type === T_COVER || tile.unit) continue;
+        this.highlights.push({ col, row, type: 'move' });
+      }
+      if (dist < unit.ap) {
+        const dirs = [[col+1,row],[col-1,row],[col,row+1],[col,row-1]];
+        for (const [nc, nr] of dirs) {
+          const k = nc + ',' + nr;
+          if (!visited[k] && nc >= 0 && nc < GRID_W && nr >= 0 && nr < GRID_H) {
+            visited[k] = true;
+            queue.push({ col: nc, row: nr, dist: dist+1 });
+          }
+        }
+      }
+    }
+    this._renderHighlights();
+  }
+
+  _showAttackTiles(unit) {
+    this.highlights = [];
+    for (let r = 0; r < GRID_H; r++) {
+      for (let c = 0; c < GRID_W; c++) {
+        const d = Math.abs(c - unit.col) + Math.abs(r - unit.row);
+        if (d > 0 && d <= unit.weapon.range) {
+          const tile = this.mapData[r][c];
+          if (tile.unit && tile.unit.team !== unit.team && tile.unit.alive) {
+            this.highlights.push({ col: c, row: r, type: 'attack' });
+          }
+        }
+      }
+    }
+    this._renderHighlights();
+  }
+
+  _showHealTiles(unit) {
+    this.highlights = [];
+    for (let r = 0; r < GRID_H; r++) {
+      for (let c = 0; c < GRID_W; c++) {
+        const d = Math.abs(c - unit.col) + Math.abs(r - unit.row);
+        if (d <= unit.ability.range) {
+          const tile = this.mapData[r][c];
+          if (tile.unit && tile.unit.team === unit.team && tile.unit.alive) {
+            this.highlights.push({ col: c, row: r, type: 'heal' });
+          }
+        }
+      }
+    }
+    this._renderHighlights();
+  }
+
+  // ================= HIT FORMULA =================
+  _calcHit(attacker, target) {
+    const w = attacker.weapon;
+    let acc = w.acc;
+    acc += (attacker.dex - 5) * 3;
+    acc -= (target.nim - 5) * 2;
+    // Height advantage
+    const ah = this.mapData[attacker.row][attacker.col].height;
+    const th = this.mapData[target.row][target.col].height;
+    acc += (ah - th) * 10;
+    // Cover (ignored by hex bolt)
+    if (!w.ignoresCover) {
+      const tType = this.mapData[target.row][target.col].type;
+      acc -= TERRAIN_COVER[tType] || 0;
+    }
+    acc = Phaser.Math.Clamp(acc, 5, 95);
+    const tvig = target.vig;
+    const hunk = target.hunkered ? 3 : 0;
+    const minDmg = Math.max(1, w.min - Math.floor(tvig / 4) - hunk);
+    const maxDmg = Math.max(1, w.max - Math.floor(tvig / 4) - hunk);
+    return { acc, minDmg, maxDmg };
+  }
+
+  _updateHitPreview(hoverTile) {
+    const { col, row } = hoverTile;
+    const el = document.getElementById('hit-preview-content');
+    if (col < 0 || col >= GRID_W || row < 0 || row >= GRID_H) return;
+    const tile = this.mapData[row][col];
+
+    if (this.actionMode === 'attack') {
+      if (!tile.unit || tile.unit.team === (this.currentUnit && this.currentUnit.team) || !tile.unit.alive) {
+        el.textContent = 'Click an enemy to attack.';
+        return;
+      }
+      const { acc, minDmg, maxDmg } = this._calcHit(this.currentUnit, tile.unit);
+      // Build preview lines safely
+      el.textContent = '';
+      const lines = [
+        'Target: ' + tile.unit.name,
+        'Hit Chance: ' + acc + '%',
+        'Damage: ' + minDmg + ' - ' + maxDmg,
+        'HP: ' + tile.unit.hp + ' / ' + tile.unit.maxhp,
+      ];
+      lines.forEach((line, i) => {
+        const span = document.createElement('span');
+        span.style.color = i === 1 ? '#D4A843' : i === 2 ? '#E8DCC8' : '#C4A265';
+        span.textContent = line;
+        el.appendChild(span);
+        if (i < lines.length - 1) el.appendChild(document.createElement('br'));
+      });
+    } else if (this.actionMode === 'heal') {
+      if (!tile.unit || !tile.unit.alive) {
+        el.textContent = 'Click an ally to heal.';
+        return;
+      }
+      el.textContent = 'Heal ' + tile.unit.name + ' — Restore 5-10 HP';
+    }
+  }
+
+  // ================= ACTION EXECUTION =================
+  _doMove(unit, toCol, toRow) {
+    const path = this._findPath(unit.col, unit.row, toCol, toRow);
+    if (!path || path.length === 0) return;
+
+    const apCost = path.length;
+    if (unit.ap < apCost) { this.logSys('Not enough AP!'); return; }
+
+    this.animBusy = true;
+    this._cancelAction();
+
+    this.mapData[unit.row][unit.col].unit = null;
+    unit.ap -= apCost;
+
+    this.logEntry(unit.name + ' moves.', unit.team === 0 ? 'player' : 'enemy');
+
+    // Check overwatch triggers
+    const overwatchers = this.units.filter(u => u.alive && u.overwatching && u.team !== unit.team);
+
+    const step = (idx) => {
+      if (idx >= path.length) {
+        unit.col = toCol;
+        unit.row = toRow;
+        this.mapData[toRow][toCol].unit = unit;
+        this.animBusy = false;
+        this._renderAll();
+        this.updatePanel(this.currentUnit);
+
+        // Overwatch resolution
+        for (const ow of overwatchers) {
+          const d = Math.abs(ow.col - unit.col) + Math.abs(ow.row - unit.row);
+          if (d <= ow.weapon.range && unit.alive) {
+            setTimeout(() => {
+              this.logEntry(ow.name + ' triggers Overwatch!', 'system');
+              ow.overwatching = false;
+              this._resolveAttack(ow, unit);
+            }, 200);
+          }
+        }
+        if (unit.team === 1) setTimeout(() => this._aiContinue(), 450);
+        return;
+      }
+      const s = path[idx];
+      unit.col = s.col;
+      unit.row = s.row;
+      this._renderUnits();
+      setTimeout(() => step(idx + 1), 110);
+    };
+    step(0);
+  }
+
+  _findPath(sc, sr, ec, er) {
+    const key = (c, r) => c + ',' + r;
+    const visited = new Set([key(sc, sr)]);
+    const queue = [{ col: sc, row: sr, path: [] }];
+    while (queue.length) {
+      const { col, row, path } = queue.shift();
+      if (col === ec && row === er) return path;
+      for (const [nc, nr] of [[col+1,row],[col-1,row],[col,row+1],[col,row-1]]) {
+        const k = key(nc, nr);
+        if (!visited.has(k) && nc >= 0 && nc < GRID_W && nr >= 0 && nr < GRID_H) {
+          const tile = this.mapData[nr][nc];
+          if (tile.type !== T_ROCK && tile.type !== T_COVER && (!tile.unit || (nc===ec && nr===er))) {
+            visited.add(k);
+            queue.push({ col: nc, row: nr, path: [...path, { col: nc, row: nr }] });
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  _doAttack(attacker, target) {
+    if (attacker.ap < 2) { this.logSys('Not enough AP!'); return; }
+    attacker.ap -= 2;
+    this._cancelAction();
+    this.animBusy = true;
+
+    // Projectile tween
+    const aTile = this.mapData[attacker.row][attacker.col];
+    const tTile = this.mapData[target.row][target.col];
+    const aPos  = this.iso(attacker.col, attacker.row, aTile.height);
+    const tPos  = this.iso(target.col,   target.row,   tTile.height);
+    const z = this.camZ;
+    const ax = aPos.x, ay = aPos.y - TILE_H * z * 0.5;
+    const tx = tPos.x, ty = tPos.y - TILE_H * z * 0.5;
+
+    const proj = this.add.graphics().setDepth(10);
+    const projColor = attacker.team === 0 ? 0xFFDD44 : 0xFF4422;
+
+    this.tweens.add({
+      targets: { px: ax, py: ay },
+      px: tx, py: ty,
+      duration: 230,
+      ease: 'Linear',
+      onUpdate: (tw, tg) => {
+        proj.clear();
+        proj.fillStyle(projColor, 1 - tw.progress * 0.3);
+        proj.fillCircle(tg.px, tg.py, 3.5 * z);
+        // Tail
+        proj.fillStyle(projColor, 0.3);
+        proj.fillCircle(tg.px - (tg.px - ax) * 0.1, tg.py - (tg.py - ay) * 0.1, 2 * z);
+      },
+      onComplete: () => {
+        proj.destroy();
+        this._resolveAttack(attacker, target);
+        this.animBusy = false;
+        this.updatePanel(this.currentUnit);
+        if (attacker.team === 1 && !this.gameOver) {
+          setTimeout(() => this._aiContinue(), 500);
+        }
+      }
+    });
+  }
+
+  _resolveAttack(attacker, target) {
+    const { acc, minDmg, maxDmg } = this._calcHit(attacker, target);
+    const hit = Math.random() * 100 < acc;
+    const tTile = this.mapData[target.row][target.col];
+    const tPos  = this.iso(target.col, target.row, tTile.height);
+    const fx = tPos.x;
+    const fy = tPos.y - TILE_H * this.camZ * 0.7;
+
+    if (hit) {
+      const dmg = Phaser.Math.Between(minDmg, maxDmg);
+      target.hp = Math.max(0, target.hp - dmg);
+      this._spawnFloatingText(fx, fy, '-' + dmg, '#FF4422');
+      this._spawnDust(fx, fy);
+      this.logEntry(attacker.name + ' hits ' + target.name + ' for ' + dmg + ' dmg! (' + target.hp + '/' + target.maxhp + ' HP)',
+        attacker.team === 0 ? 'player' : 'enemy');
+
+      if (target.hp <= 0) {
+        target.alive = false;
+        this.mapData[target.row][target.col].unit = null;
+        this.logEntry(target.name + ' is defeated!', 'system');
+        this._spawnFloatingText(fx, fy - 20 * this.camZ, 'DEAD', '#B5452A');
+      }
+    } else {
+      this._spawnFloatingText(fx, fy, 'MISS', '#C4A265');
+      this.logEntry(attacker.name + ' misses ' + target.name + '.', attacker.team === 0 ? 'player' : 'enemy');
+    }
+
+    this._renderUnits();
+    this.updatePanel(this.selectedUnit || this.currentUnit);
+    this._updateTurnBar();
+    this._checkWin();
+  }
+
+  _doHunker(unit) {
+    unit.ap -= 2;
+    unit.hunkered = true;
+    this._cancelAction();
+    this.logEntry(unit.name + ' hunkers down! Defense boosted.', unit.team === 0 ? 'player' : 'enemy');
+    this._renderUnits();
+    this.updatePanel(unit);
+  }
+
+  _doOverwatch(unit) {
+    unit.ap -= 2;
+    unit.overwatching = true;
+    this._cancelAction();
+    this.logEntry(unit.name + ' enters Overwatch.', unit.team === 0 ? 'player' : 'enemy');
+    this._renderUnits();
+    this.updatePanel(unit);
+  }
+
+  _doWait(unit) {
+    unit.ct += 10;
+    this.logEntry(unit.name + ' waits. (+10 CT)', unit.team === 0 ? 'player' : 'enemy');
+    this._endTurn();
+  }
+
+  _doHeal(healer, target) {
+    healer.ap -= healer.ability.cost;
+    const amount = Phaser.Math.Between(5, 10);
+    target.hp = Math.min(target.maxhp, target.hp + amount);
+    this._cancelAction();
+    const tPos = this.iso(target.col, target.row, this.mapData[target.row][target.col].height);
+    this._spawnFloatingText(tPos.x, tPos.y - TILE_H * this.camZ, '+' + amount, '#44FF88');
+    this.logEntry(healer.name + ' heals ' + target.name + ' for ' + amount + ' HP!', 'player');
+    this._renderUnits();
+    this.updatePanel(this.currentUnit);
+  }
+
+  _doTurret(unit) {
+    unit.ap -= 3;
+    this._cancelAction();
+    this.logEntry(unit.name + ' deploys a steam turret!', 'player');
+    const pos = this.iso(unit.col, unit.row, this.mapData[unit.row][unit.col].height);
+    this._spawnFloatingText(pos.x, pos.y - TILE_H * this.camZ, 'TURRET!', '#D4A843');
+    this._renderUnits();
+    this.updatePanel(unit);
+  }
+
+  // ================= CT / TURN ORDER =================
+  // NOTE: Using setTimeout instead of this.time.delayedCall because Phaser's
+  // time plugin runs at ~1/30 speed after scene transitions (WebGL state bug).
+  _startCTLoop() {
+    this._advanceCT();
+  }
+
+  _advanceCT() {
+    const ready = this.units.filter(u => u.alive && u.ct >= 100);
+    if (ready.length > 0) {
+      ready.sort((a, b) => b.ct - a.ct || b.speed - a.speed);
+      this._beginTurn(ready[0]);
+      return;
+    }
+    setTimeout(() => {
+      if (this.gameOver) return;
+      this.units.filter(u => u.alive).forEach(u => { u.ct += u.speed; });
+      this._updateTurnBar();
+      this._advanceCT();
+    }, 75);
+  }
+
+  _beginTurn(unit) {
+    this.currentUnit = unit;
+    unit.ap = unit.maxap;
+    unit.hunkered = false;
+    this.selectedUnit = unit;
+    this.updatePanel(unit);
+    this._updateTurnBar();
+    this._updateActionBtns();
+    this._cancelAction();
+    this._renderUnits();
+
+    // Turn banner
+    const banner = document.getElementById('turn-banner');
+    banner.textContent = unit.name + "'s Turn";
+    banner.style.color = unit.team === 0 ? '#4ECDC4' : '#B5452A';
+    banner.style.borderColor = unit.team === 0 ? '#4ECDC4' : '#B5452A';
+    banner.style.display = 'block';
+    setTimeout(() => { banner.style.display = 'none'; }, 900);
+
+    if (unit.team === 1) {
+      setTimeout(() => this._runAI(unit), 750);
+    }
+  }
+
+  _endTurn() {
+    if (!this.currentUnit) return;
+    this.currentUnit.ct = 0;
+    this._cancelAction();
+    this.currentUnit = null;
+    this._renderUnits();
+    this.updatePanel(null);
+    this._updateActionBtns();
+    setTimeout(() => this._advanceCT(), 180);
+  }
+
+  // ================= TURN BAR =================
+  _updateTurnBar() {
+    const alive = this.units.filter(u => u.alive);
+    // Simulate next 8 turns
+    const sim = alive.map(u => ({ id: u.id, name: u.name, team: u.team, ct: u.ct, speed: u.speed, icon: u.icon, hp: u.hp, maxhp: u.maxhp }));
+    const order = [];
+    let iter = 0;
+    while (order.length < 8 && iter < 600) {
+      iter++;
+      sim.forEach(u => { u.ct += u.speed; });
+      const ready = sim.filter(u => u.ct >= 100).sort((a, b) => b.ct - a.ct || b.speed - a.speed);
+      for (const r of ready) {
+        if (order.length < 8) order.push({ ...r });
+        r.ct = 0;
+      }
+    }
+
+    const container = document.getElementById('turn-portraits');
+    // Remove existing children safely
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    for (let i = 0; i < order.length; i++) {
+      const u = order[i];
+      const realU = this.units.find(ru => ru.id === u.id);
+
+      const div = document.createElement('div');
+      div.className = 'turn-portrait' + (u.team === 1 ? ' enemy' : '') + (i === 0 ? ' active' : '');
+
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'portrait-icon ' + (u.team === 0 ? 'player' : 'enemy');
+      iconDiv.textContent = u.icon;
+      div.appendChild(iconDiv);
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'portrait-name';
+      nameDiv.textContent = u.name.split(' ')[0];
+      div.appendChild(nameDiv);
+
+      const bar = document.createElement('div');
+      bar.className = 'portrait-ct-bar' + (u.team === 1 ? ' enemy' : '');
+      bar.style.width = (realU ? (realU.hp / realU.maxhp) * 100 : 100) + '%';
+      div.appendChild(bar);
+
+      container.appendChild(div);
+    }
+  }
+
+  // ================= AI =================
+  _runAI(unit) {
+    if (!unit.alive || !this.currentUnit || this.currentUnit.id !== unit.id) return;
+    this.animBusy = false;
+    this._aiStep(unit);
+  }
+
+  _aiStep(unit) {
+    if (!unit.alive || unit.ap <= 0 || this.gameOver) { this._endTurn(); return; }
+
+    const players = this.units.filter(u => u.alive && u.team === 0);
+    if (!players.length) { this._endTurn(); return; }
+
+    // Select target
+    let target;
+    if (unit.id === 'witch') {
+      target = players.reduce((a, b) => a.hp <= b.hp ? a : b);
+    } else {
+      target = players.reduce((a, b) => {
+        const da = Math.abs(a.col - unit.col) + Math.abs(a.row - unit.row);
+        const db = Math.abs(b.col - unit.col) + Math.abs(b.row - unit.row);
+        return da <= db ? a : b;
+      });
+    }
+
+    const dist = Math.abs(target.col - unit.col) + Math.abs(target.row - unit.row);
+    const rng  = unit.weapon.range;
+
+    // Attack if in range
+    if (dist <= rng && unit.ap >= 2) {
+      this.animBusy = true;
+      unit.ap -= 2;
+
+      const aTile = this.mapData[unit.row][unit.col];
+      const tTile = this.mapData[target.row][target.col];
+      const aPos  = this.iso(unit.col,   unit.row,   aTile.height);
+      const tPos  = this.iso(target.col, target.row, tTile.height);
+      const z = this.camZ;
+      const ax = aPos.x, ay = aPos.y - TILE_H * z * 0.5;
+      const tx = tPos.x, ty = tPos.y - TILE_H * z * 0.5;
+
+      const proj = this.add.graphics().setDepth(10);
+      this.tweens.add({
+        targets: { px: ax, py: ay },
+        px: tx, py: ty,
+        duration: 220,
+        onUpdate: (tw, tg) => {
+          proj.clear();
+          proj.fillStyle(0xFF4422, 1);
+          proj.fillCircle(tg.px, tg.py, 3.5 * z);
+        },
+        onComplete: () => {
+          proj.destroy();
+          this._resolveAttack(unit, target);
+          this.animBusy = false;
+          if (!this.gameOver) {
+            setTimeout(() => this._aiStep(unit), 420);
+          }
+        }
+      });
+      return;
+    }
+
+    // Move toward target (ranged units may prefer distance)
+    if (unit.ap >= 1) {
+      let destCol = target.col, destRow = target.row;
+      // Ranged enemy: don't crowd the target
+      if (rng > 1 && dist < rng - 1) {
+        const dx = Math.sign(unit.col - target.col);
+        const dy = Math.sign(unit.row - target.row);
+        const nc = Phaser.Math.Clamp(unit.col + dx, 0, GRID_W - 1);
+        const nr = Phaser.Math.Clamp(unit.row + dy, 0, GRID_H - 1);
+        const nt = this.mapData[nr][nc];
+        if (!nt.unit && nt.type !== T_ROCK && nt.type !== T_COVER) {
+          destCol = nc; destRow = nr;
+        }
+      }
+      const path = this._findPath(unit.col, unit.row, destCol, destRow);
+      if (path && path.length > 0) {
+        const steps = Math.min(unit.ap, path.length);
+        const dest = path[steps - 1];
+        const dt = this.mapData[dest.row][dest.col];
+        if (!dt.unit && dt.type !== T_ROCK && dt.type !== T_COVER) {
+          this._doMove(unit, dest.col, dest.row);
+          return;
+        }
+      }
+    }
+
+    this._endTurn();
+  }
+
+  _aiContinue() {
+    if (this.currentUnit && this.currentUnit.team === 1 && this.currentUnit.alive && !this.gameOver) {
+      this._aiStep(this.currentUnit);
+    }
+  }
+
+  // ================= VISUAL FX =================
+  _spawnFloatingText(x, y, text, color) {
+    const t = this.add.text(x, y, text, {
+      fontSize: '14px',
+      fontFamily: 'Rye, serif',
+      color: color || '#FF4422',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5, 1).setDepth(50);
+
+    this.tweens.add({
+      targets: t,
+      y: y - 42,
+      alpha: 0,
+      duration: 1100,
+      ease: 'Power2',
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  _spawnDust(x, y) {
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = 20 + Math.random() * 28;
+      const g = this.add.graphics().setDepth(9);
+      const sz = 1.5 + Math.random() * 2.5;
+      this.tweens.add({
+        targets: { t: 0 },
+        t: 1,
+        duration: 380 + Math.random() * 200,
+        onUpdate: (tw, tg) => {
+          const p = tg.t;
+          g.clear();
+          g.fillStyle(PAL.sand, (1 - p) * 0.55);
+          g.fillRect(
+            x + Math.cos(angle) * dist * p - sz * 0.5,
+            y + Math.sin(angle) * dist * p - sz * 0.5,
+            sz * (1 - p * 0.5),
+            sz * (1 - p * 0.5)
+          );
+        },
+        onComplete: () => g.destroy(),
+      });
+    }
+  }
+
+  // ================= PANEL / UI =================
+  updatePanel(unit) {
+    const nameEl  = document.getElementById('unit-name');
+    const clsEl   = document.getElementById('unit-class');
+    const hpFill  = document.getElementById('hp-fill');
+    const hpVal   = document.getElementById('hp-val');
+    const apDots  = document.getElementById('ap-dots');
+    const spdEl   = document.getElementById('stat-spd');
+    const vigEl   = document.getElementById('stat-vig');
+    const dexEl   = document.getElementById('stat-dex');
+    const abilityContainer = document.getElementById('ability-buttons');
+
+    // Clear ability area
+    while (abilityContainer.firstChild) abilityContainer.removeChild(abilityContainer.firstChild);
+
+    if (!unit) {
+      nameEl.textContent = 'Select a Unit';
+      nameEl.style.color = '#D4A843';
+      clsEl.textContent  = '';
+      hpFill.style.width = '100%';
+      hpVal.textContent  = '—';
+      apDots.textContent = '';
+      spdEl.textContent  = '—';
+      vigEl.textContent  = '—';
+      dexEl.textContent  = '—';
+      return;
+    }
+
+    nameEl.textContent = unit.name;
+    nameEl.style.color = unit.team === 0 ? '#4ECDC4' : '#B5452A';
+    clsEl.textContent  = unit.cls + ' · ' + unit.weapon.name;
+
+    const hpPct = unit.hp / unit.maxhp;
+    hpFill.style.width = (hpPct * 100) + '%';
+    hpVal.textContent  = unit.hp + '/' + unit.maxhp;
+
+    while (apDots.firstChild) apDots.removeChild(apDots.firstChild);
+    for (let i = 0; i < unit.maxap; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'ap-dot' + (i >= unit.ap ? ' empty' : '');
+      apDots.appendChild(dot);
+    }
+
+    spdEl.textContent = unit.speed;
+    vigEl.textContent = unit.vig;
+    dexEl.textContent = unit.dex;
+
+    // Ability buttons (player only)
+    if (unit.team === 0 && unit.ability) {
+      const isActive = this.currentUnit && this.currentUnit.id === unit.id;
+      const btn = document.createElement('button');
+      btn.className = 'action-btn';
+      const abilityName = unit.ability.name;
+      btn.textContent = abilityName;
+      const apSpan = document.createElement('span');
+      apSpan.className = 'btn-ap';
+      apSpan.textContent = unit.ability.cost + ' AP';
+      btn.appendChild(apSpan);
+      btn.disabled = !isActive;
+      const actionKey = abilityName === 'Heal' ? 'heal' : 'turret';
+      btn.addEventListener('click', () => this.uiAction(actionKey));
+      abilityContainer.appendChild(btn);
+    }
+
+    // Status tags
+    if (unit.hunkered) {
+      const tag = document.createElement('div');
+      tag.style.cssText = 'font-size:9px;color:#D4A843;margin-top:4px;';
+      tag.textContent = '[HUNKERED — DEF boosted]';
+      abilityContainer.appendChild(tag);
+    }
+    if (unit.overwatching) {
+      const tag = document.createElement('div');
+      tag.style.cssText = 'font-size:9px;color:#FF8800;margin-top:4px;';
+      tag.textContent = '[OVERWATCH ACTIVE]';
+      abilityContainer.appendChild(tag);
+    }
+  }
+
+  _updateActionBtns() {
+    const isPlayer = this.currentUnit && this.currentUnit.team === 0 && !this.gameOver;
+    ['move','attack','hunker','overwatch','wait'].forEach(b => {
+      const el = document.getElementById('btn-' + b);
+      if (el) el.disabled = !isPlayer;
+    });
+    if (isPlayer) {
+      const u = this.currentUnit;
+      const costs = { move: 1, attack: 2, hunker: 2, overwatch: 2, wait: 0 };
+      ['move','attack','hunker','overwatch','wait'].forEach(b => {
+        const el = document.getElementById('btn-' + b);
+        if (el) el.disabled = u.ap < costs[b];
+      });
+    }
+  }
+
+  _updateTerrainInfo() {
+    const ht = this.hoveredTile;
+    const el = document.getElementById('terrain-info');
+    if (!ht || ht.col < 0 || ht.col >= GRID_W || ht.row < 0 || ht.row >= GRID_H) {
+      el.textContent = 'Hover a tile for terrain info';
+      return;
+    }
+    const tile = this.mapData[ht.row][ht.col];
+    const name = TERRAIN_NAMES[tile.type] || 'Unknown';
+    const cover = TERRAIN_COVER[tile.type] || 0;
+    const coverStr = cover > 0 ? ' | -' + cover + '% hit' : '';
+    el.textContent = '[' + ht.col + ', ' + ht.row + '] ' + name + ' | Elevation: ' + tile.height + coverStr;
+  }
+
+  // ================= WIN/LOSE =================
+  _checkWin() {
+    if (this.gameOver) return;
+    const playersAlive = this.units.filter(u => u.alive && u.team === 0).length;
+    const enemiesAlive = this.units.filter(u => u.alive && u.team === 1).length;
+
+    if (enemiesAlive === 0) {
+      this.gameOver = true;
+      this.logSys('VICTORY! All enemies have fallen!');
+      setTimeout(() => {
+        const overlay = document.getElementById('overlay');
+        document.getElementById('overlay-title').textContent = 'VICTORY';
+        document.getElementById('overlay-title').style.color = '#D4A843';
+        document.getElementById('overlay-sub').textContent = 'The dust settles. Another day in the Ashen Frontier.';
+        overlay.classList.add('active');
+      }, 900);
+    } else if (playersAlive === 0) {
+      this.gameOver = true;
+      this.logSys('DEFEAT! Your crew has fallen...');
+      setTimeout(() => {
+        const overlay = document.getElementById('overlay');
+        document.getElementById('overlay-title').textContent = 'DEFEAT';
+        document.getElementById('overlay-title').style.color = '#B5452A';
+        document.getElementById('overlay-sub').textContent = 'The Ashen Frontier claims another crew.';
+        overlay.classList.add('active');
+      });
+    }
+  }
+
+  // ================= LOG =================
+  logEntry(text, type) {
+    const container = document.getElementById('log-entries');
+    const div = document.createElement('div');
+    div.className = 'log-entry ' + (type || '');
+    div.textContent = text;
+    container.insertBefore(div, container.firstChild);
+    while (container.children.length > 30) container.removeChild(container.lastChild);
+  }
+
+  logSys(text) { this.logEntry(text, 'system'); }
+
+  // ================= FRAME UPDATE =================
+  update() {
+    if (this.gameOver) return;
+    if (this.currentUnit && this.currentUnit.team === 0) {
+      const u = this.currentUnit;
+      const costs = { move: 1, attack: 2, hunker: 2, overwatch: 2, wait: 0 };
+      if (!this.animBusy) {
+        ['move','attack','hunker','overwatch','wait'].forEach(b => {
+          const el = document.getElementById('btn-' + b);
+          if (el) el.disabled = u.ap < costs[b];
+        });
+      }
+      document.getElementById('game-state-info').textContent = u.name + "'s Turn — " + u.ap + ' AP';
+    } else if (this.currentUnit && this.currentUnit.team === 1) {
+      document.getElementById('game-state-info').textContent = 'Enemy is acting...';
+    } else {
+      document.getElementById('game-state-info').textContent = 'Advancing CT...';
+    }
+  }
+}
+
+// ============================================================
+// BOOT SCENE
+// ============================================================
+class BootScene extends Phaser.Scene {
+  constructor() { super({ key: 'BootScene' }); }
+
+  create() {
+    const { width, height } = this.scale;
+
+    // Background
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1A1209, 1);
+    bg.fillRect(0, 0, width, height);
+    bg.fillStyle(0x2A1F0A, 0.4);
+    bg.fillRect(0, height * 0.6, width, height * 0.4);
+
+    // Title
+    this.add.text(width / 2, height / 2 - 50, 'DUSTFALL', {
+      fontSize: '44px', fontFamily: 'Rye, serif',
+      color: '#D4A843', stroke: '#7A5A25', strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    this.add.text(width / 2, height / 2 + 8, 'The Ashen Frontier', {
+      fontSize: '18px', fontFamily: 'IM Fell English, serif',
+      color: '#C4A265', fontStyle: 'italic',
+    }).setOrigin(0.5);
+
+    this.add.text(width / 2, height / 2 + 48, 'Preparing combat...', {
+      fontSize: '11px', fontFamily: 'IM Fell English, serif', color: '#7A5A25',
+    }).setOrigin(0.5);
+
+    // Border
+    const border = this.add.graphics();
+    border.lineStyle(2, 0xD4A843, 0.6);
+    border.strokeRect(width / 2 - 180, height / 2 - 80, 360, 150);
+
+    // Use native setTimeout — Phaser timers/tweens cause WebGL state issues on scene transition
+    setTimeout(() => { this.scene.start('CombatScene'); }, 2000);
+  }
+}
+
+// ============================================================
+// LAUNCH GAME
+// ============================================================
+const container = document.getElementById('phaser-container');
+
+window.game = new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'phaser-container',
+  backgroundColor: '#1A1209',
+  scene: [BootScene, CombatScene],
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  render: {
+    pixelArt: false,
+    antialias: true,
+  },
+});
+
+window.addEventListener('resize', () => {
+  game.scale.resize(container.clientWidth, container.clientHeight);
+});
+</script>
+</body>
+</html>
