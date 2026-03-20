@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dustfall: Character Creator{% endblock %}</title>
+  <style>
+    /* ============================================================
+       DUSTFALL DESIGN SYSTEM
+       Weird Western · Deadwood meets Lovecraft meets Steampunk
+       ============================================================ */
+
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Special+Elite&display=swap');
+
+    :root {
+      --dust:        #f4e9c8;
+      --dust-dark:   #e8d5a3;
+      --dust-deep:   #c4a86a;
+      --ink:         #2a1a08;
+      --ink-light:   #4a3020;
+      --rust:        #8b3a1a;
+      --rust-light:  #b85030;
+      --ash:         #6a6a5a;
+      --ash-light:   #9a9a8a;
+
+      --grit:        #e05252;
+      --iron:        #c0c0c0;
+      --ghost:       #8888cc;
+      --tongue:      #cc8844;
+      --wrench:      #44aacc;
+      --trail:       #88aa44;
+
+      --ashfall:     #39ff14;
+      --void:        #4a4a8a;
+      --void-dark:   #1a1a2e;
+
+      --font-title:  'Cinzel', serif;
+      --font-body:   'Crimson Text', serif;
+      --font-type:   'Special Elite', cursive;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #1a120a;
+      background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(139,58,26,0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(74,74,138,0.1) 0%, transparent 50%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      color: var(--dust);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ---- HEADER ---- */
+    .site-header {
+      background: linear-gradient(180deg, #0d0806 0%, #1a120a 100%);
+      border-bottom: 2px solid var(--rust);
+      padding: 20px 0 16px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .site-header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 40px,
+        rgba(139,58,26,0.05) 40px,
+        rgba(139,58,26,0.05) 41px
+      );
+    }
+
+    .site-header h1 {
+      font-family: var(--font-title);
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--dust);
+      letter-spacing: 0.15em;
+      text-shadow: 0 0 30px rgba(139,58,26,0.8), 2px 2px 0 rgba(0,0,0,0.8);
+      position: relative;
+    }
+
+    .site-header .subtitle {
+      font-family: var(--font-type);
+      font-size: 0.85rem;
+      color: var(--dust-deep);
+      letter-spacing: 0.25em;
+      margin-top: 4px;
+      position: relative;
+    }
+
+    .site-header nav {
+      margin-top: 12px;
+      position: relative;
+    }
+
+    .site-header nav a {
+      font-family: var(--font-title);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      color: var(--dust-deep);
+      text-decoration: none;
+      margin: 0 16px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .site-header nav a:hover { color: var(--rust-light); }
+
+    /* ---- MAIN CONTAINER ---- */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* ---- PAPER PANEL ---- */
+    .paper {
+      background: var(--dust);
+      color: var(--ink);
+      border-radius: 2px;
+      box-shadow:
+        0 0 0 1px var(--dust-deep),
+        0 0 0 3px var(--dust-dark),
+        4px 4px 20px rgba(0,0,0,0.6),
+        inset 0 0 60px rgba(196,168,106,0.3);
+      position: relative;
+    }
+
+    .paper::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      border-radius: 2px;
+    }
+
+    /* ---- SECTION HEADERS ---- */
+    .section-title {
+      font-family: var(--font-title);
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--rust);
+      border-bottom: 1px solid var(--dust-deep);
+      padding-bottom: 6px;
+      margin-bottom: 16px;
+    }
+
+    /* ---- BUTTONS ---- */
+    .btn {
+      font-family: var(--font-title);
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 10px 24px;
+      border: 2px solid var(--rust);
+      background: transparent;
+      color: var(--dust);
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--rust);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.2s;
+      z-index: -1;
+    }
+
+    .btn:hover::before { transform: scaleX(1); }
+    .btn:hover { color: var(--dust); }
+
+    .btn-primary {
+      background: var(--rust);
+      color: var(--dust);
+    }
+
+    .btn-primary:hover { background: var(--rust-light); border-color: var(--rust-light); }
+
+    /* ---- STAT BARS ---- */
+    .stat-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-family: var(--font-title);
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      width: 65px;
+      flex-shrink: 0;
+    }
+
+    .stat-pips {
+      display: flex;
+      gap: 4px;
+    }
+
+    .pip {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      transition: background 0.15s;
+    }
+
+    .pip.filled { background: currentColor; }
+
+    /* ---- FACTION EMBLEMS (CSS-generated) ---- */
+    .faction-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      font-size: 1.4rem;
+      border: 2px solid currentColor;
+    }
+
+    .faction-Dustfolk  { color: #c8a96e; border-color: #c8a96e; }
+    .faction-Ironclad  { color: #39ff14; border-color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+    .faction-Uncanny   { color: #cc44ff; border-color: #cc44ff; text-shadow: 0 0 8px #cc44ff; }
+    .faction-Void      { color: #6a6acc; border-color: #6a6acc; }
+
+    /* ---- ALERTS ---- */
+    .alert {
+      padding: 12px 16px;
+      border-left: 4px solid var(--rust);
+      background: rgba(139,58,26,0.1);
+      color: var(--dust);
+      font-family: var(--font-type);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    /* ---- FOOTER ---- */
+    .site-footer {
+      text-align: center;
+      padding: 32px 0;
+      color: var(--ash);
+      font-family: var(--font-type);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      border-top: 1px solid rgba(139,58,26,0.3);
+      margin-top: 60px;
+    }
+
+    /* ---- UTILITY ---- */
+    .text-rust   { color: var(--rust-light); }
+    .text-ash    { color: var(--ash-light); }
+    .text-dust   { color: var(--dust); }
+    .italic      { font-style: italic; }
+    .small       { font-size: 0.85rem; }
+
+    @media (max-width: 700px) {
+      .site-header h1 { font-size: 1.4rem; }
+      .container { padding: 0 12px; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>DUSTFALL</h1>
+      <div class="subtitle">THE ASHEN FRONTIER &nbsp;·&nbsp; CHARACTER DOSSIER</div>
+      <nav>
+        <a href="/">Create</a>
+        <a href="/gallery">Gallery</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 40px; padding-bottom: 60px;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    DUSTFALL: THE ASHEN FRONTIER &nbsp;·&nbsp; DANGERCORN ENTERPRISES &nbsp;·&nbsp; YEAR 1889
+  </footer>
+</body>
+</html>

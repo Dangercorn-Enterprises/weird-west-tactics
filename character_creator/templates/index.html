@@ -1,0 +1,1013 @@
+{% extends "base.html" %}
+
+{% block title %}Dustfall — Character Creator{% endblock %}
+
+{% block head %}
+<style>
+  /* ============================================================
+     CHARACTER CREATOR — STEP WIZARD
+     ============================================================ */
+
+  .wizard-shell {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .wizard-shell { grid-template-columns: 1fr; }
+    .preview-panel { order: -1; }
+  }
+
+  /* ---- STEP TABS ---- */
+  .step-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid rgba(139,58,26,0.4);
+    overflow-x: auto;
+  }
+
+  .step-tab {
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    color: var(--ash);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .step-tab.active {
+    color: var(--dust);
+    border-bottom-color: var(--rust);
+  }
+
+  .step-tab.complete { color: var(--dust-deep); }
+
+  .step-panel { display: none; }
+  .step-panel.active { display: block; }
+
+  /* ---- FACTION GRID ---- */
+  .faction-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .faction-card {
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .faction-card:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.05); }
+  .faction-card.selected { border-color: var(--rust); background: rgba(139,58,26,0.15); }
+
+  .faction-card input[type="radio"] { display: none; }
+
+  .faction-card .faction-name {
+    font-family: var(--font-title);
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .faction-card .faction-desc {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--ash-light);
+    line-height: 1.4;
+  }
+
+  .faction-card .faction-bonus {
+    margin-top: 8px;
+    font-family: var(--font-title);
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--rust-light);
+  }
+
+  /* Faction colors */
+  .fc-Dustfolk  .faction-name { color: #c8a96e; }
+  .fc-Ironclad  .faction-name { color: #39ff14; text-shadow: 0 0 6px rgba(57,255,20,0.5); }
+  .fc-Uncanny   .faction-name { color: #cc44ff; text-shadow: 0 0 6px rgba(204,68,255,0.5); }
+  .fc-Void      .faction-name { color: #8888cc; }
+
+  /* ---- ARCHETYPE GRID ---- */
+  .archetype-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .archetype-card {
+    border: 2px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .archetype-card:hover { border-color: rgba(255,255,255,0.2); }
+  .archetype-card.selected { border-color: var(--rust); background: rgba(139,58,26,0.1); }
+  .archetype-card input[type="radio"] { display: none; }
+
+  .archetype-card .arch-name {
+    font-family: var(--font-title);
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .archetype-card .arch-desc {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--ash-light);
+    line-height: 1.3;
+  }
+
+  .archetype-card .arch-gear {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--dust-deep);
+  }
+
+  /* ---- STAT BUILDER ---- */
+  .stat-builder {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 40px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .stat-name-block { }
+  .stat-name-label {
+    font-family: var(--font-title);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .stat-name-icon { font-size: 1rem; }
+
+  .stat-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+    outline: none;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  .stat-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--rust);
+    cursor: pointer;
+    border: 2px solid var(--dust);
+    box-shadow: 0 0 6px rgba(139,58,26,0.6);
+  }
+
+  .stat-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--rust);
+    cursor: pointer;
+    border: 2px solid var(--dust);
+  }
+
+  .stat-value {
+    font-family: var(--font-title);
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .points-remaining {
+    text-align: center;
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    margin-bottom: 16px;
+  }
+
+  .points-ok   { color: var(--trail); }
+  .points-over { color: var(--grit); }
+  .points-left { color: var(--tongue); }
+
+  /* ---- TRAITS ---- */
+  .traits-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .trait-card {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .trait-card:hover { border-color: rgba(255,255,255,0.25); }
+  .trait-card.selected { border-color: var(--rust); background: rgba(139,58,26,0.12); }
+  .trait-card.disabled { opacity: 0.4; cursor: not-allowed; }
+  .trait-card input[type="checkbox"] { display: none; }
+
+  .trait-name {
+    font-family: var(--font-title);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  .trait-effect {
+    font-size: 0.75rem;
+    color: var(--ash-light);
+    font-style: italic;
+  }
+
+  /* ---- APPEARANCE ---- */
+  .appearance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .app-field label {
+    display: block;
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dust-deep);
+    margin-bottom: 6px;
+  }
+
+  .app-field select {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.4);
+    color: var(--dust);
+    border: 1px solid rgba(255,255,255,0.15);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .app-field select:focus { outline: none; border-color: var(--rust); }
+
+  /* ---- BACKSTORY OPTIONS ---- */
+  .backstory-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .bs-field label {
+    display: block;
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dust-deep);
+    margin-bottom: 8px;
+  }
+
+  .bs-field select {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.4);
+    color: var(--dust);
+    border: 1px solid rgba(255,255,255,0.15);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .bs-field select:focus { outline: none; border-color: var(--rust); }
+
+  /* ---- NAME FIELD ---- */
+  .name-field {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .name-field input {
+    flex: 1;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.4);
+    color: var(--dust);
+    border: 2px solid rgba(255,255,255,0.15);
+    font-family: var(--font-type);
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+  }
+
+  .name-field input:focus { outline: none; border-color: var(--rust); }
+  .name-field input::placeholder { color: var(--ash); }
+
+  /* ---- PREVIEW PANEL ---- */
+  .preview-panel {
+    position: sticky;
+    top: 20px;
+  }
+
+  .preview-paper {
+    background: var(--dust);
+    color: var(--ink);
+    padding: 20px;
+    border-radius: 2px;
+    box-shadow:
+      0 0 0 1px var(--dust-deep),
+      4px 4px 20px rgba(0,0,0,0.5);
+    font-family: var(--font-body);
+  }
+
+  .preview-paper h2 {
+    font-family: var(--font-title);
+    font-size: 1.3rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+    color: var(--rust);
+    margin-bottom: 4px;
+    min-height: 1.6em;
+  }
+
+  .preview-paper .prev-faction {
+    text-align: center;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--ink-light);
+    margin-bottom: 12px;
+    min-height: 1.2em;
+  }
+
+  .preview-stats { margin: 12px 0; }
+
+  .prev-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .prev-stat-label {
+    font-family: var(--font-title);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    width: 55px;
+    flex-shrink: 0;
+    color: var(--ink-light);
+  }
+
+  .prev-pip {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    flex-shrink: 0;
+  }
+
+  .prev-pip.filled { background: currentColor; }
+
+  .prev-stat-val {
+    font-family: var(--font-title);
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+
+  .preview-traits {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--dust-deep);
+    font-size: 0.8rem;
+    color: var(--ink-light);
+  }
+
+  .preview-traits .t-name {
+    font-family: var(--font-title);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--rust);
+  }
+
+  /* ---- STEP NAVIGATION ---- */
+  .step-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* ---- STAT COLORS ---- */
+  .s-grit   { color: #e05252; }
+  .s-iron   { color: #c0c0c0; }
+  .s-ghost  { color: #8888cc; }
+  .s-tongue { color: #cc8844; }
+  .s-wrench { color: #44aacc; }
+  .s-trail  { color: #88aa44; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="alert">⚠ {{ error }}</div>
+{% endif %}
+
+<form method="post" action="/create" id="creator-form">
+
+<div class="wizard-shell">
+  <!-- LEFT: STEP WIZARD -->
+  <div class="wizard-main">
+
+    <!-- Step tabs -->
+    <div class="step-tabs" id="step-tabs">
+      <button type="button" class="step-tab active" data-step="1">I. Faction</button>
+      <button type="button" class="step-tab" data-step="2">II. Archetype</button>
+      <button type="button" class="step-tab" data-step="3">III. Stats</button>
+      <button type="button" class="step-tab" data-step="4">IV. Traits</button>
+      <button type="button" class="step-tab" data-step="5">V. Appearance</button>
+      <button type="button" class="step-tab" data-step="6">VI. Backstory</button>
+    </div>
+
+    <!-- STEP 1: FACTION -->
+    <div class="step-panel active" id="step-1">
+      <p class="section-title">Choose Your Allegiance</p>
+      <p style="margin-bottom:20px; font-style:italic; color: var(--ash-light); font-size:0.9rem;">
+        The frontier is divided by divine power and desperate survival. Who do you answer to?
+      </p>
+
+      <div class="faction-grid">
+        {% for key, f in factions.items() %}
+        <label class="faction-card fc-{{ key }}" id="fl-{{ key }}">
+          <input type="radio" name="faction" value="{{ key }}" required
+                 onchange="selectFaction('{{ key }}')"
+                 {% if form_data and form_data.get('faction') == key %}checked{% endif %}>
+          <div class="faction-name">
+            <span>{{ f.emblem }}</span>
+            <span>{{ key }}</span>
+          </div>
+          <div class="faction-desc">{{ f.description }}</div>
+          <div class="faction-bonus">
+            Bonus: {% for stat, val in f.stat_bonus.items() %}+{{ val }} {{ stat|upper }}{% endfor %}
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="step-nav">
+        <span></span>
+        <button type="button" class="btn btn-primary" onclick="goStep(2)">Next: Archetype →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: ARCHETYPE -->
+    <div class="step-panel" id="step-2">
+      <p class="section-title">Choose Your Path</p>
+      <p style="margin-bottom:20px; font-style:italic; color: var(--ash-light); font-size:0.9rem;">
+        What you are on the frontier. Your skills, your tools, your reputation.
+      </p>
+
+      <div class="archetype-grid">
+        {% for key, a in archetypes.items() %}
+        <label class="archetype-card" id="al-{{ key }}">
+          <input type="radio" name="archetype" value="{{ key }}" required
+                 onchange="selectArchetype('{{ key }}')"
+                 {% if form_data and form_data.get('archetype') == key %}checked{% endif %}>
+          <div class="arch-name">
+            <span>{{ a.emblem }}</span>
+            <span>{{ key }}</span>
+          </div>
+          <div class="arch-desc">{{ a.description }}</div>
+          <div class="arch-gear">
+            Starting gear:
+            {% for g in a.starting_gear[:2] %}{{ g.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="step-nav">
+        <button type="button" class="btn" onclick="goStep(1)">← Back</button>
+        <button type="button" class="btn btn-primary" onclick="goStep(3)">Next: Stats →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: STATS -->
+    <div class="step-panel" id="step-3">
+      <p class="section-title">Distribute Your Points</p>
+
+      <div class="points-remaining" id="points-display">
+        Points Remaining: <span id="points-val">{{ stat_point_pool }}</span> / {{ stat_point_pool }}
+      </div>
+
+      <div class="stat-builder">
+        {% for key in stat_keys %}
+        {% set s = stats[key] %}
+        <div class="stat-row">
+          <div class="stat-name-block">
+            <div class="stat-name-icon s-{{ key }}">{{ s.icon }}</div>
+            <div class="stat-name-label s-{{ key }}">{{ s.label }}</div>
+          </div>
+          <input
+            type="range"
+            class="stat-slider"
+            id="slider-{{ key }}"
+            name="stat_{{ key }}"
+            min="{{ stat_min }}"
+            max="{{ stat_max }}"
+            value="{{ (form_data.get('stat_' + key, '1') if form_data else '1') }}"
+            oninput="updateStats()"
+            data-stat="{{ key }}"
+            style="accent-color: {{ s.color }};"
+          >
+          <div class="stat-value s-{{ key }}" id="val-{{ key }}">1</div>
+        </div>
+        <div style="margin: -10px 0 6px 92px; font-size: 0.75rem; font-style:italic; color: var(--ash);">
+          {{ s.description }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="step-nav">
+        <button type="button" class="btn" onclick="goStep(2)">← Back</button>
+        <button type="button" class="btn btn-primary" onclick="goStep(4)" id="next-from-stats">Next: Traits →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: TRAITS -->
+    <div class="step-panel" id="step-4">
+      <p class="section-title">Choose 2 Traits</p>
+      <p style="margin-bottom:16px; font-style:italic; color: var(--ash-light); font-size:0.9rem;">
+        Defining qualities that shape how you survive the frontier. Select exactly 2.
+      </p>
+
+      <p id="trait-count-msg" style="font-family: var(--font-title); font-size:0.75rem; letter-spacing:0.1em; margin-bottom:14px; color: var(--tongue);">
+        0 of 2 selected
+      </p>
+
+      <div class="traits-grid">
+        {% for tkey, t in traits.items() %}
+        <label class="trait-card" id="tc-{{ tkey|replace(' ','-') }}">
+          <input type="checkbox" name="traits" value="{{ tkey }}"
+                 onchange="updateTraits()"
+                 {% if form_data and tkey in form_data.getlist('traits') %}checked{% endif %}>
+          <div class="trait-name">{{ tkey }}</div>
+          <div class="trait-effect">{{ t.effect }}</div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="step-nav">
+        <button type="button" class="btn" onclick="goStep(3)">← Back</button>
+        <button type="button" class="btn btn-primary" onclick="goStep(5)">Next: Appearance →</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: APPEARANCE -->
+    <div class="step-panel" id="step-5">
+      <p class="section-title">Your Face to the World</p>
+      <p style="margin-bottom:16px; font-style:italic; color: var(--ash-light); font-size:0.9rem;">
+        The first thing people see before they reach for their iron.
+      </p>
+
+      <div class="name-field">
+        <input type="text" name="name" id="char-name" placeholder="Enter character name..."
+               value="{{ form_data.get('name', '') if form_data else '' }}"
+               maxlength="60">
+        <button type="button" class="btn" onclick="randomName()" title="Random frontier name">
+          ⟳ Random
+        </button>
+      </div>
+
+      <div class="appearance-grid">
+        <div class="app-field">
+          <label>Eyes</label>
+          <select name="app_eyes">
+            {% for opt in appearances.eyes %}
+            <option value="{{ opt }}" {% if form_data and form_data.get('app_eyes') == opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="app-field">
+          <label>Build</label>
+          <select name="app_build">
+            {% for opt in appearances.build %}
+            <option value="{{ opt }}" {% if form_data and form_data.get('app_build') == opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="app-field">
+          <label>Distinguishing Marks</label>
+          <select name="app_marks">
+            {% for opt in appearances.marks %}
+            <option value="{{ opt }}" {% if form_data and form_data.get('app_marks') == opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="app-field">
+          <label>Dress</label>
+          <select name="app_dress">
+            {% for opt in appearances.dress %}
+            <option value="{{ opt }}" {% if form_data and form_data.get('app_dress') == opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button type="button" class="btn" onclick="goStep(4)">← Back</button>
+        <button type="button" class="btn btn-primary" onclick="goStep(6)">Next: Backstory →</button>
+      </div>
+    </div>
+
+    <!-- STEP 6: BACKSTORY -->
+    <div class="step-panel" id="step-6">
+      <p class="section-title">Your History</p>
+      <p style="margin-bottom:16px; font-style:italic; color: var(--ash-light); font-size:0.9rem;">
+        The events that made you. Optionally steer the narrative, or leave it to fate.
+      </p>
+
+      <div class="backstory-options">
+        <div class="bs-field">
+          <label>Defining Event — the thing that changed everything</label>
+          <select name="event_key">
+            <option value="">— Let fate decide —</option>
+            {% for ev in events %}
+            <option value="{{ ev.key }}"
+              {% if form_data and form_data.get('event_key') == ev.key %}selected{% endif %}>
+              {{ ev.key|replace('_',' ')|title }} — {{ ev.text[:70] }}...
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="bs-field">
+          <label>Motivation — what drives you forward</label>
+          <select name="motivation_key">
+            <option value="">— Let fate decide —</option>
+            {% for mkey, m in motivations.items() %}
+            <option value="{{ mkey }}"
+              {% if form_data and form_data.get('motivation_key') == mkey %}selected{% endif %}>
+              {{ m.label }} — {{ m.description[:60] }}...
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top: 32px; text-align: center;">
+        <button type="submit" class="btn btn-primary" style="font-size:1rem; padding: 14px 48px; letter-spacing:0.2em;">
+          RIDE INTO THE FRONTIER
+        </button>
+      </div>
+
+      <div class="step-nav" style="justify-content: flex-start;">
+        <button type="button" class="btn" onclick="goStep(5)">← Back</button>
+      </div>
+    </div>
+
+  </div><!-- /wizard-main -->
+
+  <!-- RIGHT: LIVE PREVIEW -->
+  <div class="preview-panel">
+    <div class="preview-paper">
+      <div style="text-align:center; margin-bottom:8px;">
+        <span id="prev-faction-emblem" style="font-size:2rem; color: #c8a96e;">◈</span>
+      </div>
+      <h2 id="prev-name">NAME UNKNOWN</h2>
+      <div class="prev-faction" id="prev-faction-arch">— · —</div>
+
+      <div style="border-top: 1px solid var(--dust-deep); padding-top: 10px; margin-top:8px;">
+        <div style="font-family: var(--font-title); font-size:0.6rem; letter-spacing:0.2em; color: var(--rust); margin-bottom:8px;">STATISTICS</div>
+        <div class="preview-stats" id="prev-stats">
+          {% set stat_colors = {'grit': '#e05252', 'iron': '#c0c0c0', 'ghost': '#8888cc', 'tongue': '#cc8844', 'wrench': '#44aacc', 'trail': '#88aa44'} %}
+          {% set stat_labels = {'grit': 'GRIT', 'iron': 'IRON', 'ghost': 'GHOST', 'tongue': 'TONGUE', 'wrench': 'WRENCH', 'trail': 'TRAIL'} %}
+          {% for key in stat_keys %}
+          {% set s = stats[key] %}
+          <div class="prev-stat-row" id="psr-{{ key }}">
+            <div class="prev-stat-label" style="color: {{ s.color }};">{{ s.label }}</div>
+            <div class="stat-pips" id="ppips-{{ key }}" style="color: {{ s.color }};">
+              {% for i in range(6) %}
+              <div class="prev-pip {% if i < 1 %}filled{% endif %}" data-pip="{{ i }}"></div>
+              {% endfor %}
+            </div>
+            <div class="prev-stat-val" style="color: {{ s.color }};" id="pval-{{ key }}">1</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="preview-traits" id="prev-traits">
+        <div style="font-family: var(--font-title); font-size:0.6rem; letter-spacing:0.2em; color: var(--rust); margin-bottom:6px;">TRAITS</div>
+        <div id="prev-trait-list" style="color: var(--ink-light); font-size:0.8rem; font-style:italic;">None selected yet</div>
+      </div>
+
+      <div style="border-top: 1px solid var(--dust-deep); padding-top: 8px; margin-top:8px; font-size:0.78rem; color: var(--ink-light);">
+        <div style="font-family: var(--font-title); font-size:0.6rem; letter-spacing:0.2em; color: var(--rust); margin-bottom:4px;">DERIVED</div>
+        <span>HP: <strong id="prev-hp">12</strong></span>
+        &nbsp;·&nbsp;
+        <span>Init: <strong id="prev-init">2</strong></span>
+        &nbsp;·&nbsp;
+        <span>Carry: <strong id="prev-carry">7</strong></span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wizard-shell -->
+</form>
+
+<script>
+// ============================================================
+// WIZARD STATE
+// ============================================================
+let currentStep = 1;
+const totalSteps = 6;
+
+const statPool = {{ stat_point_pool }};
+const statMax  = {{ stat_max }};
+const statMin  = {{ stat_min }};
+const statKeys = {{ stat_keys | tojson }};
+
+// Faction data for preview
+const factionData = {{ factions | tojson }};
+const archetypeData = {{ archetypes | tojson }};
+const traitData = {{ traits | tojson }};
+
+// ---- Step navigation ----
+function goStep(n) {
+  if (n < 1 || n > totalSteps) return;
+
+  // Validate current before advance
+  if (n > currentStep) {
+    const err = validateStep(currentStep);
+    if (err) { showStepError(err); return; }
+  }
+
+  document.getElementById(`step-${currentStep}`).classList.remove('active');
+  document.querySelectorAll('.step-tab')[currentStep - 1].classList.remove('active');
+  if (n < currentStep) {
+    document.querySelectorAll('.step-tab')[currentStep - 1].classList.remove('complete');
+  } else {
+    document.querySelectorAll('.step-tab')[currentStep - 1].classList.add('complete');
+  }
+
+  currentStep = n;
+  document.getElementById(`step-${currentStep}`).classList.add('active');
+  document.querySelectorAll('.step-tab')[currentStep - 1].classList.add('active');
+  document.querySelectorAll('.step-tab')[currentStep - 1].classList.remove('complete');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function validateStep(step) {
+  if (step === 1) {
+    if (!document.querySelector('input[name="faction"]:checked')) return 'Select a faction before continuing.';
+  }
+  if (step === 2) {
+    if (!document.querySelector('input[name="archetype"]:checked')) return 'Select an archetype before continuing.';
+  }
+  if (step === 3) {
+    const remaining = getPointsRemaining();
+    if (remaining !== 0) return `Distribute all ${statPool} points (${remaining > 0 ? remaining + ' remaining' : Math.abs(remaining) + ' over'}).`;
+  }
+  if (step === 4) {
+    const checked = document.querySelectorAll('input[name="traits"]:checked').length;
+    if (checked !== 2) return 'Select exactly 2 traits.';
+  }
+  return null;
+}
+
+function showStepError(msg) {
+  let el = document.getElementById('step-error-msg');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'step-error-msg';
+    el.className = 'alert';
+    el.style.marginTop = '12px';
+    document.getElementById(`step-${currentStep}`).appendChild(el);
+  }
+  el.textContent = msg;
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+}
+
+// ---- Faction selection ----
+function selectFaction(key) {
+  document.querySelectorAll('.faction-card').forEach(c => c.classList.remove('selected'));
+  const lbl = document.getElementById(`fl-${key}`);
+  if (lbl) lbl.classList.add('selected');
+  updatePreview();
+}
+
+function selectArchetype(key) {
+  document.querySelectorAll('.archetype-card').forEach(c => c.classList.remove('selected'));
+  const lbl = document.getElementById(`al-${key}`);
+  if (lbl) lbl.classList.add('selected');
+  updatePreview();
+}
+
+// ---- Stats ----
+function getPointsRemaining() {
+  let used = 0;
+  statKeys.forEach(k => {
+    used += parseInt(document.getElementById(`slider-${k}`).value) || statMin;
+  });
+  return statPool - used;
+}
+
+function updateStats() {
+  let used = 0;
+  statKeys.forEach(k => {
+    const v = parseInt(document.getElementById(`slider-${k}`).value) || statMin;
+    used += v;
+    document.getElementById(`val-${k}`).textContent = v;
+  });
+  const remaining = statPool - used;
+  const el = document.getElementById('points-val');
+  const wrap = document.getElementById('points-display');
+  el.textContent = remaining;
+  wrap.className = 'points-remaining ' + (remaining === 0 ? 'points-ok' : (remaining < 0 ? 'points-over' : 'points-left'));
+  updatePreview();
+}
+
+// ---- Traits ----
+function updateTraits() {
+  const checked = document.querySelectorAll('input[name="traits"]:checked');
+  const count = checked.length;
+  const msg = document.getElementById('trait-count-msg');
+  msg.textContent = `${count} of 2 selected`;
+  msg.style.color = count === 2 ? '#88aa44' : '#cc8844';
+
+  // Disable unchosen cards once 2 selected
+  document.querySelectorAll('.trait-card').forEach(card => {
+    const cb = card.querySelector('input[type="checkbox"]');
+    if (count >= 2 && !cb.checked) {
+      card.classList.add('disabled');
+      cb.disabled = true;
+    } else {
+      card.classList.remove('disabled');
+      cb.disabled = false;
+      if (cb.checked) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+  });
+  updatePreview();
+}
+
+// ---- Preview ----
+function updatePreview() {
+  // Name
+  const nameEl = document.getElementById('char-name');
+  const prevName = document.getElementById('prev-name');
+  prevName.textContent = (nameEl && nameEl.value.trim()) ? nameEl.value.trim().toUpperCase() : 'NAME UNKNOWN';
+
+  // Faction + Archetype
+  const factionInput = document.querySelector('input[name="faction"]:checked');
+  const archInput = document.querySelector('input[name="archetype"]:checked');
+  const fKey = factionInput ? factionInput.value : null;
+  const aKey = archInput ? archInput.value : null;
+
+  const prevFA = document.getElementById('prev-faction-arch');
+  const prevEmb = document.getElementById('prev-faction-emblem');
+  if (fKey && aKey) {
+    prevFA.textContent = `${fKey} · ${aKey}`;
+  } else if (fKey) {
+    prevFA.textContent = fKey;
+  } else {
+    prevFA.textContent = '— · —';
+  }
+
+  if (fKey && factionData[fKey]) {
+    prevEmb.textContent = factionData[fKey].emblem;
+    const colorMap = {'Dustfolk':'#c8a96e','Ironclad':'#39ff14','Uncanny':'#cc44ff','Void':'#6a6acc'};
+    prevEmb.style.color = colorMap[fKey] || '#c8a96e';
+  }
+
+  // Stats
+  const statColorMap = {grit:'#e05252',iron:'#c0c0c0',ghost:'#8888cc',tongue:'#cc8844',wrench:'#44aacc',trail:'#88aa44'};
+  let totalGrit=0, totalIron=0, totalGhost=0;
+
+  statKeys.forEach(k => {
+    const slider = document.getElementById(`slider-${k}`);
+    const val = parseInt(slider ? slider.value : 1) || 1;
+
+    if (k === 'grit') totalGrit = val;
+    if (k === 'iron') totalIron = val;
+    if (k === 'ghost') totalGhost = val;
+
+    document.getElementById(`pval-${k}`).textContent = val;
+    const pipsEl = document.getElementById(`ppips-${k}`);
+    if (pipsEl) {
+      pipsEl.querySelectorAll('.prev-pip').forEach((pip, i) => {
+        pip.classList.toggle('filled', i < val);
+      });
+    }
+  });
+
+  // Derived
+  let hp = 10 + (totalGrit * 2);
+  // Faction bonus
+  if (fKey && factionData[fKey] && factionData[fKey].stat_bonus) {
+    const bonus = factionData[fKey].stat_bonus;
+    if (bonus.grit) hp += bonus.grit * 2;
+  }
+  document.getElementById('prev-hp').textContent = hp;
+  document.getElementById('prev-init').textContent = totalIron + totalGhost;
+  document.getElementById('prev-carry').textContent = 6 + totalGrit;
+
+  // Traits
+  const selectedTraits = [...document.querySelectorAll('input[name="traits"]:checked')].map(cb => cb.value);
+  const traitListEl = document.getElementById('prev-trait-list');
+  if (selectedTraits.length === 0) {
+    traitListEl.textContent = 'None selected yet';
+  } else {
+    traitListEl.innerHTML = selectedTraits.map(t =>
+      `<span class="t-name">${t}</span>`
+    ).join(' · ');
+  }
+}
+
+// ---- Random name ----
+async function randomName() {
+  const resp = await fetch('/api/random-name');
+  const data = await resp.json();
+  document.getElementById('char-name').value = data.name;
+  updatePreview();
+}
+
+// Listen to name input
+document.addEventListener('DOMContentLoaded', () => {
+  const nameEl = document.getElementById('char-name');
+  if (nameEl) nameEl.addEventListener('input', updatePreview);
+
+  // Init stats
+  updateStats();
+  updateTraits();
+
+  // Re-select saved faction/archetype if form error
+  const checkedFaction = document.querySelector('input[name="faction"]:checked');
+  if (checkedFaction) selectFaction(checkedFaction.value);
+  const checkedArch = document.querySelector('input[name="archetype"]:checked');
+  if (checkedArch) selectArchetype(checkedArch.value);
+
+  // Init trait cards
+  document.querySelectorAll('.trait-card input[type="checkbox"]:checked').forEach(cb => {
+    cb.closest('.trait-card').classList.add('selected');
+  });
+});
+</script>
+{% endblock %}

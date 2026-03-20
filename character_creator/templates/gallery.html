@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Character Gallery — Dustfall{% endblock %}
+
+{% block head %}
+<style>
+  .gallery-header {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+
+  .gallery-header h2 {
+    font-family: var(--font-title);
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    color: var(--dust);
+    margin-bottom: 8px;
+  }
+
+  .gallery-header p {
+    font-style: italic;
+    color: var(--ash-light);
+  }
+
+  /* ---- FILTER BAR ---- */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-label {
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ash);
+  }
+
+  .filter-btn {
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: var(--ash-light);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover,
+  .filter-btn.active {
+    border-color: var(--rust);
+    color: var(--dust);
+    background: rgba(139,58,26,0.15);
+  }
+
+  /* ---- CHARACTER GRID ---- */
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .char-card {
+    background: rgba(244,233,200,0.04);
+    border: 1px solid rgba(196,168,106,0.2);
+    border-radius: 2px;
+    padding: 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+    display: block;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .char-card:hover {
+    border-color: var(--rust);
+    background: rgba(139,58,26,0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  /* Faction accent bar */
+  .char-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .char-card.fDustfolk::before  { background: #c8a96e; }
+  .char-card.fIronclad::before  { background: #39ff14; box-shadow: 0 0 6px #39ff14; }
+  .char-card.fUncanny::before   { background: #cc44ff; box-shadow: 0 0 6px #cc44ff; }
+  .char-card.fVoid::before      { background: #4a4a8a; }
+
+  .char-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .char-emblem {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .fDustfolk .char-emblem { color: #c8a96e; }
+  .fIronclad .char-emblem { color: #39ff14; text-shadow: 0 0 6px rgba(57,255,20,0.5); }
+  .fUncanny  .char-emblem { color: #cc44ff; text-shadow: 0 0 6px rgba(204,68,255,0.4); }
+  .fVoid     .char-emblem { color: #6a6acc; }
+
+  .char-meta {}
+
+  .char-name {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+    color: var(--dust);
+    margin-bottom: 2px;
+  }
+
+  .char-sub {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--ash-light);
+  }
+
+  /* Mini stat row */
+  .mini-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .mini-stat {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--font-title);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mini-stat-val {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  /* Mini pips */
+  .mini-pip-row {
+    display: flex;
+    gap: 2px;
+  }
+
+  .mini-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+  }
+
+  .mini-pip.filled { background: currentColor; }
+
+  .char-traits {
+    font-size: 0.75rem;
+    color: var(--ash-light);
+    font-style: italic;
+  }
+
+  .char-traits .t { color: var(--dust-deep); font-style: normal; }
+
+  .char-date {
+    font-size: 0.7rem;
+    color: var(--ash);
+    font-family: var(--font-title);
+    letter-spacing: 0.05em;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .seed-tag {
+    display: inline-block;
+    font-family: var(--font-title);
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ash);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 1px 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--ash);
+  }
+
+  .empty-state .big-text {
+    font-family: var(--font-title);
+    font-size: 1.4rem;
+    margin-bottom: 12px;
+    color: var(--dust-deep);
+  }
+
+  .empty-state p {
+    font-style: italic;
+    margin-bottom: 24px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gallery-header">
+  <h2>Dossiers &amp; Wanted Posters</h2>
+  <p>Every soul that's passed through the creator. Ride-alongs, gunslingers, hexweavers, and worse.</p>
+</div>
+
+{% if characters %}
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <span class="filter-label">Filter:</span>
+  <button class="filter-btn active" onclick="filterCards('all', this)">All ({{ characters|length }})</button>
+  {% set factions_seen = [] %}
+  {% for char in characters %}
+    {% if char.faction not in factions_seen %}
+      {% set _ = factions_seen.append(char.faction) %}
+      <button class="filter-btn" onclick="filterCards('{{ char.faction }}', this)">{{ char.faction }}</button>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<div class="char-grid" id="char-grid">
+  {% set faction_emblems = {'Dustfolk': '◈', 'Ironclad': '⚙', 'Uncanny': '⟁', 'Void': '⊗'} %}
+  {% set stat_colors = {'grit': '#e05252', 'iron': '#c0c0c0', 'ghost': '#8888cc', 'tongue': '#cc8844', 'wrench': '#44aacc', 'trail': '#88aa44'} %}
+  {% set stat_labels = {'grit': 'GRT', 'iron': 'IRN', 'ghost': 'GHT', 'tongue': 'TNG', 'wrench': 'WRN', 'trail': 'TRL'} %}
+
+  {% for char in characters %}
+  <a href="/character/{{ char.id }}" class="char-card f{{ char.faction }}" data-faction="{{ char.faction }}">
+    <div class="char-card-header">
+      <div class="char-emblem">{{ faction_emblems.get(char.faction, '◈') }}</div>
+      <div class="char-meta">
+        <div class="char-name">
+          {{ char.name }}
+          {% if char.is_seed %}<span class="seed-tag">NPC</span>{% endif %}
+        </div>
+        <div class="char-sub">{{ char.faction }} · {{ char.archetype }}</div>
+      </div>
+    </div>
+
+    <!-- Mini stat pips -->
+    <div class="mini-stats">
+      {% for key, label in stat_labels.items() %}
+      {% set val = char.stats.get(key, 1) %}
+      <div class="mini-stat" style="color: {{ stat_colors[key] }};">
+        <span>{{ label }}</span>
+        <div class="mini-pip-row">
+          {% for i in range(6) %}
+          <div class="mini-pip {% if i < val %}filled{% endif %}"></div>
+          {% endfor %}
+        </div>
+        <span class="mini-stat-val">{{ val }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if char.traits %}
+    <div class="char-traits">
+      Traits:
+      {% for t in char.traits %}
+      <span class="t">{{ t }}</span>{% if not loop.last %} · {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if char.motivation and char.motivation.get('label') %}
+    <div style="margin-top:8px; font-size:0.75rem; font-style:italic; color: var(--ash);">
+      Drives: {{ char.motivation.label }}
+    </div>
+    {% endif %}
+
+    <div class="char-date">
+      Created {{ char.created_at | int | timestamp_fmt if char.created_at else '—' }}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="big-text">No Souls on Record</div>
+  <p>The frontier is empty. Someone has to ride into it first.</p>
+  <a href="/" class="btn btn-primary">Create a Character</a>
+</div>
+{% endif %}
+
+<script>
+function filterCards(faction, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.char-card').forEach(card => {
+    if (faction === 'all' || card.dataset.faction === faction) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

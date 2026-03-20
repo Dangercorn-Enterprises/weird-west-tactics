@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+
+{% block title %}{{ char.name }} — Dustfall Character Sheet{% endblock %}
+
+{% block head %}
+<style>
+  /* ============================================================
+     CHARACTER SHEET — Aged Western Document
+     Sepia tones, worn edges, typewriter feel
+     ============================================================ */
+
+  .sheet-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .sheet-paper {
+    background: var(--dust);
+    color: var(--ink);
+    padding: 40px 48px;
+    border-radius: 2px;
+    position: relative;
+    box-shadow:
+      0 0 0 1px var(--dust-deep),
+      0 0 0 3px var(--dust-dark),
+      6px 8px 40px rgba(0,0,0,0.7),
+      -2px -2px 20px rgba(0,0,0,0.3);
+    font-family: var(--font-body);
+  }
+
+  /* Worn-corner effect */
+  .sheet-paper::before {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 60px; height: 60px;
+    background: linear-gradient(225deg, #1a120a 30%, transparent 31%),
+                linear-gradient(225deg, var(--dust-deep) 50%, transparent 51%);
+    border-radius: 0 0 2px 0;
+  }
+
+  /* Horizontal rule lines (typewriter paper) */
+  .sheet-paper::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      180deg,
+      transparent,
+      transparent 31px,
+      rgba(139,58,26,0.06) 31px,
+      rgba(139,58,26,0.06) 32px
+    );
+    pointer-events: none;
+    border-radius: 2px;
+  }
+
+  .sheet-paper > * { position: relative; z-index: 1; }
+
+  /* ---- HEADER ---- */
+  .sheet-header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 3px double var(--rust);
+  }
+
+  .sheet-header .world-name {
+    font-family: var(--font-title);
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 8px;
+  }
+
+  .sheet-header .char-name {
+    font-family: var(--font-title);
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--rust);
+    line-height: 1.1;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.15);
+  }
+
+  .sheet-header .char-sub {
+    font-family: var(--font-type);
+    font-size: 0.9rem;
+    color: var(--ink-light);
+    margin-top: 6px;
+    letter-spacing: 0.1em;
+  }
+
+  .sheet-header .faction-emblem-lg {
+    display: inline-block;
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+  }
+
+  /* ---- TWO-COLUMN LAYOUT ---- */
+  .sheet-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 700px) {
+    .sheet-body { grid-template-columns: 1fr; }
+    .sheet-paper { padding: 24px 20px; }
+  }
+
+  /* ---- SECTION ---- */
+  .sheet-section {
+    margin-bottom: 24px;
+  }
+
+  .sheet-section-title {
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--rust);
+    border-bottom: 1px solid var(--dust-deep);
+    padding-bottom: 4px;
+    margin-bottom: 14px;
+  }
+
+  /* ---- STATS ---- */
+  .stats-block { }
+
+  .stat-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .stat-entry .stat-lbl {
+    font-family: var(--font-title);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    width: 58px;
+    flex-shrink: 0;
+    color: var(--ink-light);
+  }
+
+  .stat-entry .stat-pips-wrap {
+    display: flex;
+    gap: 4px;
+  }
+
+  .stat-pip {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+  }
+
+  .stat-pip.filled { background: currentColor; }
+
+  .stat-entry .stat-num {
+    font-family: var(--font-title);
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-left: 6px;
+  }
+
+  /* ---- DERIVED STATS ---- */
+  .derived-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    text-align: center;
+    margin-top: 12px;
+  }
+
+  .derived-box {
+    border: 1px solid var(--dust-deep);
+    padding: 8px 4px;
+    border-radius: 1px;
+  }
+
+  .derived-box .d-label {
+    font-family: var(--font-title);
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ash);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .derived-box .d-val {
+    font-family: var(--font-title);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--rust);
+  }
+
+  /* ---- TRAITS ---- */
+  .trait-entry {
+    margin-bottom: 12px;
+  }
+
+  .trait-entry .trait-n {
+    font-family: var(--font-title);
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    color: var(--rust);
+    margin-bottom: 2px;
+  }
+
+  .trait-entry .trait-e {
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--ink-light);
+    line-height: 1.4;
+  }
+
+  /* ---- GEAR ---- */
+  .gear-item {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+
+  .gear-item::before {
+    content: '·';
+    color: var(--rust);
+    font-size: 1rem;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+
+  .gear-item .gear-n {
+    font-family: var(--font-title);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
+
+  .gear-item .gear-note {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--ash);
+    margin-top: 1px;
+  }
+
+  /* ---- APPEARANCE ---- */
+  .app-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .app-table td {
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(139,58,26,0.1);
+    vertical-align: top;
+  }
+
+  .app-table td:first-child {
+    font-family: var(--font-title);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ash);
+    width: 60px;
+    padding-right: 10px;
+  }
+
+  /* ---- BACKSTORY ---- */
+  .backstory-block {
+    font-family: var(--font-type);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--ink);
+    padding: 16px;
+    background: rgba(196,168,106,0.15);
+    border-left: 3px solid var(--rust);
+    margin-bottom: 16px;
+  }
+
+  .backstory-block p { margin-bottom: 12px; }
+  .backstory-block p:last-child { margin-bottom: 0; }
+
+  .motivation-box {
+    border: 1px solid var(--dust-deep);
+    padding: 12px 16px;
+    background: rgba(196,168,106,0.08);
+  }
+
+  .motivation-box .mot-label {
+    font-family: var(--font-title);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin-bottom: 4px;
+  }
+
+  .motivation-box .mot-desc {
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--ink-light);
+    line-height: 1.4;
+  }
+
+  /* ---- SECRET ---- */
+  .secret-box {
+    border: 1px dashed var(--ash);
+    padding: 10px 14px;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--ash);
+    position: relative;
+  }
+
+  .secret-box .secret-label {
+    font-family: var(--font-title);
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 4px;
+  }
+
+  /* ---- ORIGIN ---- */
+  .origin-line {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--ash);
+    margin-bottom: 8px;
+  }
+
+  /* ---- FULL-WIDTH SECTIONS ---- */
+  .sheet-full { grid-column: 1 / -1; }
+
+  /* ---- ACTION BAR ---- */
+  .sheet-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .sheet-actions a, .sheet-actions button {
+    font-family: var(--font-title);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ---- SEED BADGE ---- */
+  .seed-badge {
+    display: inline-block;
+    font-family: var(--font-title);
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dust-deep);
+    border: 1px solid var(--dust-deep);
+    padding: 2px 8px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sheet-wrap">
+  <div class="sheet-paper">
+
+    <!-- ===== HEADER ===== -->
+    <div class="sheet-header">
+      <div class="world-name">Dustfall: The Ashen Frontier &nbsp;·&nbsp; Character Dossier &nbsp;·&nbsp; Year 1889</div>
+      {% set faction_emblems = {'Dustfolk': '◈', 'Ironclad': '⚙', 'Uncanny': '⟁', 'Void': '⊗'} %}
+      {% set faction_colors = {'Dustfolk': '#c8a96e', 'Ironclad': '#39ff14', 'Uncanny': '#cc44ff', 'Void': '#6a6acc'} %}
+      <div class="faction-emblem-lg" style="color: {{ faction_colors.get(char.faction, '#c8a96e') }};">
+        {{ faction_emblems.get(char.faction, '◈') }}
+      </div>
+      <div class="char-name">
+        {{ char.name }}
+        {% if char.is_seed %}<span class="seed-badge">NPC</span>{% endif %}
+      </div>
+      <div class="char-sub">
+        {{ char.faction }} &nbsp;·&nbsp; {{ char.archetype }}
+        {% if char.origin_town %}&nbsp;·&nbsp; Out of {{ char.origin_town }}{% endif %}
+      </div>
+    </div>
+
+    <!-- ===== BODY ===== -->
+    <div class="sheet-body">
+
+      <!-- LEFT COLUMN -->
+      <div>
+
+        <!-- STATS -->
+        <div class="sheet-section">
+          <div class="sheet-section-title">Core Statistics</div>
+          <div class="stats-block">
+            {% set stat_colors = {'grit': '#e05252', 'iron': '#c0c0c0', 'ghost': '#8888cc', 'tongue': '#cc8844', 'wrench': '#44aacc', 'trail': '#88aa44'} %}
+            {% for key in stat_keys %}
+            {% set s = stats[key] %}
+            {% set val = char.stats.get(key, 1) %}
+            <div class="stat-entry">
+              <div class="stat-lbl" style="color: {{ s.color }};">{{ s.label }}</div>
+              <div class="stat-pips-wrap" style="color: {{ s.color }};">
+                {% for i in range(6) %}
+                <div class="stat-pip {% if i < val %}filled{% endif %}"></div>
+                {% endfor %}
+              </div>
+              <div class="stat-num" style="color: {{ s.color }};">{{ val }}</div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Derived -->
+          <div class="derived-row">
+            <div class="derived-box">
+              <span class="d-label">Max HP</span>
+              <span class="d-val">{{ char.derived.get('max_hp', '—') }}</span>
+            </div>
+            <div class="derived-box">
+              <span class="d-label">Initiative</span>
+              <span class="d-val">{{ char.derived.get('initiative', '—') }}</span>
+            </div>
+            <div class="derived-box">
+              <span class="d-label">Carry</span>
+              <span class="d-val">{{ char.derived.get('carry_cap', '—') }}</span>
+            </div>
+            <div class="derived-box">
+              <span class="d-label">Wounds</span>
+              <span class="d-val">0/{{ char.derived.get('wounds_max', 3) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRAITS -->
+        <div class="sheet-section">
+          <div class="sheet-section-title">Traits</div>
+          {% for t in char.traits %}
+          {% set td = traits.get(t, {}) %}
+          <div class="trait-entry">
+            <div class="trait-n">{{ t }}</div>
+            {% if td.description %}<div class="trait-e">{{ td.description }}</div>{% endif %}
+            {% if td.effect %}<div style="font-size:0.8rem; color: var(--ash); margin-top:2px;">{{ td.effect }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+      </div><!-- /left -->
+
+      <!-- RIGHT COLUMN -->
+      <div>
+
+        <!-- GEAR -->
+        <div class="sheet-section">
+          <div class="sheet-section-title">Starting Gear</div>
+          {% for item in char.gear %}
+          <div class="gear-item">
+            <div>
+              <div class="gear-n">{{ item.name }}</div>
+              <div class="gear-note">{{ item.notes }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- APPEARANCE -->
+        <div class="sheet-section">
+          <div class="sheet-section-title">Appearance</div>
+          <table class="app-table">
+            <tr><td>Eyes</td><td>{{ char.appearance.get('eyes', '—') }}</td></tr>
+            <tr><td>Build</td><td>{{ char.appearance.get('build', '—') }}</td></tr>
+            <tr><td>Marks</td><td>{{ char.appearance.get('marks', '—') }}</td></tr>
+            <tr><td>Dress</td><td>{{ char.appearance.get('dress', '—') }}</td></tr>
+          </table>
+        </div>
+
+        <!-- FACTION FLAVOR -->
+        {% if factions.get(char.faction, {}).get('flavor') %}
+        <div class="sheet-section">
+          <div class="sheet-section-title">Faction Note</div>
+          <div style="font-style:italic; font-size:0.85rem; color: var(--ink-light); line-height:1.5;">
+            "{{ factions[char.faction].flavor }}"
+          </div>
+        </div>
+        {% endif %}
+
+      </div><!-- /right -->
+
+    </div><!-- /sheet-body -->
+
+    <!-- ===== FULL-WIDTH: BACKSTORY ===== -->
+    {% if char.backstory %}
+    <div class="sheet-section">
+      <div class="sheet-section-title">Background</div>
+      <div class="backstory-block">
+        {% for para in char.backstory.split('\n\n') %}
+        <p>{{ para.strip() }}</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- MOTIVATION + SECRET row -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:24px;">
+      {% if char.motivation and char.motivation.get('label') %}
+      <div class="motivation-box">
+        <div class="mot-label">Motivation: {{ char.motivation.label }}</div>
+        <div class="mot-desc">{{ char.motivation.get('description', '') }}</div>
+        {% if char.motivation.get('drives') %}
+        <div style="font-size:0.8rem; color: var(--ash); margin-top:6px; font-style:italic;">{{ char.motivation.drives }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if char.secret %}
+      <div class="secret-box">
+        <div class="secret-label">Known Only to Keeper</div>
+        {{ char.secret }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ===== ACTION BAR ===== -->
+    <div class="sheet-actions">
+      <a href="/gallery" class="btn">← All Characters</a>
+      <a href="/" class="btn">+ New Character</a>
+      {% if reportlab_available %}
+      <a href="/export/{{ char.id }}" class="btn btn-primary">⬇ Export PDF</a>
+      {% endif %}
+    </div>
+
+  </div><!-- /sheet-paper -->
+</div><!-- /sheet-wrap -->
+{% endblock %}
