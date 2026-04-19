@@ -591,12 +591,37 @@ class LoreEngine:
         self._model = model or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-5")
         self._api_key = os.getenv("ANTHROPIC_API_KEY", "")
 
-    def _call_claude(self, prompt: str, max_tokens: int = 1500) -> Optional[dict]:
-        """Call Claude and parse JSON response. Returns None on failure."""
+    def _call_claude(self, prompt: str, max_tokens: int = 1500) -> Optional[dict]:  # noqa: E501
+        """Call Claude and parse JSON response. Returns None on failure.
+
+        Prefers `dcch` (dangercorn-claude-helper) for shared cost tracking
+        + retry + model downshift. Falls back to direct anthropic client
+        if dcch not installed.
+        """
         if not self._api_key:
             logger.warning("[lore] ANTHROPIC_API_KEY not set — using fallback generator")
             return None
 
+        # Preferred path: dcch shared helper
+        try:
+            from dcch import Claude, ParseError
+            claude = Claude(
+                api_key=self._api_key,
+                app="dustfall",
+                model=self._model,
+                max_tokens=max_tokens,
+            )
+            try:
+                result = claude.text(prompt, json_mode=True)
+                return result.json
+            except ParseError:
+                # Lore prompts sometimes return prose-wrapped JSON; fall back to regex parse
+                result = claude.text(prompt)
+                return _parse_json_response(result.content)
+        except ImportError:
+            pass  # dcch not installed, fall through to direct client
+
+        # Fallback: direct anthropic client (legacy code path)
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=self._api_key)
@@ -608,7 +633,7 @@ class LoreEngine:
             text = msg.content[0].text if msg.content else ""
             return _parse_json_response(text)
         except ImportError:
-            logger.warning("[lore] anthropic package not installed")
+            logger.warning("[lore] neither dcch nor anthropic installed")
             return None
         except Exception as exc:
             logger.error(f"[lore] Claude call failed: {exc}")
@@ -772,7 +797,7 @@ def _fallback_town(deity: Optional[str], region: Optional[str], db: LoreDB) -> d
         "population": random.choice(["Small (50-200)", "Medium (200-500)"]),
         "mood": random.choice(["Stable", "Tense"]),
         "description": f"A sun-bleached settlement clinging to the edge of {region or 'the flats'}. The kind of place where everyone knows everyone else's secrets and nobody talks about them.",
-        "history": f"Founded three years back by prospectors chasing an Ashfall deposit that turned out to be real. The {'divine influence' if deity else 'lack of any god's blessing'} has shaped this place in ways the founders didn't expect.",
+        "history": f"Founded three years back by prospectors chasing an Ashfall deposit that turned out to be real. The {'divine influence' if deity else 'lack of any godly blessing'} has shaped this place in ways the founders didn't expect.",
         "factions": [{"name": "The Old Guard", "alignment": "neutral", "description": "The original settlers, trying to keep order"}],
         "npcs": [{"name": "Marta Bones", "archetype": "Saloon Keeper", "description": "Knows everything, sells information for the right price"}],
         "secrets": ["There's an Ashfall deposit under the saloon floor", "The town marshal is wanted in two territories", "Something walks the streets after midnight"],
