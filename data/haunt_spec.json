@@ -1,0 +1,1443 @@
+{
+  "version": "0.1.0",
+  "generated": "2026-04-24T01:30:16.210Z",
+  "generator": "tools/extract_haunt_spec.js",
+  "source": "src/haunts.js",
+  "counts": {
+    "bestiary": 15,
+    "locations": 6,
+    "haunts": 10
+  },
+  "bestiary": {
+    "walking_dead": {
+      "id": "walking_dead",
+      "name": "Walkin' Dead",
+      "class": "Undead",
+      "icon": "💀",
+      "tier": 1,
+      "stats": {
+        "deftness": 3,
+        "nimbleness": 3,
+        "quickness": 3,
+        "vigor": 8,
+        "spirit": 1
+      },
+      "base_hp": 12,
+      "base_ap": 3,
+      "weapons": [
+        {
+          "name": "Rusty Claws",
+          "damage": [
+            3,
+            6
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 70
+        }
+      ],
+      "special": null,
+      "flavor": "Shambling, hungry, and patient. Bullets don't kill what was never alive."
+    },
+    "gravedigger": {
+      "id": "gravedigger",
+      "name": "The Gravedigger",
+      "class": "Undead",
+      "icon": "⚰",
+      "tier": 3,
+      "stats": {
+        "deftness": 5,
+        "nimbleness": 4,
+        "quickness": 4,
+        "vigor": 12,
+        "spirit": 6
+      },
+      "base_hp": 22,
+      "base_ap": 4,
+      "weapons": [
+        {
+          "name": "Rusted Shovel",
+          "damage": [
+            5,
+            10
+          ],
+          "range": 1,
+          "apCost": 2,
+          "accuracy": 80
+        },
+        {
+          "name": "Grave Dust",
+          "damage": [
+            3,
+            5
+          ],
+          "range": 3,
+          "apCost": 1,
+          "accuracy": 65
+        }
+      ],
+      "special": "Heals 2 HP per turn while adjacent to a corpse.",
+      "flavor": "He buries them. Then he unburies them. Then they follow him."
+    },
+    "wraith": {
+      "id": "wraith",
+      "name": "Prairie Wraith",
+      "class": "Undead",
+      "icon": "👻",
+      "tier": 2,
+      "stats": {
+        "deftness": 5,
+        "nimbleness": 9,
+        "quickness": 9,
+        "vigor": 3,
+        "spirit": 8
+      },
+      "base_hp": 8,
+      "base_ap": 5,
+      "weapons": [
+        {
+          "name": "Spectral Claw",
+          "damage": [
+            2,
+            7
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 85
+        }
+      ],
+      "special": "Ignores cover. Immune to normal bullets (needs Spirit-infused weapons or Hex Bolts).",
+      "flavor": "Cold breath on your neck. Then nothing. Then the bleeding starts."
+    },
+    "hellstromme_drone": {
+      "id": "hellstromme_drone",
+      "name": "Hellstromme Drone",
+      "class": "Automaton",
+      "icon": "🤖",
+      "tier": 2,
+      "stats": {
+        "deftness": 6,
+        "nimbleness": 2,
+        "quickness": 4,
+        "vigor": 10,
+        "spirit": 0
+      },
+      "base_hp": 20,
+      "base_ap": 3,
+      "weapons": [
+        {
+          "name": "Steam Cannon",
+          "damage": [
+            6,
+            14
+          ],
+          "range": 5,
+          "apCost": 2,
+          "accuracy": 55
+        },
+        {
+          "name": "Crushing Arm",
+          "damage": [
+            4,
+            8
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 75
+        }
+      ],
+      "special": null,
+      "flavor": "Built in Pittsburgh from ghost-rock and brass. You can hear it a mile off."
+    },
+    "iron_scorpion": {
+      "id": "iron_scorpion",
+      "name": "Iron Scorpion",
+      "class": "Automaton",
+      "icon": "🦂",
+      "tier": 3,
+      "stats": {
+        "deftness": 7,
+        "nimbleness": 6,
+        "quickness": 7,
+        "vigor": 6,
+        "spirit": 0
+      },
+      "base_hp": 14,
+      "base_ap": 5,
+      "weapons": [
+        {
+          "name": "Venom Dart",
+          "damage": [
+            3,
+            7
+          ],
+          "range": 4,
+          "apCost": 1,
+          "accuracy": 75
+        },
+        {
+          "name": "Stinger",
+          "damage": [
+            5,
+            9
+          ],
+          "range": 1,
+          "apCost": 2,
+          "accuracy": 80
+        }
+      ],
+      "special": "Dart injects a toxin — target loses 1 AP next turn.",
+      "flavor": "A clockwork thing with a soul the size of a pinhead. It doesn't tire."
+    },
+    "boiler_walker": {
+      "id": "boiler_walker",
+      "name": "Boiler Walker",
+      "class": "Automaton",
+      "icon": "🔥",
+      "tier": 4,
+      "stats": {
+        "deftness": 4,
+        "nimbleness": 1,
+        "quickness": 3,
+        "vigor": 14,
+        "spirit": 0
+      },
+      "base_hp": 32,
+      "base_ap": 3,
+      "weapons": [
+        {
+          "name": "Flamethrower",
+          "damage": [
+            7,
+            12
+          ],
+          "range": 3,
+          "apCost": 3,
+          "accuracy": 70
+        },
+        {
+          "name": "Steam Vent",
+          "damage": [
+            4,
+            6
+          ],
+          "range": 2,
+          "apCost": 1,
+          "accuracy": 85
+        }
+      ],
+      "special": "When HP drops below 25%, explodes on its next turn for 10-18 damage in 2-tile radius.",
+      "flavor": "The shell holds steam at eight times pressure. You do the math."
+    },
+    "outlaw_grunt": {
+      "id": "outlaw_grunt",
+      "name": "Saddle Bum",
+      "class": "Outlaw",
+      "icon": "🤠",
+      "tier": 1,
+      "stats": {
+        "deftness": 5,
+        "nimbleness": 4,
+        "quickness": 4,
+        "vigor": 4,
+        "spirit": 3
+      },
+      "base_hp": 10,
+      "base_ap": 4,
+      "weapons": [
+        {
+          "name": "Rusted Pistol",
+          "damage": [
+            3,
+            6
+          ],
+          "range": 5,
+          "apCost": 2,
+          "accuracy": 55
+        },
+        {
+          "name": "Knife",
+          "damage": [
+            2,
+            5
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 75
+        }
+      ],
+      "special": null,
+      "flavor": "A rider who chose the wrong trail. Still chose it, though."
+    },
+    "rattlesnake_bill": {
+      "id": "rattlesnake_bill",
+      "name": "Rattlesnake Bill",
+      "class": "Outlaw",
+      "icon": "🐍",
+      "tier": 2,
+      "stats": {
+        "deftness": 7,
+        "nimbleness": 6,
+        "quickness": 6,
+        "vigor": 5,
+        "spirit": 4
+      },
+      "base_hp": 16,
+      "base_ap": 4,
+      "weapons": [
+        {
+          "name": "Winchester",
+          "damage": [
+            4,
+            9
+          ],
+          "range": 7,
+          "apCost": 2,
+          "accuracy": 70
+        },
+        {
+          "name": "Boot Knife",
+          "damage": [
+            2,
+            5
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 80
+        }
+      ],
+      "special": null,
+      "flavor": "Thirty-seven notches on his rifle. He'll take your notch count too."
+    },
+    "the_sheriff": {
+      "id": "the_sheriff",
+      "name": "Sheriff McClure",
+      "class": "Outlaw",
+      "icon": "⭐",
+      "tier": 4,
+      "stats": {
+        "deftness": 8,
+        "nimbleness": 5,
+        "quickness": 6,
+        "vigor": 7,
+        "spirit": 6
+      },
+      "base_hp": 24,
+      "base_ap": 5,
+      "weapons": [
+        {
+          "name": "Long Colt",
+          "damage": [
+            5,
+            10
+          ],
+          "range": 6,
+          "apCost": 2,
+          "accuracy": 80
+        },
+        {
+          "name": "Sawed-Off",
+          "damage": [
+            4,
+            9
+          ],
+          "range": 3,
+          "apCost": 2,
+          "accuracy": 75
+        }
+      ],
+      "special": "Rallies adjacent outlaws: +10 accuracy to their next shot.",
+      "flavor": "Wears a star that hasn't meant anything in ten years."
+    },
+    "ghost_rider": {
+      "id": "ghost_rider",
+      "name": "Ghost Rider",
+      "class": "Harrowed",
+      "icon": "🐎",
+      "tier": 3,
+      "stats": {
+        "deftness": 7,
+        "nimbleness": 8,
+        "quickness": 9,
+        "vigor": 5,
+        "spirit": 7
+      },
+      "base_hp": 18,
+      "base_ap": 6,
+      "weapons": [
+        {
+          "name": "Flaming Lance",
+          "damage": [
+            5,
+            11
+          ],
+          "range": 2,
+          "apCost": 2,
+          "accuracy": 75
+        }
+      ],
+      "special": "Moves 2 tiles per 1 AP (mounted). Leaves a 1-tile fire trail behind.",
+      "flavor": "A rider whose horse died and rode on anyway."
+    },
+    "preachers_shadow": {
+      "id": "preachers_shadow",
+      "name": "Preacher's Shadow",
+      "class": "Harrowed",
+      "icon": "🕯",
+      "tier": 3,
+      "stats": {
+        "deftness": 5,
+        "nimbleness": 7,
+        "quickness": 7,
+        "vigor": 4,
+        "spirit": 9
+      },
+      "base_hp": 14,
+      "base_ap": 4,
+      "weapons": [
+        {
+          "name": "Unholy Words",
+          "damage": [
+            4,
+            8
+          ],
+          "range": 4,
+          "apCost": 2,
+          "accuracy": 70
+        }
+      ],
+      "special": "Players within 2 tiles suffer -2 to their accuracy (prayer-cloud aura).",
+      "flavor": "What's left of a man who broke a vow to something older than God."
+    },
+    "thunderbird_chick": {
+      "id": "thunderbird_chick",
+      "name": "Thunderbird Fledgling",
+      "class": "Myth",
+      "icon": "🦅",
+      "tier": 4,
+      "stats": {
+        "deftness": 6,
+        "nimbleness": 9,
+        "quickness": 9,
+        "vigor": 5,
+        "spirit": 6
+      },
+      "base_hp": 16,
+      "base_ap": 6,
+      "weapons": [
+        {
+          "name": "Lightning Cry",
+          "damage": [
+            4,
+            9
+          ],
+          "range": 5,
+          "apCost": 2,
+          "accuracy": 70
+        },
+        {
+          "name": "Talons",
+          "damage": [
+            3,
+            6
+          ],
+          "range": 1,
+          "apCost": 1,
+          "accuracy": 80
+        }
+      ],
+      "special": "Flying — ignores terrain. Thunderclap (once per fight): stuns all within 2 tiles for 1 turn.",
+      "flavor": "Its parent hasn't returned yet. It's hungry. It's angry."
+    },
+    "wendigo": {
+      "id": "wendigo",
+      "name": "Wendigo",
+      "class": "Myth",
+      "icon": "🦌",
+      "tier": 5,
+      "stats": {
+        "deftness": 5,
+        "nimbleness": 7,
+        "quickness": 6,
+        "vigor": 12,
+        "spirit": 7
+      },
+      "base_hp": 36,
+      "base_ap": 5,
+      "weapons": [
+        {
+          "name": "Hunger",
+          "damage": [
+            7,
+            14
+          ],
+          "range": 1,
+          "apCost": 2,
+          "accuracy": 75
+        }
+      ],
+      "special": "Inflicts 'Cold Dread' on hit: target loses 1 Spirit permanently (save on Spirit check).",
+      "flavor": "Once a man. Then he ate his kin. Now he cannot stop."
+    },
+    "void_eye": {
+      "id": "void_eye",
+      "name": "Void Eye",
+      "class": "Eldritch",
+      "icon": "👁",
+      "tier": 4,
+      "stats": {
+        "deftness": 2,
+        "nimbleness": 2,
+        "quickness": 4,
+        "vigor": 3,
+        "spirit": 10
+      },
+      "base_hp": 8,
+      "base_ap": 3,
+      "weapons": [
+        {
+          "name": "Gaze",
+          "damage": [
+            3,
+            9
+          ],
+          "range": 6,
+          "apCost": 1,
+          "accuracy": 90
+        }
+      ],
+      "special": "Looking at it costs 1 Spirit per turn. Cannot be blinded. Ignores cover.",
+      "flavor": "It's not an animal. It's the IDEA of being seen. It should not be here."
+    },
+    "dustskin": {
+      "id": "dustskin",
+      "name": "Dustskin",
+      "class": "Eldritch",
+      "icon": "🌫",
+      "tier": 4,
+      "stats": {
+        "deftness": 4,
+        "nimbleness": 8,
+        "quickness": 6,
+        "vigor": 7,
+        "spirit": 8
+      },
+      "base_hp": 22,
+      "base_ap": 4,
+      "weapons": [
+        {
+          "name": "Suffocating Grasp",
+          "damage": [
+            4,
+            8
+          ],
+          "range": 1,
+          "apCost": 2,
+          "accuracy": 80
+        }
+      ],
+      "special": "Half damage from bullets (dust reconstitutes). Full damage from fire or spirit weapons.",
+      "flavor": "It wears a man's shape, filled with the sand of forty graves."
+    }
+  },
+  "locations": {
+    "dust_town": {
+      "id": "dust_town",
+      "name": "Dust Town",
+      "description": "A dying settlement. Broken buildings, narrow streets."
+    },
+    "canyon": {
+      "id": "canyon",
+      "name": "Red Canyon",
+      "description": "High walls, sharp drops, abundant cover behind rocks."
+    },
+    "rail_line": {
+      "id": "rail_line",
+      "name": "The Rail Line",
+      "description": "A stretch of the Transcontinental. Exposed, windy."
+    },
+    "ghost_rock_mine": {
+      "id": "ghost_rock_mine",
+      "name": "Ghost-Rock Mine",
+      "description": "Tunnels and shafts, ghost-rock veins everywhere."
+    },
+    "prairie": {
+      "id": "prairie",
+      "name": "Open Prairie",
+      "description": "Flat grassland. Minimal cover. Long sight lines."
+    },
+    "sanitarium": {
+      "id": "sanitarium",
+      "name": "The Sanitarium",
+      "description": "A ruin that was a hospital. Or was it?"
+    }
+  },
+  "haunts": [
+    {
+      "id": "drowned_preacher",
+      "name": "The Drowned Preacher",
+      "tier": 3,
+      "theme": "undead",
+      "location_ids": [
+        "dust_town",
+        "sanitarium"
+      ],
+      "lore": "The flood came in 1872. Pastor Whitt stood on the pulpit as the water rose. He's still preaching.",
+      "special_rule": {
+        "name": "Holy Ground",
+        "desc": "If the Preacher is defeated while a player occupies the pulpit tile (center of map), that player gains +1 to all Spirit checks for the rest of the campaign."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 2
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 4
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 4
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Waterlogged Bible",
+          "rarity": "uncommon",
+          "effect": "+1 Spirit once per rest"
+        },
+        {
+          "item": "Silver Cross",
+          "rarity": "rare",
+          "effect": "Spirit-weapon tag on melee attacks"
+        }
+      ]
+    },
+    {
+      "id": "iron_graveyard",
+      "name": "The Iron Graveyard",
+      "tier": 4,
+      "theme": "automaton",
+      "location_ids": [
+        "canyon",
+        "ghost_rock_mine"
+      ],
+      "lore": "Hellstromme Industries buried its failures out here. The failures kept working.",
+      "special_rule": {
+        "name": "Ghost-Rock Veins",
+        "desc": "Highlighted tiles are ghost-rock outcrops. Standing on one restores 1 AP at turn start, but deals 2 HP/turn (radiation)."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          },
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 2
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 1
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          },
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 2
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 1
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          },
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 2
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 1
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          },
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 2
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 2
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          },
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 2
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 3
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Raw Ghost-Rock",
+          "rarity": "common",
+          "effect": "Crafting component"
+        },
+        {
+          "item": "Intact Drone Core",
+          "rarity": "rare",
+          "effect": "Tinkerer can build a turret in 1 turn (vs 3)"
+        }
+      ]
+    },
+    {
+      "id": "the_9_12_from_hellstromme",
+      "name": "The 9:12 from Hellstromme",
+      "tier": 4,
+      "theme": "harrowed",
+      "location_ids": [
+        "rail_line"
+      ],
+      "lore": "The train left Pittsburgh on time. It has not arrived. You are on it now. The conductor punches your ticket — three red holes.",
+      "special_rule": {
+        "name": "Moving Train",
+        "desc": "The map scrolls 1 tile toward the left each enemy turn. Units that fall off the east edge are Gone."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "ghost_rider",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 1
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "ghost_rider",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 1
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "ghost_rider",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "ghost_rider",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "ghost_rider",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 3
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Conductor's Watch",
+          "rarity": "rare",
+          "effect": "+3 initiative on first turn (Quick Draw stacks)"
+        },
+        {
+          "item": "Engineer's Cap",
+          "rarity": "uncommon",
+          "effect": "Immune to Cold Dread"
+        }
+      ]
+    },
+    {
+      "id": "thunder_roost",
+      "name": "Thunder Roost",
+      "tier": 5,
+      "theme": "myth",
+      "location_ids": [
+        "canyon",
+        "prairie"
+      ],
+      "lore": "The elders warned you. The rocks are thunder-stones; this is the Thunderbird's nest. Something is very hungry.",
+      "special_rule": {
+        "name": "Electric Air",
+        "desc": "Every ranged weapon fired gets +10% crit chance but -10% accuracy. Metal armor: 50% chance to draw one Lightning Cry automatically to the wearer per turn."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "thunderbird_chick",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "thunderbird_chick",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "thunderbird_chick",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "thunderbird_chick",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "thunderbird_chick",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Thunder-stone",
+          "rarity": "legendary",
+          "effect": "+2 damage to all electrical/lightning attacks"
+        },
+        {
+          "item": "Fledgling Feather",
+          "rarity": "rare",
+          "effect": "Grants 1 use of 'Flight' (move across impassable terrain)"
+        }
+      ]
+    },
+    {
+      "id": "dust_storm_ambush",
+      "name": "The Dust Storm",
+      "tier": 2,
+      "theme": "frontier",
+      "location_ids": [
+        "prairie",
+        "dust_town"
+      ],
+      "lore": "A twister rolls in out of the south. Bandits use the cover. You don't.",
+      "special_rule": {
+        "name": "Zero Visibility",
+        "desc": "Sight range capped at 3 tiles. Ranged attacks beyond 3 tiles auto-miss. Stealth class bonuses doubled."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "rattlesnake_bill",
+            "count": 1
+          },
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 4
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "rattlesnake_bill",
+            "count": 1
+          },
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 5
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "rattlesnake_bill",
+            "count": 1
+          },
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 6
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "rattlesnake_bill",
+            "count": 1
+          },
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 7
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "rattlesnake_bill",
+            "count": 1
+          },
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 8
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Bandit Cache",
+          "rarity": "common",
+          "effect": "$50 or 1 weapon mod"
+        },
+        {
+          "item": "Rattlesnake's Bandana",
+          "rarity": "uncommon",
+          "effect": "+1 accuracy in dust storms"
+        }
+      ]
+    },
+    {
+      "id": "the_last_sermon",
+      "name": "The Last Sermon",
+      "tier": 3,
+      "theme": "undead",
+      "location_ids": [
+        "dust_town",
+        "sanitarium"
+      ],
+      "lore": "The congregation gathers every Sunday. They died in 1879. They are still here.",
+      "special_rule": {
+        "name": "Sacred Echo",
+        "desc": "Preacher-archetype players gain +2 damage and can cast Lay on Hands at 0 AP cost. Others suffer -1 Spirit while in the church."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 4
+          },
+          {
+            "enemy_id": "gravedigger",
+            "count": 1
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 5
+          },
+          {
+            "enemy_id": "gravedigger",
+            "count": 1
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 5
+          },
+          {
+            "enemy_id": "gravedigger",
+            "count": 1
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 6
+          },
+          {
+            "enemy_id": "gravedigger",
+            "count": 1
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "preachers_shadow",
+            "count": 1
+          },
+          {
+            "enemy_id": "walking_dead",
+            "count": 6
+          },
+          {
+            "enemy_id": "gravedigger",
+            "count": 1
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Tarnished Chalice",
+          "rarity": "uncommon",
+          "effect": "Heal 2 HP once per rest"
+        },
+        {
+          "item": "The Sermon Book",
+          "rarity": "rare",
+          "effect": "Preacher learns 'Holy Smite'"
+        }
+      ]
+    },
+    {
+      "id": "cracked_earth",
+      "name": "Cracked Earth",
+      "tier": 5,
+      "theme": "eldritch",
+      "location_ids": [
+        "canyon",
+        "ghost_rock_mine"
+      ],
+      "lore": "The canyon opened wider last night. Things crawled out. They wear our shapes but they are not ours.",
+      "special_rule": {
+        "name": "Reality Thin",
+        "desc": "At the end of each round, roll 1d6 per player. On a 1, that player swaps positions with a random unit on the map. On a 6, gains 1 AP next turn."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "void_eye",
+            "count": 2
+          },
+          {
+            "enemy_id": "dustskin",
+            "count": 2
+          },
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "void_eye",
+            "count": 2
+          },
+          {
+            "enemy_id": "dustskin",
+            "count": 2
+          },
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "void_eye",
+            "count": 2
+          },
+          {
+            "enemy_id": "dustskin",
+            "count": 2
+          },
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "void_eye",
+            "count": 2
+          },
+          {
+            "enemy_id": "dustskin",
+            "count": 2
+          },
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "void_eye",
+            "count": 2
+          },
+          {
+            "enemy_id": "dustskin",
+            "count": 2
+          },
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Fragment of Elsewhere",
+          "rarity": "legendary",
+          "effect": "Once per session: relocate any unit 5 tiles"
+        },
+        {
+          "item": "Dust-Silk Scarf",
+          "rarity": "rare",
+          "effect": "Immune to one status effect per encounter"
+        }
+      ]
+    },
+    {
+      "id": "outlaw_ambush",
+      "name": "The Hanging Tree",
+      "tier": 1,
+      "theme": "frontier",
+      "location_ids": [
+        "prairie"
+      ],
+      "lore": "A man swings from the big oak. He's been there a week. Watching. His friends are in the rocks.",
+      "special_rule": {
+        "name": "Cover Rich",
+        "desc": "All rocks on the map provide +30% cover (normal: 20%)."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 4
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 5
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 6
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 7
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "outlaw_grunt",
+            "count": 8
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Outlaw's Boots",
+          "rarity": "common",
+          "effect": "+1 movement on dirt tiles"
+        },
+        {
+          "item": "Noose",
+          "rarity": "uncommon",
+          "effect": "Used as a rope tool: climb walls or lasso (1 AP)"
+        }
+      ]
+    },
+    {
+      "id": "cold_mine",
+      "name": "The Cold Mine",
+      "tier": 4,
+      "theme": "myth",
+      "location_ids": [
+        "ghost_rock_mine"
+      ],
+      "lore": "The miners came out and wouldn't stop shivering. The ones who went back in never came out.",
+      "special_rule": {
+        "name": "Cold Dread",
+        "desc": "Every player loses 1 Spirit per round (save on 3+ d6). At 0 Spirit, player becomes 'Numb' — cannot use abilities but takes -2 damage."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 2
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 3
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 3
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "wendigo",
+            "count": 1
+          },
+          {
+            "enemy_id": "wraith",
+            "count": 3
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Wendigo Claw",
+          "rarity": "rare",
+          "effect": "+2 damage to Myth-class enemies"
+        },
+        {
+          "item": "Miner's Flask",
+          "rarity": "common",
+          "effect": "Removes one Cold Dread stack per use"
+        }
+      ]
+    },
+    {
+      "id": "failed_experiment",
+      "name": "The Failed Experiment",
+      "tier": 3,
+      "theme": "automaton",
+      "location_ids": [
+        "sanitarium"
+      ],
+      "lore": "Dr. Strycker's lab went quiet six months ago. The rumbling, however, never stopped. Someone should check.",
+      "special_rule": {
+        "name": "Steam Pipes",
+        "desc": "Attacking a pipe tile (highlighted) vents scalding steam, dealing 4-8 damage in 3-tile area and destroying the pipe."
+      },
+      "roster_by_tier": {
+        "1": [
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 1
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 2
+          },
+          {
+            "enemy_id": "boiler_walker",
+            "count": 0
+          }
+        ],
+        "2": [
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 1
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 3
+          },
+          {
+            "enemy_id": "boiler_walker",
+            "count": 0
+          }
+        ],
+        "3": [
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 1
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 3
+          },
+          {
+            "enemy_id": "boiler_walker",
+            "count": 0
+          }
+        ],
+        "4": [
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 1
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 4
+          },
+          {
+            "enemy_id": "boiler_walker",
+            "count": 1
+          }
+        ],
+        "5": [
+          {
+            "enemy_id": "hellstromme_drone",
+            "count": 1
+          },
+          {
+            "enemy_id": "iron_scorpion",
+            "count": 4
+          },
+          {
+            "enemy_id": "boiler_walker",
+            "count": 2
+          }
+        ]
+      },
+      "loot_table": [
+        {
+          "item": "Dr. Strycker's Notes",
+          "rarity": "rare",
+          "effect": "Tinkerer unlocks 'Arc Pistol' upgrade"
+        },
+        {
+          "item": "Gear Assembly",
+          "rarity": "common",
+          "effect": "Crafting component"
+        }
+      ]
+    }
+  ]
+}

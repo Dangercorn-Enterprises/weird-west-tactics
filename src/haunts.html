@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dustfall — Haunts</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1209;color:#d4c5a9;font-family:'IM Fell English',serif;line-height:1.6;padding:2rem;min-height:100vh}
+header{text-align:center;margin-bottom:2.5rem}
+h1{font-family:'Rye',serif;font-size:clamp(32px,5vw,54px);color:#d4a843;text-shadow:2px 2px 4px rgba(0,0,0,0.8)}
+.sub{font-family:'Special Elite',cursive;color:#a0522d;letter-spacing:3px;text-transform:uppercase;font-size:13px;margin-top:0.5rem}
+.nav-back{position:fixed;top:1rem;left:1rem;font-family:'Rye',serif;font-size:12px;color:#a0522d;text-decoration:none;padding:8px 16px;border:1px solid #a0522d;border-radius:2px}
+.nav-back:hover{color:#d4a843;border-color:#d4a843}
+
+.gen{max-width:900px;margin:0 auto 2rem;background:rgba(30,20,10,0.7);border:1px solid #a0522d;border-radius:4px;padding:1.5rem}
+.gen h2{font-family:'Rye',serif;color:#d4a843;margin-bottom:1rem;font-size:1.3rem}
+.controls{display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+.controls label{font-family:'Special Elite',cursive;font-size:13px;color:#a0522d;text-transform:uppercase;letter-spacing:1px}
+.controls select,.controls input{padding:8px 12px;background:#1a1209;border:1px solid #a0522d;color:#d4c5a9;font-family:'IM Fell English',serif;font-size:14px;border-radius:2px}
+.controls button{padding:10px 24px;background:transparent;border:1px solid #4ecdc4;color:#4ecdc4;font-family:'Rye',serif;font-size:13px;letter-spacing:1px;cursor:pointer;border-radius:2px}
+.controls button:hover{background:rgba(78,205,196,0.1)}
+
+.haunt-card{background:rgba(40,25,15,0.7);border:1px solid #a0522d;border-radius:4px;padding:1.5rem;margin-bottom:1.5rem;max-width:900px;margin-left:auto;margin-right:auto}
+.haunt-card .name{font-family:'Rye',serif;color:#d4a843;font-size:1.5rem;margin-bottom:0.3rem}
+.haunt-card .meta{font-family:'Special Elite',cursive;color:#b8a88a;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem}
+.haunt-card .lore{font-style:italic;color:#b8a88a;border-left:3px solid #a0522d;padding-left:1rem;margin-bottom:1.3rem;font-size:0.95rem}
+.haunt-card h3{font-family:'Rye',serif;color:#d4a843;font-size:1rem;margin:1rem 0 0.5rem;letter-spacing:1px}
+.haunt-card .rule{background:rgba(78,205,196,0.05);border-left:3px solid #4ecdc4;padding:0.8rem 1rem;font-size:0.9rem}
+.haunt-card .rule .title{color:#4ecdc4;font-family:'Rye',serif;margin-bottom:0.3rem}
+.enemy-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.8rem}
+.enemy{background:rgba(0,0,0,0.25);border:1px solid #50382c;border-radius:3px;padding:0.8rem;font-size:0.85rem}
+.enemy .n{font-family:'Rye',serif;color:#d4a843;font-size:1rem;margin-bottom:0.3rem}
+.enemy .stat{font-family:'Special Elite',cursive;color:#a0522d;font-size:0.75rem;letter-spacing:0.5px}
+.enemy .flavor{font-style:italic;color:#7a6a50;margin-top:0.4rem;font-size:0.8rem}
+.enemy .special{color:#d4a843;font-size:0.8rem;margin-top:0.4rem}
+.loot{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem}
+.loot-item{background:rgba(212,168,67,0.08);border:1px solid #8a6f2a;border-radius:2px;padding:0.4rem 0.7rem;font-size:0.85rem}
+.loot-item .rar{font-family:'Special Elite',cursive;font-size:0.7rem;letter-spacing:1px;text-transform:uppercase;margin-right:0.4rem}
+.rar.common{color:#9fa8b4}.rar.uncommon{color:#4ecdc4}.rar.rare{color:#d4a843}.rar.legendary{color:#ff6b9d}
+
+.export{margin-top:1.5rem;text-align:center}
+.export button{padding:10px 20px;background:transparent;border:1px solid #d4a843;color:#d4a843;font-family:'Rye',serif;font-size:12px;cursor:pointer;border-radius:2px;margin:0 0.3rem}
+.export button:hover{background:rgba(212,168,67,0.1)}
+
+.bestiary{max-width:1100px;margin:3rem auto 0}
+.bestiary h2{font-family:'Rye',serif;color:#d4a843;text-align:center;margin-bottom:1.5rem;font-size:1.6rem}
+.bestiary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.bestiary .enemy{padding:1rem}
+
+footer{text-align:center;margin-top:3rem;padding-top:1.5rem;border-top:1px solid #50382c;color:#7a6a50;font-size:0.85rem}
+</style>
+</head>
+<body>
+<a class="nav-back" href="../index.html">← Back to Menu</a>
+
+<header>
+<h1>Haunts of the Ashen Frontier</h1>
+<div class="sub">Procedural encounters for Dustfall</div>
+</header>
+
+<div class="gen">
+  <h2>Generate a Haunt</h2>
+  <div class="controls">
+    <label>Party Tier <select id="tier">
+      <option value="1">1 — Greenhorns</option>
+      <option value="2" selected>2 — Seasoned</option>
+      <option value="3">3 — Hardened</option>
+      <option value="4">4 — Legendary</option>
+      <option value="5">5 — Mythic</option>
+    </select></label>
+    <label>Theme <select id="theme">
+      <option value="">Any</option>
+      <option value="undead">Undead</option>
+      <option value="automaton">Automaton</option>
+      <option value="frontier">Frontier</option>
+      <option value="harrowed">Harrowed</option>
+      <option value="myth">Myth</option>
+      <option value="eldritch">Eldritch</option>
+    </select></label>
+    <label>Seed <input id="seed" type="number" placeholder="optional" style="width:110px"></label>
+    <button id="genBtn">🎲 Roll Haunt</button>
+  </div>
+  <div style="font-size:0.85rem;color:#7a6a50;font-style:italic">
+    The bestiary + loot + special rule are all in <code style="color:#4ecdc4">haunts.js</code>. Add your own and they'll appear in the pool.
+  </div>
+</div>
+
+<div id="output"></div>
+
+<section class="bestiary" id="bestiary">
+  <h2>Full Bestiary</h2>
+  <div class="bestiary-grid" id="bestiaryGrid"></div>
+</section>
+
+<footer>
+  Dustfall: The Ashen Frontier · Haunts v0.1 · Built 2026-04-23
+</footer>
+
+<script src="haunts.js"></script>
+<script>
+function el(tag, attrs, text) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === "class") e.className = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  if (text !== undefined && text !== null) e.textContent = String(text);
+  return e;
+}
+
+function renderEnemy(e) {
+  const card = el("div", {class: "enemy"});
+  card.appendChild(el("div", {class: "n"}, `${e.icon} ${e.name}`));
+  card.appendChild(el("div", {class: "stat"}, `${e.cls} · HP ${e.hp} · AP ${e.ap}`));
+  const statStr = Object.entries(e.stats).map(([k,v]) => `${k.slice(0,3).toUpperCase()} ${v}`).join(" · ");
+  card.appendChild(el("div", {class: "stat"}, statStr));
+  const wpns = e.weapons.map(w => `${w.name} (${w.damage[0]}-${w.damage[1]} dmg, range ${w.range})`).join("; ");
+  card.appendChild(el("div", {class: "stat"}, wpns));
+  if (e.special) {
+    const s = el("div", {class: "special"});
+    s.textContent = "★ " + e.special;
+    card.appendChild(s);
+  }
+  if (e.flavor) card.appendChild(el("div", {class: "flavor"}, "— " + e.flavor));
+  return card;
+}
+
+function renderHaunt(h) {
+  const card = el("div", {class: "haunt-card"});
+  card.appendChild(el("div", {class: "name"}, h.name));
+  card.appendChild(el("div", {class: "meta"},
+    `Tier ${h.tier} · ${h.theme.toUpperCase()} · ${h.location.name}`));
+  card.appendChild(el("div", {class: "lore"}, '"' + h.lore + '"'));
+  card.appendChild(el("div", {style: "color:#7a6a50;margin-bottom:1rem;font-size:0.9rem"},
+    "Location: " + h.location.desc));
+
+  card.appendChild(el("h3", null, "Special Rule"));
+  const rule = el("div", {class: "rule"});
+  rule.appendChild(el("div", {class: "title"}, h.special_rule.name));
+  rule.appendChild(el("div", null, h.special_rule.desc));
+  card.appendChild(rule);
+
+  card.appendChild(el("h3", null, `Roster (${h.enemies.length} enemies)`));
+  const list = el("div", {class: "enemy-list"});
+  h.enemies.forEach(e => list.appendChild(renderEnemy(e)));
+  card.appendChild(list);
+
+  if (h.loot_table && h.loot_table.length) {
+    card.appendChild(el("h3", null, "Loot on Victory"));
+    const loot = el("div", {class: "loot"});
+    h.loot_table.forEach(item => {
+      const li = el("div", {class: "loot-item"});
+      const rar = el("span", {class: "rar " + item.rarity}, item.rarity);
+      li.appendChild(rar);
+      li.appendChild(document.createTextNode(`${item.item} — ${item.effect}`));
+      loot.appendChild(li);
+    });
+    card.appendChild(loot);
+  }
+
+  const exp = el("div", {class: "export"});
+  const copyBtn = el("button", null, "Copy JSON");
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(JSON.stringify(h, null, 2));
+    copyBtn.textContent = "Copied ✓";
+    setTimeout(() => copyBtn.textContent = "Copy JSON", 1500);
+  };
+  exp.appendChild(copyBtn);
+  const dlBtn = el("button", null, "Download JSON");
+  dlBtn.onclick = () => {
+    const blob = new Blob([JSON.stringify(h, null, 2)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = el("a", {href: url, download: `haunt_${h.haunt_id}_${Date.now()}.json`});
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  exp.appendChild(dlBtn);
+  card.appendChild(exp);
+
+  return card;
+}
+
+function rollHaunt() {
+  const tier = parseInt(document.getElementById("tier").value, 10);
+  const theme = document.getElementById("theme").value || null;
+  const seedStr = document.getElementById("seed").value;
+  const seed = seedStr ? parseInt(seedStr, 10) : undefined;
+  const h = generateHaunt({tier, theme, seed});
+  const out = document.getElementById("output");
+  while (out.firstChild) out.removeChild(out.firstChild);
+  out.appendChild(renderHaunt(h));
+}
+
+function renderBestiary() {
+  const grid = document.getElementById("bestiaryGrid");
+  Object.values(HAUNTS_BESTIARY).forEach(e => {
+    const withPos = {...e, maxHp: e.hp, maxAp: e.ap, x: 0, y: 0, id: "b_" + e.name};
+    grid.appendChild(renderEnemy(withPos));
+  });
+}
+
+document.getElementById("genBtn").addEventListener("click", rollHaunt);
+renderBestiary();
+rollHaunt();
+</script>
+</body>
+</html>
