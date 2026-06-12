@@ -54,7 +54,7 @@ canvas{display:block;border:1px solid #3a2a14;border-radius:4px;box-shadow:0 12p
 <a href="../index.html" class="nav-back">&larr; Saloon</a>
 <div id="wrap">
   <canvas id="c" width="900" height="620"></canvas>
-  <div id="title"><h1>DUSTFALL</h1><div class="sub">The Ashen Frontier &middot; Arena</div></div>
+  <div id="title"><h1>DUSTFALL</h1><div class="sub" id="waveLabel">The Ashen Frontier &middot; Arena</div></div>
   <div id="log"></div>
   <div id="hud">
     <div class="party" id="party"></div>
@@ -63,7 +63,7 @@ canvas{display:block;border:1px solid #3a2a14;border-radius:4px;box-shadow:0 12p
       <button class="btn warn" id="endBtn">End Turn</button>
     </div>
   </div>
-  <div id="banner"><h2 id="bannerTitle"></h2><p id="bannerSub"></p><button class="btn warn" onclick="location.reload()">Ride Again</button></div>
+  <div id="banner"><h2 id="bannerTitle"></h2><p id="bannerSub"></p><div id="boonRow" style="display:none;flex-direction:row;gap:10px;margin-bottom:18px"></div><button class="btn warn" id="bannerBtn" onclick="location.reload()">Ride Again</button></div>
 </div>
 <div class="hint">Click a glowing tile to move &middot; click an enemy in range to fire &middot; cover &amp; high ground change your odds</div>
 
@@ -89,13 +89,51 @@ const players = [
   mkUnit({id:'gun', name:'Cassidy Vane', role:'Gunslinger', side:'p', q:1,r:1, hp:24, str:6, quick:9, aim:82, rng:6, wmin:5, wmax:9, color:'#e8c88a', ability:'Fan the Hammer'}),
   mkUnit({id:'hex', name:'Marisol Vega', role:'Hexslinger', side:'p', q:0,r:3, hp:20, str:4, quick:7, aim:75, rng:5, wmin:6, wmax:10, color:'#b98ed4', ability:'Hex Bolt'}),
 ];
-const enemies = [
-  mkUnit({id:'e1', name:"Walkin' Dead", role:'Risen', side:'e', q:8,r:8, hp:16, str:7, quick:2, aim:55, rng:1, wmin:4, wmax:7, color:'#7c9a6a'}),
-  mkUnit({id:'e2', name:"Walkin' Dead", role:'Risen', side:'e', q:9,r:6, hp:16, str:7, quick:2, aim:55, rng:1, wmin:4, wmax:7, color:'#6a8a5a'}),
-  mkUnit({id:'e3', name:'Rattlesnake Bill', role:'Outlaw', side:'e', q:8,r:2, hp:22, str:6, quick:8, aim:78, rng:6, wmin:5, wmax:8, color:'#c0392b', ability:'Sawed-Off'}),
+const enemies = [];
+
+// ---- waves (enemy roster per DUSTFALL_BIBLE 7. ENEMIES) ----
+// hexer: attack jinxes the target (-15 aim, 1 turn) — Dust Witch
+// blinker: teleports toward prey instead of walking — Harrowed Gunfighter
+// bomber: dynamite blast hits the target tile AND every adjacent unit
+const WAVES = [
+  {name:'The Crossing', intro:"The Walkin' Dead shamble at the crossing.", units:[
+    {name:"Walkin' Dead", role:'Risen', hp:16, str:7, quick:2, aim:55, rng:1, wmin:4, wmax:7, color:'#7c9a6a'},
+    {name:"Walkin' Dead", role:'Risen', hp:16, str:7, quick:2, aim:55, rng:1, wmin:4, wmax:7, color:'#6a8a5a'},
+    {name:'Rattlesnake Bill', role:'Outlaw', hp:22, str:6, quick:8, aim:78, rng:6, wmin:5, wmax:8, color:'#c0392b'},
+  ]},
+  {name:'Dust and Hexes', intro:'A witch rides in on the dust, coyotes at her heel.', units:[
+    {name:'Dust Witch', role:'Hexer', hp:14, str:4, quick:6, aim:72, rng:4, wmin:3, wmax:6, color:'#9a6ab8', hexer:true},
+    {name:'Coyote', role:'Beast', hp:9, str:5, quick:10, aim:65, rng:1, wmin:3, wmax:5, color:'#b88a4a'},
+    {name:'Coyote', role:'Beast', hp:9, str:5, quick:10, aim:65, rng:1, wmin:3, wmax:5, color:'#a87a3a'},
+    {name:"Walkin' Dead", role:'Risen', hp:16, str:7, quick:2, aim:55, rng:1, wmin:4, wmax:7, color:'#7c9a6a'},
+  ]},
+  {name:'The Harrowed', intro:'The dead that learned to shoot. And one with dynamite.', units:[
+    {name:'Harrowed Gunfighter', role:'Harrowed', hp:20, str:5, quick:7, aim:74, rng:5, wmin:5, wmax:8, color:'#5a8a8a', blinker:true},
+    {name:'Dynamite Bandit', role:'Bomber', hp:14, str:5, quick:6, aim:70, rng:4, wmin:4, wmax:7, color:'#d4763a', bomber:true},
+    {name:"Walkin' Dead", role:'Risen', hp:18, str:8, quick:2, aim:58, rng:1, wmin:5, wmax:8, color:'#6a8a5a'},
+    {name:"Walkin' Dead", role:'Risen', hp:18, str:8, quick:2, aim:58, rng:1, wmin:5, wmax:8, color:'#7c9a6a'},
+  ]},
 ];
+let wave=0, kills=0, turnsTaken=0;
+
+const SPAWNS = [[8,8],[9,6],[8,2],[9,3],[7,9],[9,8],[8,5]];
+function spawnWave(n){
+  wave=n;
+  const w=WAVES[n-1];
+  enemies.length=0;
+  const free=SPAWNS.filter(([q,r])=>!unitAt(q,r));
+  w.units.forEach((spec,i)=>{
+    const [q,r]=free[i]||SPAWNS[i%SPAWNS.length];
+    const u=mkUnit({...spec, id:'w'+n+'e'+i, side:'e', q, r});
+    u.maxAp=3+Math.floor(u.quick/4); u.ap=u.maxAp;
+    enemies.push(u);
+  });
+  document.getElementById('waveLabel').textContent=
+    'The Ashen Frontier · Wave '+n+' of '+WAVES.length+' · '+w.name;
+  log(w.intro);
+}
+
 players.forEach(u=>{u.maxAp=3+Math.floor(u.quick/4);u.ap=u.maxAp;});
-enemies.forEach(u=>{u.maxAp=3+Math.floor(u.quick/4);u.ap=u.maxAp;});
 const all = ()=>[...players,...enemies].filter(u=>u.alive);
 function unitAt(q,r){return all().find(u=>u.q===q&&u.r===r);}
 
@@ -135,6 +173,7 @@ function hitChance(att,def,ignoreCover){
   const hd=grid[att.r][att.q].h-grid[def.r][def.q].h;
   c += hd*10;                                 // high ground +10%/level
   c -= Math.max(0,dist(att,def)-att.rng)*15;  // out of range falloff
+  if(att.jinx)c-=15;                          // Dust Witch's hex
   return Math.max(5,Math.min(95,Math.round(c)));
 }
 function rollDmg(att){return Math.floor(Math.random()*(att.wmax-att.wmin+1))+att.wmin+Math.floor(att.str/3);}
@@ -163,13 +202,35 @@ function fire(att,def,opts={}){
       for(let k=0;k<12;k++)particles.push({x:tgt.x,y:tgt.y-22,vx:(Math.random()-.5)*5,vy:-Math.random()*4-1,life:18,c:PAL.blood});
       floaters.push({x:tgt.x,y:tgt.y-40,t:'-'+dmg,life:42,c:PAL.blood});
       log(att.name+' hits '+def.name+' for '+dmg);
-      if(def.hp<=0){def.alive=false; def.downed=1; log(def.name+' falls.');}
+      if(att.hexer&&def.side==='p'&&def.alive){def.jinx=1;floaters.push({x:tgt.x,y:tgt.y-56,t:'JINXED',life:42,c:'#9a6ab8'});log(def.name+' is jinxed — aim suffers.');}
+      if(def.hp<=0){def.alive=false; def.downed=1; if(def.side==='e')kills++; log(def.name+' falls.');}
     } else {floaters.push({x:tgt.x,y:tgt.y-40,t:'MISS',life:42,c:PAL.parch}); log(att.name+' misses '+def.name+'.');}
     busy=false; refreshSel(); checkEnd(); opts.cb&&opts.cb();
   },260);
 }
 
+// ---- dynamite: blast the target tile + every adjacent unit (friend or foe) ----
+function blast(att,def,cb){
+  busy=true;
+  const tgt=iso(def.q,def.r,grid[def.r][def.q].h);
+  for(let k=0;k<10;k++)particles.push({x:tgt.x,y:tgt.y-60,vx:(Math.random()-.5)*2,vy:2+Math.random()*2,life:16,c:'#d4763a'});
+  setTimeout(()=>{
+    shake=14;
+    for(let k=0;k<26;k++)particles.push({x:tgt.x,y:tgt.y-18,vx:(Math.random()-.5)*8,vy:-Math.random()*6,life:22,c:k%2?PAL.amber:PAL.blood});
+    const caught=all().filter(u=>Math.abs(u.q-def.q)<=1&&Math.abs(u.r-def.r)<=1);
+    caught.forEach(u=>{
+      const dmg=Math.floor(Math.random()*4)+4; u.hp-=dmg; u.flash=10;
+      const p=iso(u.q,u.r,grid[u.r][u.q].h);
+      floaters.push({x:p.x,y:p.y-40,t:'-'+dmg,life:42,c:PAL.blood});
+      if(u.hp<=0){u.alive=false;u.downed=1;if(u.side==='e')kills++;log(u.name+' falls.');}
+    });
+    log(att.name+"'s dynamite catches "+caught.length+" in the blast!");
+    busy=false; refreshSel(); checkEnd(); cb&&cb();
+  },300);
+}
+
 // ---- enemy AI: move toward nearest player, attack if able ----
+// blinkers teleport instead of walking; bombers throw dynamite (AoE)
 function enemyTurn(){
   const queue=enemies.filter(e=>e.alive); let idx=0;
   const step=()=>{
@@ -178,7 +239,27 @@ function enemyTurn(){
     const act=()=>{
       const tgt=players.filter(p=>p.alive).sort((a,b)=>dist(e,a)-dist(e,b))[0];
       if(!tgt){idx++;setTimeout(step,150);return;}
-      if(dist(e,tgt)<=e.rng+1 && e.ap>=2){e.ap-=2; sel=e; fire(e,tgt,{cb:()=>{setTimeout(act,180);}}); return;}
+      if(dist(e,tgt)<=e.rng+1 && e.ap>=2){
+        e.ap-=2; sel=e;
+        if(e.bomber){blast(e,tgt,()=>setTimeout(act,180));}
+        else fire(e,tgt,{cb:()=>{setTimeout(act,180);}});
+        return;
+      }
+      if(e.blinker&&e.ap>=1&&dist(e,tgt)>e.rng){ // the Harrowed step through the dust
+        const spots=[];
+        for(let r=0;r<ROWS;r++)for(let q=0;q<COLS;q++){
+          if(grid[r][q].h>=2||unitAt(q,r))continue;
+          const d=Math.abs(q-tgt.q)+Math.abs(r-tgt.r);
+          if(d>=1&&d<=e.rng)spots.push({q,r,d});
+        }
+        if(spots.length){
+          const s=spots[Math.floor(Math.random()*spots.length)];
+          const from=iso(e.q,e.r,grid[e.r][e.q].h), to=iso(s.q,s.r,grid[s.r][s.q].h);
+          [from,to].forEach(p=>{for(let k=0;k<10;k++)particles.push({x:p.x,y:p.y-22,vx:(Math.random()-.5)*3,vy:-Math.random()*2,life:16,c:'#5a8a8a'});});
+          e.q=s.q;e.r=s.r;e.ap-=1;log(e.name+' steps through the dust.');
+          setTimeout(act,200);return;
+        }
+      }
       const rc=reach(e); let best=null,bd=dist(e,tgt);
       Object.keys(rc).forEach(k=>{const [q,r]=k.split(',').map(Number);const d=Math.abs(q-tgt.q)+Math.abs(r-tgt.r);if(d<bd){bd=d;best=[q,r];}});
       if(best&&e.ap>0){moveTo(e,best[0],best[1],()=>setTimeout(act,150));}
@@ -188,14 +269,57 @@ function enemyTurn(){
   };
   step();
 }
-function endEnemy(){turn='p';players.forEach(p=>{if(p.alive)p.ap=p.maxAp;});sel=players.find(p=>p.alive);abilityMode=false;log('— Your move —');refreshSel();}
+function endEnemy(){turn='p';turnsTaken++;players.forEach(p=>{if(p.alive)p.ap=p.maxAp;});sel=players.find(p=>p.alive);abilityMode=false;log('— Your move —');refreshSel();}
 
 function checkEnd(){
-  if(!enemies.some(e=>e.alive)){banner('VICTORY','The crossing is yours',PAL.amber);return true;}
-  if(!players.some(p=>p.alive)){banner('WIPED OUT','The dust takes you',PAL.blood);return true;}
+  if(!players.some(p=>p.alive)){banner('WIPED OUT','The dust takes you — wave '+wave+', '+kills+' kills',PAL.blood);return true;}
+  if(!enemies.some(e=>e.alive)){
+    if(wave<WAVES.length){boonBanner();}
+    else banner('THE DUST SETTLES','All '+WAVES.length+' waves broken · '+kills+' kills · '+turnsTaken+' turns',PAL.amber);
+    return true;
+  }
   return false;
 }
-function banner(t,s,c){busy=true;const b=document.getElementById('banner');const bt=document.getElementById('bannerTitle');bt.textContent=t;bt.style.color=c;document.getElementById('bannerSub').textContent=s;b.style.display='flex';}
+function banner(t,s,c){busy=true;const b=document.getElementById('banner');const bt=document.getElementById('bannerTitle');bt.textContent=t;bt.style.color=c;document.getElementById('bannerSub').textContent=s;document.getElementById('boonRow').style.display='none';document.getElementById('bannerBtn').style.display='';b.style.display='flex';}
+
+// ---- between waves: lick wounds, pick one boon, ride on ----
+const BOONS = [
+  {n:'Bandages', d:'both riders heal 12', f:()=>players.forEach(p=>{p.hp=Math.min(p.maxHp,p.hp+12);})},
+  {n:'Hollow Points', d:'+2 weapon damage', f:()=>players.forEach(p=>{p.wmin+=2;p.wmax+=2;})},
+  {n:"Coyote's Luck", d:'+8 aim', f:()=>players.forEach(p=>{p.aim+=8;})},
+];
+function boonBanner(){
+  busy=true;
+  const b=document.getElementById('banner');
+  const bt=document.getElementById('bannerTitle');
+  bt.textContent='WAVE '+wave+' BROKEN'; bt.style.color=PAL.teal;
+  document.getElementById('bannerSub').textContent='Take a breath. Choose a boon. Wave '+(wave+1)+' rides at dawn.';
+  document.getElementById('bannerBtn').style.display='none';
+  const row=document.getElementById('boonRow');
+  while(row.firstChild)row.removeChild(row.firstChild);
+  BOONS.forEach(boon=>{
+    const btn=document.createElement('button');
+    btn.className='btn';
+    btn.textContent=boon.n+' — '+boon.d;
+    btn.onclick=()=>{reviveFallen();boon.f();log('Boon: '+boon.n+'.');nextWave();};
+    row.appendChild(btn);
+  });
+  row.style.display='flex';
+  b.style.display='flex';
+}
+// the fallen pick themselves back up, barely — before the boon applies,
+// so a heal lands on the revived rider instead of being overwritten
+function reviveFallen(){
+  players.forEach(p=>{if(!p.alive){p.alive=true;p.downed=0;p.hp=Math.max(1,Math.round(p.maxHp*.3));log(p.name+' staggers back up.');}});
+}
+function nextWave(){
+  document.getElementById('banner').style.display='none';
+  players.forEach(p=>{p.ap=p.maxAp;p.jinx=0;});
+  spawnWave(wave+1);
+  turn='p'; sel=players.find(p=>p.alive); abilityMode=false; busy=false;
+  log('— Your move —');
+  refreshSel();
+}
 
 // ---- input ----
 C.addEventListener('mousemove',e=>{const rb=C.getBoundingClientRect();C.hoverTile=tileUnderMouse(e.clientX-rb.left,e.clientY-rb.top);});
@@ -211,7 +335,7 @@ C.addEventListener('click',e=>{
   }
   if(sel&&!abilityMode&&reachable[t.q+','+t.r]!==undefined)moveTo(sel,t.q,t.r);
 });
-document.getElementById('endBtn').onclick=()=>{if(busy||turn!=='p')return;turn='e';abilityMode=false;log('Enemies stir...');enemyTurn();};
+document.getElementById('endBtn').onclick=()=>{if(busy||turn!=='p')return;turn='e';abilityMode=false;players.forEach(p=>p.jinx=0);log('Enemies stir...');enemyTurn();};
 document.getElementById('abilityBtn').onclick=()=>{if(sel&&sel.ability&&sel.ap>=2){abilityMode=!abilityMode;log(abilityMode?sel.ability+': pick a target':'cancelled');}};
 function doAbility(tgt){
   abilityMode=false;
@@ -249,6 +373,7 @@ function drawUnit(u){
   X.beginPath();X.arc(p.x,p.y+TH/2-38+bob,6,0,7);X.fill();
   X.fillStyle=flash?'#fff':'#2a1d0f';X.fillRect(p.x-10,p.y+TH/2-43+bob,20,3);X.fillRect(p.x-5,p.y+TH/2-49+bob,10,7);
   if(u===sel&&u.alive){X.strokeStyle=PAL.amber;X.lineWidth=2;X.beginPath();X.ellipse(p.x,p.y+TH/2+2,17,8,0,0,7);X.stroke();X.lineWidth=1;}
+  if(u.jinx){X.strokeStyle='#9a6ab8';X.lineWidth=2;X.beginPath();X.ellipse(p.x,p.y+TH/2-38+bob,9,9,0,0,7);X.stroke();X.lineWidth=1;}
   const bw=26;X.fillStyle='#2a1d0f';X.fillRect(p.x-bw/2,p.y+TH/2-54+bob,bw,4);
   X.fillStyle=u.side==='p'?PAL.teal:PAL.blood;X.fillRect(p.x-bw/2,p.y+TH/2-54+bob,bw*Math.max(0,u.hp/u.maxHp),4);
   if(u.flash>0)u.flash--;
@@ -283,8 +408,16 @@ function renderParty(){
   });
 }
 
-log("The Walkin' Dead shamble at the crossing."); log('— Your move —');
+spawnWave(1); log('— Your move —');
 refreshSel(); frame();
+
+// test hook: lets a scripted browser check drive the real game functions
+window.DF = {
+  players, enemies, WAVES, BOONS, grid,
+  spawnWave, hitChance, rollDmg, fire, blast, reach, unitAt, checkEnd, nextWave,
+  get wave(){return wave;}, get kills(){return kills;}, get turn(){return turn;},
+  get busy(){return busy;},
+};
 </script>
 </body>
 </html>
