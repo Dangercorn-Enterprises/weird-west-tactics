@@ -99,14 +99,15 @@
       quick = s.quickness || 5,
       str = s.strength || 4,
       deft = s.deftness || 5;
-    const ability =
-      arch && arch.abilities && arch.abilities[0]
-        ? arch.abilities[0].name
-        : p.archetype === "gunslinger"
-          ? "Fan the Hammer"
-          : p.archetype === "hexslinger"
-            ? "Hex Bolt"
-            : null;
+    const ABIL = {
+      gunslinger: "Fan the Hammer",
+      hexslinger: "Hex Bolt",
+      tinkerer: "Ashfall Grenade",
+      preacher: "Lay on Hands",
+      lawdog: "Called Shot",
+      drifter: "Aimed Shot",
+    };
+    const ability = ABIL[p.archetype] || "Aimed Shot";
     return mkUnit({
       id: p.uid || "p" + i,
       name: p.name || (arch ? arch.name : "Rider"),
@@ -620,14 +621,25 @@
     enemyTurn();
   }
   function toggleAbility() {
-    if (sel && sel.ability && sel.ap >= 2) {
-      abilityMode = !abilityMode;
-      log(abilityMode ? sel.ability + ": pick a target" : "cancelled");
+    if (!(sel && sel.ability && sel.ap >= 2)) return;
+    if (isHeal(sel.ability)) {
+      const allies = players.filter((p) => p.alive);
+      const who =
+        allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] ||
+        sel;
+      doAbility(who);
+      return;
     }
+    abilityMode = !abilityMode;
+    log(abilityMode ? sel.ability + ": pick a target" : "cancelled");
+  }
+  function isHeal(a) {
+    return a === "Lay on Hands" || a === "Soul Drain";
   }
   function doAbility(tgt) {
     abilityMode = false;
-    if (sel.ability === "Fan the Hammer") {
+    const a = sel.ability;
+    if (a === "Fan the Hammer") {
       sel.ap -= 3;
       log("Fan the Hammer — three shots!");
       let n = 0;
@@ -644,10 +656,54 @@
         }
       };
       s();
-    } else if (sel.ability === "Hex Bolt") {
+    } else if (a === "Hex Bolt") {
       sel.ap -= 2;
       log("Hex Bolt ignores cover!");
       fire(sel, tgt, { ignoreCover: true });
+    } else if (a === "Ashfall Grenade") {
+      sel.ap -= 2;
+      log(sel.name + " lobs an Ashfall grenade!");
+      blast(sel, tgt);
+    } else if (a === "Called Shot") {
+      sel.ap -= 3;
+      log("Called Shot — dead to rights.");
+      const sv = sel.aim;
+      sel.aim = 999;
+      fire(sel, tgt, {
+        cb: () => {
+          sel.aim = sv;
+        },
+      });
+    } else if (a === "Lay on Hands" || a === "Soul Drain") {
+      sel.ap -= 2;
+      const amt = 6 + Math.floor(Math.random() * 5);
+      const who = a === "Soul Drain" ? sel : tgt;
+      if (who.downed) {
+        who.alive = true;
+        who.downed = false;
+        who.bleed = 0;
+        who.hp = amt;
+        log(sel.name + " pulls " + who.name + " back from the brink.");
+      } else {
+        who.hp = Math.min(who.maxHp, who.hp + amt);
+        log(
+          sel.name +
+            (a === "Soul Drain"
+              ? " drains the void (+"
+              : " lays hands on " + who.name + " (+") +
+            amt +
+            ").",
+        );
+      }
+      const p = iso(who.q, who.r, grid[who.r][who.q].h);
+      floaters.push({
+        x: p.x,
+        y: p.y - 40,
+        t: "+" + amt,
+        life: 42,
+        c: PAL.teal,
+      });
+      refreshSel();
     } else {
       sel.ap -= 2;
       fire(sel, tgt, { mult: 1.5 });
