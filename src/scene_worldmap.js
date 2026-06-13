@@ -123,6 +123,22 @@
     DF.state.location = to.id;
     DF.state.visited[to.id] = true;
     DF.saveGame();
+    const ENC = typeof ENEMY_CATALOG !== "undefined" ? ENEMY_CATALOG : [];
+    // first arrival at a tier-3 node = a boss reckoning
+    if (to.tier >= 3 && !DF.state.flags["boss_" + to.id]) {
+      DF.state.flags["boss_" + to.id] = true;
+      DF.saveGame();
+      const boss =
+        ENC.find((e) => e.boss && e.faction === to.god) ||
+        ENC.find((e) => e.boss);
+      const minions = ENC.filter((e) => e.tier <= 2 && !e.boss).slice(0, 2);
+      DF.go("battle", {
+        title: "Reckoning at " + to.name,
+        enemies: [boss].concat(minions).filter(Boolean),
+        onComplete: () => DF.go("worldmap"),
+      });
+      return;
+    }
     const chance = risk >= 3 ? 0.6 : risk === 2 ? 0.3 : 0;
     if (Math.random() < chance) {
       // ambush on the trail — enemies scaled to the destination's tier

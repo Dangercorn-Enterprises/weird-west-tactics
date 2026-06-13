@@ -2,7 +2,15 @@
 
 A turn-based tactical RPG set in a supernatural weird western world — inspired by games like XCOM, Fallout Tactics, and classic tabletop RPG systems.
 
-**Status:** Early Prototype / Active Development
+**Status:** Playable vertical slice (worldmap · towns · iso combat · leveling) — Active Development
+
+## ▶ Play
+
+Open `index.html` (or `src/game.html` directly) in a browser, or run the dev server: `npx serve src`, then visit `/game.html`.
+
+**The vertical slice loop:** Title → travel the **US-Southwest overworld** (Oregon→Mexico, offshore Catalina→Texas; major cities + lore-famous sites, each bound to one of six warring gods) → **town hubs** (saloon recruit/rest/rumors, outfitter, shrine, marshal bounties — a live gold economy) → **isometric tactical combat** (elevation + cover, AP, six archetype abilities, healing, divine powers) → **results, XP & leveling** → back to the map. First arrival at a tier-3 node triggers a **boss reckoning**.
+
+**Architecture (ship-ready):** offline, self-contained, classic-script SPA — `src/game.html` + `engine.js` (scene manager / state / storage / scaling) + per-scene files + `data.js`/`worldmap_data.js`. Web tech is the engine; the game packages to a desktop app for **Steam / Epic / GoG** via Electron (`electron/`). Full build plan in `BUILD_PLAN.md`.
 
 ## What Is This?
 
