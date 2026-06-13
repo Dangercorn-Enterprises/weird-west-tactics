@@ -93,17 +93,9 @@ body{
   <div class="hint">Click an adjacent town to travel · click your town to enter · trails &amp; wilderness risk ambush</div>
 </section>
 
-<!-- TOWN (Phase 1 stub) -->
+<!-- TOWN (Phase 3 — menu-driven hub) -->
 <section data-scene="town" style="display:none">
-  <div class="menu">
-    <h1 style="font-size:38px">Rustwater</h1>
-    <div class="sub">Town hub — Phase 3 builds saloon / outfitter / shrine</div>
-    <p>Neutral ground built around the last clean aquifer. Three gods, two blocks.</p>
-    <div class="col">
-      <button class="btn warn" id="tnBattle">Take a Bounty (Skirmish)</button>
-      <button class="btn" id="tnBack">Back to Map</button>
-    </div>
-  </div>
+  <div id="tnRoot" class="menu" style="max-width:620px"></div>
 </section>
 
 <!-- BATTLE (the locked iso/elevation/cover core; scene_battle.js wires this) -->
@@ -142,5 +134,6 @@ body{
 <script src="scene_battle.js"></script>
 <script src="scenes_hub.js"></script>
 <script src="scene_worldmap.js"></script>
+<script src="scene_town.js"></script>
 </body>
 </html>
