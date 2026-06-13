@@ -179,6 +179,36 @@
     });
   };
 
+  // ---- progression / leveling (Phase 5) ----
+  DF.xpForLevel = function (lvl) {
+    return (lvl || 1) * 100;
+  }; // XP to reach the next level
+  DF.gainXP = function (unit, amount) {
+    unit.xp = (unit.xp || 0) + (amount || 0);
+    unit.level = unit.level || 1;
+    unit.stats = unit.stats || {};
+    const reached = [];
+    const favored = {
+      gunslinger: ["deftness", "quickness"],
+      hexslinger: ["cognition", "spirit"],
+      tinkerer: ["knowledge", "cognition"],
+      preacher: ["spirit", "vigor"],
+      lawdog: ["vigor", "mien"],
+      drifter: ["nimbleness", "quickness"],
+    };
+    while (unit.xp >= DF.xpForLevel(unit.level)) {
+      unit.xp -= DF.xpForLevel(unit.level);
+      unit.level += 1;
+      // bible: +2 stats per level. Bump one favored stat + vigor (HP growth).
+      const fav = favored[unit.archetype] || ["vigor", "quickness"];
+      const s1 = fav[Math.floor(Math.random() * fav.length)];
+      unit.stats[s1] = (unit.stats[s1] || 3) + 1;
+      unit.stats.vigor = (unit.stats.vigor || 3) + 1;
+      reached.push(unit.level);
+    }
+    return reached; // [] or list of new levels
+  };
+
   // ---- boot ----
   DF.boot = function () {
     if (!DF.loadGame()) {

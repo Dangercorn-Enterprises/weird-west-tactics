@@ -43,13 +43,22 @@
       h.querySelector("#rBody").textContent = r
         ? r.kills + " kills · " + r.turns + " turns · +" + r.xp + " XP earned"
         : "";
-      // award XP to the surviving roster (Phase 5 deepens leveling)
+      // award XP to the surviving roster and process level-ups (Phase 5)
       if (r && r.xp && DF.state && DF.state.party && DF.state.party.length) {
         const share = Math.round(r.xp / DF.state.party.length);
+        const ups = [];
         DF.state.party.forEach((p) => {
-          if (p.alive !== false) p.xp = (p.xp || 0) + share;
+          if (p.alive !== false) {
+            const reached = DF.gainXP(p, share);
+            if (reached.length) ups.push(p.name + " → Lv " + p.level);
+          }
         });
         DF.saveGame();
+        if (ups.length) {
+          const body = h.querySelector("#rBody");
+          body.textContent =
+            body.textContent + "  ·  LEVEL UP — " + ups.join(", ");
+        }
       }
       h.querySelector("#rContinue").onclick = () => {
         DF.go(DF.scenes.worldmap ? "worldmap" : "title");
