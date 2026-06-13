@@ -1,0 +1,38 @@
+{
+  "name": "dustfall",
+  "productName": "Dustfall: The Ashen Frontier",
+  "version": "0.5.0",
+  "description": "A weird-western tactical RPG — American Gods meets Final Fantasy Tactics on the sun-scorched Southwest frontier.",
+  "author": "Dangercorn Enterprises",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "npx serve src -l 5174 --no-clipboard",
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "net.dangercorn.dustfall",
+    "productName": "Dustfall",
+    "copyright": "Copyright (c) 2026 Dangercorn Enterprises",
+    "directories": { "output": "dist-electron" },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "index.html",
+      "DUSTFALL_BIBLE.md"
+    ],
+    "win": { "target": ["nsis"], "artifactName": "Dustfall-Setup-${version}.${ext}" },
+    "mac": { "target": ["dmg"], "category": "public.app-category.games" },
+    "linux": { "target": ["AppImage"], "category": "Game" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}
