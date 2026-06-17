@@ -98,6 +98,94 @@ const SPRITES = {
     "................",
     "................",
   ],
+  tinkerer: [
+    "................",
+    ".....bbbbbb.....",
+    "....bKKKKKKb....",
+    "...bKKKKKKKKb...",
+    "....bBBBBBBb....",
+    ".....SSSSSS.....",
+    ".....StSStS.....",
+    ".....SSSSSS.....",
+    "......dSSd......",
+    "...BbLLLLLLbB...",
+    "...BbLlBBlLbB...",
+    "...BbLlLLlLbB...",
+    "..GbLlLLLLlbG..",
+    "..GbLLLLLLLbG..",
+    "...bLLLLLLLb...",
+    "...bLLb.bLLb...",
+    "...bDDb.bDDb...",
+    "...bDDb.bDDb...",
+    "...bbbb.bbbb...",
+    "..bbbbb.bbbbb..",
+  ],
+  preacher: [
+    "................",
+    "....bbbbbbbb....",
+    "...bKKKKKKKKb...",
+    "...bKKKKKKKKb...",
+    "....bbbbbbbb....",
+    ".....SSSSSS.....",
+    ".....SbSSbS.....",
+    ".....SSSSSS.....",
+    ".....WWWWWW.....",
+    "....bKKKKKKb....",
+    "...bKKKWWKKKb...",
+    "...bKKKWWKKKb...",
+    "..WbKKKKKKKbK..",
+    "..WbKKKKKKKbK..",
+    "...bKKKKKKKb...",
+    "...bKKb.bKKb...",
+    "...bKKb.bKKb...",
+    "...bKKb.bKKb...",
+    "...bbbb.bbbb...",
+    "..bbbbb.bbbbb..",
+  ],
+  lawdog: [
+    "................",
+    ".....bbbbbb.....",
+    "....bKKKKKKb....",
+    "...bKKKKKKKKb...",
+    "....bbbbbbbb....",
+    ".....SSSSSS.....",
+    ".....SbSSbS.....",
+    ".....SSSSSS.....",
+    "......dSSd......",
+    "....bDDDDDDb....",
+    "...bDDBDDDDb...",
+    "...bDDDDDDDb...",
+    "..GbDDDDDDDbG..",
+    "..GbDDDDDDDbG..",
+    "...bDDDDDDDb...",
+    "...bDDb.bDDb...",
+    "...bDDb.bDDb...",
+    "...bDDb.bDDb...",
+    "...bbbb.bbbb...",
+    "..bbbbb.bbbbb..",
+  ],
+  drifter: [
+    "................",
+    "....bbbbbbbb....",
+    "...bKKKKKKKKb...",
+    "...bKKKKKKKKb...",
+    "....bbbbbbbb....",
+    ".....SSSSSS.....",
+    ".....SbSSbS.....",
+    ".....SSSSSS.....",
+    "....llllllll...",
+    "...lLrLLrLLl...",
+    "...lLLLLLLLl...",
+    "...lLrLLrLLl...",
+    "...llllllll....",
+    "....bLLLLb.....",
+    "....bDDDDb.....",
+    "....bDb.bDb....",
+    "....bDb.bDb....",
+    "....bbb.bbb....",
+    "...bbbb.bbbb...",
+    "................",
+  ],
 };
 
 // TODO (overnight): the rest of the roster, each screenshot-verified, same hand-authored bar:
@@ -126,13 +214,15 @@ function drawSprite(ctx, rows, ox, oy, sc, opts) {
 // Map a battle unit to its sprite key. Extend as the roster grows.
 function spriteFor(unit) {
   if (!unit) return SPRITES.gunslinger;
-  const key = (unit.archetype || unit.role || unit.name || "")
+  const raw = (unit.archetype || unit.role || unit.name || "")
     .toString()
-    .toLowerCase()
-    .replace(/[^a-z]/g, "_");
-  if (SPRITES[key]) return SPRITES[key];
-  if (/dead|risen|harrow|zombie/.test(key)) return SPRITES.walkin_dead;
-  if (/hex|witch|weaver/.test(key)) return SPRITES.hexslinger;
+    .toLowerCase();
+  const norm = raw.replace(/[^a-z0-9]/g, ""); // strip spaces/apostrophes/underscores
+  for (const k in SPRITES) {
+    if (k.replace(/[^a-z0-9]/g, "") === norm) return SPRITES[k];
+  }
+  if (/dead|risen|harrow|zombie/.test(raw)) return SPRITES.walkin_dead;
+  if (/hex|witch|weaver/.test(raw)) return SPRITES.hexslinger;
   return SPRITES.gunslinger;
 }
 
