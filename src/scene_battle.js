@@ -143,6 +143,7 @@
     const beh = spec.behavior || "";
     return mkUnit({
       id: "e" + i,
+      archetype: spec.id,
       name: spec.name,
       role: spec.faction || "",
       side: "e",

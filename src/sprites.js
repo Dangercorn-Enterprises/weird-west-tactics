@@ -186,6 +186,28 @@ const SPRITES = {
     "...bbbb.bbbb...",
     "................",
   ],
+  rattlesnake: [
+    "................",
+    ".....bbbbbb.....",
+    "....bKKKKKKb....",
+    "...bKKKKKKKKb...",
+    "....bbbbbbbb....",
+    ".....SSSSSS.....",
+    ".....SbSSbS.....",
+    ".....rrrrrr.....",
+    "......rrrr......",
+    "....bLLLLLLb....",
+    "...bLrLLrLLb...",
+    "...bLLLDDLLb...",
+    "..GbLLLDDLLbG..",
+    "..GbLLLLLLLbG..",
+    "...bLLLLLLLb...",
+    "...bLLb.bLLb...",
+    "...bDDb.bDDb...",
+    "...bDDb.bDDb...",
+    "...bbbb.bbbb...",
+    "..bbbbb.bbbbb..",
+  ],
 };
 
 // TODO (overnight): the rest of the roster, each screenshot-verified, same hand-authored bar:
