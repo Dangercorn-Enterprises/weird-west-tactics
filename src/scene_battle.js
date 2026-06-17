@@ -947,7 +947,12 @@
         params.enemies && params.enemies.length
           ? params.enemies
           : typeof ENEMY_CATALOG !== "undefined"
-            ? [ENEMY_CATALOG[0], ENEMY_CATALOG[0], ENEMY_CATALOG[1]]
+            ? [
+                ENEMY_CATALOG[0],
+                ENEMY_CATALOG[2],
+                ENEMY_CATALOG[3],
+                ENEMY_CATALOG[4],
+              ]
             : [];
       buildGrid();
       const free = SPAWNS.slice();
