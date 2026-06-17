@@ -288,7 +288,7 @@
     c.appendChild(
       el("p", {
         class: "flavor",
-        text: "Guns, armor, and ghost-rock charges, frontier-style. Inventory varies by town.",
+        text: "Guns, armor, and Ashfall charges, frontier-style. Inventory varies by town.",
         style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "8px" },
       }),
     );

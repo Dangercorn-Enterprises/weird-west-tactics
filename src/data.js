@@ -1078,7 +1078,7 @@ const WEAPONS = [
     dmg: [5, 12],
     accuracy: 58,
     cost: 200,
-    note: "Ghost-rock, armor-piercing.",
+    note: "Ashfall, armor-piercing.",
   },
   {
     id: "steam_cannon",
