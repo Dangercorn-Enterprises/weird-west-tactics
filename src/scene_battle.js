@@ -793,25 +793,33 @@
     X.fill();
     const flash = u.flash > 0;
     const by = p.y + TH / 2 + bob; // feet line
-    const skin = "#e8c8a0",
-      dark = "#2a1d0f";
-    // legs
-    X.fillStyle = flash ? "#fff" : dark;
-    X.fillRect(p.x - 5, by - 8, 3, 8);
-    X.fillRect(p.x + 2, by - 8, 3, 8);
-    // arms
-    X.fillRect(p.x - 8, by - 18, 2, 9);
-    X.fillRect(p.x + 6, by - 18, 2, 9);
-    // torso (faction/archetype color)
-    X.fillStyle = flash ? "#fff" : u.color;
-    X.fillRect(p.x - 6, by - 20, 12, 13);
-    // head
-    X.fillStyle = flash ? "#fff" : skin;
-    X.fillRect(p.x - 4, by - 27, 8, 7);
-    // hat — brim + crown
-    X.fillStyle = flash ? "#fff" : dark;
-    X.fillRect(p.x - 8, by - 28, 16, 2);
-    X.fillRect(p.x - 4, by - 33, 8, 5);
+    // REAL pixel sprite (src/sprites.js) — replaces the old canvas-block figure
+    if (typeof drawSprite === "function" && typeof spriteFor === "function") {
+      const sc = 2; // 16x20 sprite -> 32x40 px
+      drawSprite(
+        X,
+        spriteFor(u),
+        Math.round(p.x - 8 * sc),
+        Math.round(by - 19 * sc),
+        sc,
+        { flash },
+      );
+    } else {
+      const skin = "#e8c8a0",
+        dark = "#2a1d0f";
+      X.fillStyle = flash ? "#fff" : dark;
+      X.fillRect(p.x - 5, by - 8, 3, 8);
+      X.fillRect(p.x + 2, by - 8, 3, 8);
+      X.fillRect(p.x - 8, by - 18, 2, 9);
+      X.fillRect(p.x + 6, by - 18, 2, 9);
+      X.fillStyle = flash ? "#fff" : u.color;
+      X.fillRect(p.x - 6, by - 20, 12, 13);
+      X.fillStyle = flash ? "#fff" : skin;
+      X.fillRect(p.x - 4, by - 27, 8, 7);
+      X.fillStyle = flash ? "#fff" : dark;
+      X.fillRect(p.x - 8, by - 28, 16, 2);
+      X.fillRect(p.x - 4, by - 33, 8, 5);
+    }
     if (u === sel && u.alive) {
       X.strokeStyle = PAL.amber;
       X.lineWidth = 2;
