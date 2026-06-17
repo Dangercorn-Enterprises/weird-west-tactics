@@ -2,3 +2,7 @@
 Thumbs.db
 *.swp
 *.swo
+
+# build + deps (never commit)
+node_modules/
+dist-electron/
