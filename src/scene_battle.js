@@ -796,7 +796,7 @@
     const by = p.y + TH / 2 + bob; // feet line
     // REAL pixel sprite (src/sprites.js) — replaces the old canvas-block figure
     if (typeof drawSprite === "function" && typeof spriteFor === "function") {
-      const sc = 2; // 16x20 sprite -> 32x40 px
+      const sc = 3; // 16x20 sprite -> 48x60 px (readable at iso zoom)
       drawSprite(
         X,
         spriteFor(u),
