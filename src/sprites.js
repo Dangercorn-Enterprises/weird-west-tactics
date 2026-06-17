@@ -312,6 +312,28 @@ const SPRITES = {
     ".bbbbb..bbbbb...",
     "bbbbbb..bbbbbb..",
   ],
+  the_deacon: [
+    "................",
+    "....bbbbbbbb....",
+    "...bKKKKKKKKb...",
+    "...bKKKKKKKKb...",
+    "....bbbbbbbb....",
+    ".....eWWWWe.....",
+    ".....ebWWbe.....",
+    ".....eWWWWe.....",
+    "....PPddddPP....",
+    "...bKKKKKKKKb...",
+    "..PbKKKWWKKKbP..",
+    "..PbKKKWWKKKbP..",
+    "...bKKKKKKKKb...",
+    "...bKKKKKKKKb...",
+    "...bKKKKKKKKb...",
+    "...bKKb..bKKb...",
+    "...bKKb..bKKb...",
+    "...bKKb..bKKb...",
+    "...bbbb..bbbb...",
+    "..bbbbb..bbbbb..",
+  ],
 };
 
 // TODO (overnight): the rest of the roster, each screenshot-verified, same hand-authored bar:

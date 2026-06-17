@@ -22,6 +22,17 @@
           DF.state.party = DF.makeStarterParty();
         DF.go("battle", { title: "Skirmish at the Crossing" });
       };
+      h.querySelector("#tBoss").onclick = () => {
+        if (!DF.state.party || !DF.state.party.length)
+          DF.state.party = DF.makeStarterParty();
+        const cat = typeof ENEMY_CATALOG !== "undefined" ? ENEMY_CATALOG : [];
+        const deacon = cat.find((e) => e.id === "the_deacon");
+        const minions = cat.length ? [cat[0], cat[0], cat[2]] : [];
+        DF.go("battle", {
+          title: "The Deacon's Reckoning",
+          enemies: deacon ? [deacon].concat(minions) : minions,
+        });
+      };
       const cont = h.querySelector("#tContinue");
       cont.style.display = DF.hasSave() ? "" : "none";
       cont.onclick = () => {
