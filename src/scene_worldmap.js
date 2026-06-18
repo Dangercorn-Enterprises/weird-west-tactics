@@ -28,7 +28,7 @@
 
   // ---- Act 1 campaign spine: Catalina -> Los Angeles -> Death Valley (the Deacon) ----
   const ACT1_OBJ = [
-    "Act I — Make for Los Angeles. The Deacon's harrowed raid the coast.",
+    "Act I — Make for Los Angeles. The Deacon's revenants raid the coast.",
     "Act I — Into the Boneyard. Hunt the Deacon at Death Valley.",
     "Act I complete — the Deacon is broken. The frontier lies open.",
   ];
@@ -43,12 +43,12 @@
   function act1Beat(to) {
     const step = act1Step();
     DF.state.flags = DF.state.flags || {};
-    // Beat 1: Los Angeles — the Harrowed Vanguard. Advances only on a win.
+    // Beat 1: Los Angeles — the Revenant Vanguard. Advances only on a win.
     if (to.id === "losangeles" && step === 0) {
       DF.go("battle", {
-        title: "The Harrowed Vanguard",
+        title: "The Revenant Vanguard",
         enemies: enemiesByIds([
-          "harrowed_gun",
+          "revenant_gun",
           "walkin_dead",
           "walkin_dead",
           "dynamite_bandit",
@@ -174,7 +174,7 @@
     if (step === 0) {
       DF.go("battle", {
         title: "Heralds of the Hollow Court",
-        enemies: enemiesByIds(["the_weaver", "dust_witch", "harrowed_gun"]),
+        enemies: enemiesByIds(["the_weaver", "dust_witch", "revenant_gun"]),
         onComplete: (r) => {
           if (r && r.win) {
             DF.state.act3 = { step: 1 };

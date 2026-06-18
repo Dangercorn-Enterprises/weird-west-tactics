@@ -51,7 +51,7 @@ The gods of Dustfall are real, present, and at war. Each deity has a **domain**,
 |-------|--------|--------|---------|------------|
 | **Vulcan** | Roman | Forge, fire, industry | Forgeworks Syndicate | Dehumanization — people become parts |
 | **Perun** | Slavic | Thunder, war, justice | The Regulators | Fanaticism — law without mercy |
-| **Baron Samedi** | Haitian Vodou | Death, crossroads, resurrection | The Harrowed | Undeath — the living become fuel |
+| **Baron Samedi** | Haitian Vodou | Death, crossroads, resurrection | The Revenants | Undeath — the living become fuel |
 | **Coyote** | Native American | Trickery, change, the wild | The Dust Walkers | Chaos — reality breaks down |
 | **Anansi** | West African | Stories, cunning, knowledge | Los Tejedores (The Weavers) | Manipulation — truth ceases to exist |
 | **The Sleeping One** | Unknown/Primordial | ???, endings, the deep earth | The Hollow Court | Annihilation — everything returns to dust |
@@ -63,7 +63,7 @@ The Roman god of fire and metalwork found paradise in America's industrial revol
 The Slavic god of thunder and righteous war. He crossed the ocean with Eastern European immigrants and found a land desperately in need of order. His followers are the **Regulators** — marshals, preachers, and honest folk who believe in law at any cost. Perun's blessing makes you strong, fast, and certain. The problem is certainty — his most devoted become zealots who see nuance as weakness.
 
 #### Baron Samedi — The Gatekeeper
-The Haitian Vodou loa of death arrived with enslaved Africans and their descendants. In the Ashlands, where death is common and Ashfall corrupts the boundary between life and death, the Baron's power runs deep. His **Harrowed** are the returned dead — some who fight the darkness inside, most who surrendered to it. The Baron isn't evil. He just doesn't see much difference between alive and dead.
+The Haitian Vodou loa of death arrived with enslaved Africans and their descendants. In the Ashlands, where death is common and Ashfall corrupts the boundary between life and death, the Baron's power runs deep. His **Revenants** are the returned dead — some who fight the darkness inside, most who surrendered to it. The Baron isn't evil. He just doesn't see much difference between alive and dead.
 
 #### Coyote — The Trickster
 The oldest god in the Ashlands. Coyote was here before any immigrant deity, and he's not happy about the company. Shapeshifter, liar, teacher, fool — Coyote's **Dust Walkers** are indigenous spiritual warriors, outlaws, and anyone who values freedom over order. Coyote's influence makes the land strange — canyons that loop, mirages that bite, ghost towns that weren't there yesterday. His corruption is pure chaos.
@@ -245,7 +245,7 @@ if critical (roll > 90% of accuracy threshold):
 - At 0 HP, unit is **Downed** (3-turn bleed-out timer, like FFT)
 - Allies can **Revive** with items or abilities before timer expires
 - If timer expires: **Dead**. Permanent in campaign mode.
-- Baron Samedi-aligned enemies can raise the fallen as Harrowed...
+- Baron Samedi-aligned enemies can raise the fallen as Revenants...
 - Divine patronage can offer one "miracle save" per campaign — but the deity remembers the debt
 
 ---
@@ -305,7 +305,7 @@ Patronage can be **changed** at shrines, but it costs reputation and there's a 3
 - **Strengths:** Healing, buffs, anti-undead damage bonus
 - **Abilities:**
   - *Lay on Hands* (2 AP) — Heal ally 5-10 HP, range 2
-  - *Smite* (2 AP) — +50% damage vs Harrowed/Undead
+  - *Smite* (2 AP) — +50% damage vs Revenants/Undead
   - *Sanctuary* (3 AP) — All allies in 3-tile radius gain +20% defense for 2 turns
 
 #### Law Dog
@@ -553,7 +553,7 @@ Player actions in the story affect town moods. Helping a town's faction improves
 ### Tier 2 — Veterans
 | Enemy | HP | Speed | Faction | Behavior |
 |-------|-----|-------|---------|----------|
-| Harrowed Gunfighter | 18 | 6 | Samedi | Ranged + teleport, undead |
+| Revenant Gunfighter | 18 | 6 | Samedi | Ranged + teleport, undead |
 | Dynamite Bandit | 14 | 5 | Coyote | Throws explosives, suicidal |
 | Ashfall Golem | 30 | 2 | Vulcan | Massive HP, melee crush, AoE |
 | Dust Witch | 12 | 5 | Anansi | Hexes, debuffs, summons coyotes |

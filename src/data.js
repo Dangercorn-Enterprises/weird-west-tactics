@@ -719,7 +719,7 @@ const GODS = [
     title: "The Gatekeeper",
     origin: "Haitian Vodou",
     domain: "Death, crossroads, resurrection",
-    faction: "The Harrowed",
+    faction: "The Revenants",
     corruption: "Undeath — the living become fuel",
     color: "#6B3FA0",
     divine: {
@@ -866,8 +866,8 @@ const ENEMY_CATALOG = [
   },
   // Tier 2 — Veterans
   {
-    id: "harrowed_gun",
-    name: "Harrowed Gunfighter",
+    id: "revenant_gun",
+    name: "Revenant Gunfighter",
     tier: 2,
     faction: "samedi",
     icon: "🔫",

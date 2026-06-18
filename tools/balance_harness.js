@@ -705,9 +705,9 @@ const ENCOUNTERS = [
     ["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"],
   ],
   [
-    "Act 1 · Harrowed Vanguard",
+    "Act 1 · Revenant Vanguard",
     "starter",
-    ["harrowed_gun", "walkin_dead", "walkin_dead", "dynamite_bandit"],
+    ["revenant_gun", "walkin_dead", "walkin_dead", "dynamite_bandit"],
   ],
   [
     "Act 1 · The Deacon (boss)",
@@ -737,7 +737,7 @@ const ENCOUNTERS = [
   [
     "Ambush · wilderness T2",
     "starter",
-    ["harrowed_gun", "dynamite_bandit", "ashfall_golem"],
+    ["revenant_gun", "dynamite_bandit", "ashfall_golem"],
   ],
   [
     "Act 1 · The Deacon (4-party)",
@@ -763,7 +763,7 @@ const ENCOUNTERS = [
   [
     "Act 3 · Weaver Heralds",
     "full",
-    ["the_weaver", "dust_witch", "harrowed_gun"],
+    ["the_weaver", "dust_witch", "revenant_gun"],
   ],
   [
     "Act 3 · Hollow Man (finale)",

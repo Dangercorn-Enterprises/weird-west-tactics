@@ -257,7 +257,7 @@ const SPRITES = {
     ".......n........",
     "................",
   ],
-  harrowed_gun: [
+  revenant_gun: [
     "................",
     ".....bbbbbb.....",
     "....bKKKKKKb....",
@@ -471,7 +471,7 @@ const SPRITES = {
 // TODO (overnight): the rest of the roster, each screenshot-verified, same hand-authored bar:
 //   archetypes: tinkerer, preacher, lawdog, drifter
 //   bestiary T1: rattlesnake_bill(outlaw), forgeworks_sentry, dust_devil, coyote
-//   bestiary T2: harrowed_gunfighter, dynamite_bandit, ashfall_golem, dust_witch, thunder_zealot
+//   bestiary T2: revenant_gunfighter, dynamite_bandit, ashfall_golem, dust_witch, thunder_zealot
 //   bestiary T3 boss: the_deacon, iron_foreman, hollow_man, coyotes_shadow, the_weaver
 //   terrain/iso tiles: sand, mesa(h1/h2), ashfall_vein, crate(cover), cactus(half-cover)
 //   overworld: parchment node icons, town/shrine/forge markers
