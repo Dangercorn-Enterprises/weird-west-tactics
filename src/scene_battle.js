@@ -82,6 +82,7 @@
     o.flash = 0;
     o.maxAp = 3 + Math.floor(o.quick / 4);
     o.ap = o.maxAp;
+    o.status = { burn: 0, bleed: 0, hex: 0, marked: 0, hunker: 0 }; // Phase 1a
     return o;
   }
 
@@ -182,6 +183,62 @@
       bomber: beh === "bomber",
       tier: spec.tier,
       boss: spec.boss,
+    });
+  }
+
+  // ---- status effects (Phase 1a) -------------------------------------------
+  // burn   = damage-over-time, ticks each of the unit's turns
+  // bleed  = damage-over-time, ticks when the unit MOVES (punishes repositioning)
+  // hex    = the afflicted unit's own attacks lose accuracy (-15)
+  // marked = the afflicted unit takes +30% damage (rewards focus fire)
+  // hunker = the afflicted unit is harder to hit (-20 to attackers) — a defensive buff
+  const STATUS_META = {
+    burn: { tag: "BRN", col: "#e8704f", dot: 3 },
+    bleed: { tag: "BLD", col: "#c0392b", dot: 2 },
+    hex: { tag: "HEX", col: "#9a6ab8" },
+    marked: { tag: "MRK", col: "#d4a843" },
+    hunker: { tag: "HNK", col: "#4ecdc4" },
+  };
+  function applyStatus(u, key, dur) {
+    if (!u || !u.alive || !u.status) return;
+    u.status[key] = Math.max(u.status[key] || 0, dur); // refresh to longest duration
+    const p = iso(u.q, u.r, grid[u.r][u.q].h);
+    floaters.push({
+      x: p.x,
+      y: p.y - 52,
+      t: STATUS_META[key].tag,
+      life: 40,
+      c: STATUS_META[key].col,
+    });
+  }
+  function statusDamage(u, dmg, key) {
+    if (!u || !u.alive) return;
+    u.hp -= dmg;
+    u.flash = 8;
+    const p = iso(u.q, u.r, grid[u.r][u.q].h);
+    floaters.push({
+      x: p.x,
+      y: p.y - 40,
+      t: "-" + dmg,
+      life: 36,
+      c: STATUS_META[key].col,
+    });
+    if (u.hp <= 0) {
+      u.alive = false;
+      u.downed = 1;
+      if (u.side === "e") kills++;
+      log(u.name + " succumbs to " + key + ".");
+    }
+  }
+  // tick burn + decrement timed statuses at the start of a unit's activation
+  function tickStatus(u) {
+    if (!u || !u.alive || !u.status) return;
+    if (u.status.burn > 0) {
+      statusDamage(u, STATUS_META.burn.dot, "burn");
+      u.status.burn--;
+    }
+    ["hex", "marked", "hunker"].forEach((k) => {
+      if (u.status[k] > 0) u.status[k]--;
     });
   }
 
@@ -308,6 +365,8 @@
     c += (grid[att.r][att.q].h - grid[def.r][def.q].h) * 10;
     c -= Math.max(0, dist(att, def) - att.rng) * 15;
     if (att.jinx) c -= 15;
+    if (att.status && att.status.hex > 0) c -= 15; // hexed: attacker less accurate
+    if (def.status && def.status.hunker > 0) c -= 20; // hunkered: harder to hit
     return Math.max(5, Math.min(95, Math.round(c)));
   }
   function rollDmg(att) {
@@ -348,8 +407,13 @@
         u.q = q;
         u.r = r;
         u.ap -= cost;
+        if (u.status && u.status.bleed > 0) {
+          statusDamage(u, STATUS_META.bleed.dot, "bleed"); // bleed ticks on move
+          u.status.bleed--;
+        }
         busy = false;
         refreshSel();
+        checkEnd();
         cb && cb();
       }
     };
@@ -372,7 +436,8 @@
       });
     setTimeout(() => {
       if (hit) {
-        const dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+        let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+        if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
         def.hp -= dmg;
         def.flash = 10;
         shake = 8;
@@ -393,16 +458,11 @@
           c: PAL.blood,
         });
         log(att.name + " hits " + def.name + " for " + dmg);
-        if (att.hexer && def.side === "p" && def.alive) {
-          def.jinx = 1;
-          floaters.push({
-            x: tgt.x,
-            y: tgt.y - 56,
-            t: "JINXED",
-            life: 42,
-            c: "#9a6ab8",
-          });
-          log(def.name + " is jinxed — aim suffers.");
+        if (opts.status && def.alive)
+          applyStatus(def, opts.status, opts.statusN || 2);
+        if (att.hexer && def.alive) {
+          applyStatus(def, "hex", 2);
+          log(def.name + " is hexed — their aim suffers.");
         }
         if (def.hp <= 0) {
           def.alive = false;
@@ -538,8 +598,15 @@
       }
       const e = queue[idx];
       e.ap = e.maxAp;
+      tickStatus(e); // burn/decrements at the start of this enemy's turn
+      if (checkEnd()) return;
       const act = () => {
         if (!active) return;
+        if (!e.alive) {
+          idx++;
+          setTimeout(step, 100);
+          return;
+        }
         const tgt = players
           .filter((p) => p.alive)
           .sort((a, b) => dist(e, a) - dist(e, b))[0];
@@ -613,8 +680,12 @@
     turn = "p";
     turnsTaken++;
     players.forEach((p) => {
-      if (p.alive) p.ap = p.maxAp;
+      if (p.alive) {
+        p.ap = p.maxAp;
+        tickStatus(p); // burn/decrements at the start of the player's turn
+      }
     });
+    if (checkEnd()) return;
     sel = players.find((p) => p.alive);
     abilityMode = false;
     log("— Your move —");
@@ -707,6 +778,7 @@
     while (menu.firstChild) menu.removeChild(menu.firstChild);
     const opts = (sel.abilities || [sel.ability]).slice();
     if (sel.divine && !sel.divineUsed) opts.push(sel.divine);
+    opts.push("Hunker Down"); // universal defensive action (1 AP)
     opts.forEach((name) => {
       const b = document.createElement("button");
       b.className = "btn abil-opt" + (name === sel.divine ? " divine" : "");
@@ -719,8 +791,16 @@
   }
   function chooseAbility(name) {
     if (!sel) return;
-    sel.ability = name;
     hideAbilityMenu();
+    if (name === "Hunker Down") {
+      if (sel.ap < 1) return;
+      sel.ap -= 1;
+      applyStatus(sel, "hunker", 2);
+      log(sel.name + " hunkers down — harder to hit.");
+      refreshSel();
+      return;
+    }
+    sel.ability = name;
     if (isHeal(name)) {
       const allies = players.filter((p) => p.alive);
       const who =
@@ -785,18 +865,20 @@
       s();
     } else if (a === "Hex Bolt") {
       sel.ap -= 2;
-      log("Hex Bolt ignores cover!");
-      fire(sel, tgt, { ignoreCover: true });
+      log("Hex Bolt ignores cover — and hexes!");
+      fire(sel, tgt, { ignoreCover: true, status: "hex", statusN: 2 });
     } else if (a === "Ashfall Grenade") {
       sel.ap -= 2;
       log(sel.name + " lobs an Ashfall grenade!");
       blast(sel, tgt);
     } else if (a === "Called Shot") {
       sel.ap -= 3;
-      log("Called Shot — dead to rights.");
+      log("Called Shot — dead to rights, and marked.");
       const sv = sel.aim;
       sel.aim = 999;
       fire(sel, tgt, {
+        status: "marked",
+        statusN: 2,
         cb: () => {
           sel.aim = sv;
         },
@@ -833,8 +915,8 @@
       refreshSel();
     } else if (a === "Gut Shot" || a === "Both Barrels") {
       sel.ap -= 2;
-      log(sel.name + " — " + a + "!");
-      fire(sel, tgt, { mult: 1.8 });
+      log(sel.name + " — " + a + "! (bleeding wound)");
+      fire(sel, tgt, { mult: 1.8, status: "bleed", statusN: 3 });
     } else if (a === "Arc Shock") {
       sel.ap -= 2;
       log("Arc Shock crackles through the cover!");
@@ -1070,6 +1152,23 @@
         pips.appendChild(pip);
       }
       card.appendChild(pips);
+      // active status effects (Phase 1a)
+      const st = document.createElement("div");
+      st.className = "statuses";
+      if (u.status) {
+        Object.keys(STATUS_META).forEach((k) => {
+          if (u.status[k] > 0) {
+            const s = document.createElement("span");
+            s.className = "stag";
+            s.textContent = STATUS_META[k].tag;
+            s.style.color = STATUS_META[k].col;
+            s.style.borderColor = STATUS_META[k].col;
+            s.title = k + " · " + u.status[k] + " turn(s)";
+            st.appendChild(s);
+          }
+        });
+      }
+      card.appendChild(st);
       el.appendChild(card);
     });
   }
@@ -1200,6 +1299,9 @@
     endPlayerTurn,
     doAbility,
     chooseAbility,
+    applyStatus,
+    tickStatus,
+    STATUS_META,
     get sel() {
       return sel;
     },

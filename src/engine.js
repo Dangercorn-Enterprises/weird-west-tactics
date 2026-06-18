@@ -210,7 +210,14 @@
   };
 
   // ---- boot ----
+  // Idempotent + scene-guarded: game.html's loader calls this once the last
+  // scene script has executed; the DOMContentLoaded fallback covers any page
+  // that includes the scripts as static tags. Whichever fires with the scenes
+  // registered boots first; the guards prevent a premature or double boot.
   DF.boot = function () {
+    if (DF._booted) return;
+    if (!DF.scenes.title && !DF.scenes.battle) return; // scenes not loaded yet
+    DF._booted = true;
     if (!DF.loadGame()) {
       DF.newGame();
     }

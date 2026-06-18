@@ -121,6 +121,7 @@ function mkUnit(o) {
   o.maxAp = 3 + Math.floor(o.quick / 4);
   o.ap = o.maxAp;
   o.jinx = 0;
+  o.status = { burn: 0, bleed: 0, hex: 0, marked: 0, hunker: 0 };
   return o;
 }
 function partyToUnit(p, i) {
@@ -185,6 +186,8 @@ function hitChance(grid, att, def, ignoreCover) {
   c += (grid[att.r][att.q].h - grid[def.r][def.q].h) * 10;
   c -= Math.max(0, dist(att, def) - att.rng) * 15;
   if (att.jinx) c -= 15;
+  if (att.status && att.status.hex > 0) c -= 15; // hexed: attacker less accurate
+  if (def.status && def.status.hunker > 0) c -= 20; // hunkered: harder to hit
   return Math.max(5, Math.min(95, Math.round(c)));
 }
 function rollDmg(att) {
@@ -243,12 +246,30 @@ function doFire(B, att, def, opts) {
   opts = opts || {};
   const ch = hitChance(B.grid, att, def, opts.ignoreCover);
   if (chance(ch)) {
-    const dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+    let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+    if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
     applyDamage(B, def, dmg);
-    if (att.hexer && def.side === "p" && def.alive) def.jinx = 1; // line ~396
+    if (opts.status && def.alive)
+      def.status[opts.status] = Math.max(
+        def.status[opts.status] || 0,
+        opts.statusN || 2,
+      );
+    if (att.hexer && def.alive) def.status.hex = Math.max(def.status.hex, 2);
     return true;
   }
   return false;
+}
+// ---- status ticking (mirror of tickStatus() in scene_battle.js) -------------
+const STATUS_DOT = { burn: 3, bleed: 2 };
+function tickStatus(B, u) {
+  if (!u || !u.alive || !u.status) return;
+  if (u.status.burn > 0) {
+    applyDamage(B, u, STATUS_DOT.burn);
+    u.status.burn--;
+  }
+  ["hex", "marked", "hunker"].forEach((k) => {
+    if (u.status[k] > 0) u.status[k]--;
+  });
 }
 function doBlast(B, center) {
   // dynamite/AoE: chebyshev<=1, 4-7 dmg (mirror of blast(), lines ~429-480)
@@ -308,6 +329,10 @@ function moveToward(B, u, tgt) {
     u.ap -= rc[best[0] + "," + best[1]];
     u.q = best[0];
     u.r = best[1];
+    if (u.status && u.status.bleed > 0) {
+      applyDamage(B, u, STATUS_DOT.bleed); // bleed ticks on move
+      u.status.bleed--;
+    }
     return true;
   }
   return false;
@@ -321,6 +346,8 @@ function enemyPhase(B) {
   for (const e of queue) {
     if (!e.alive) continue;
     e.ap = e.maxAp;
+    tickStatus(B, e); // burn/decrements at the start of this enemy's turn
+    if (!e.alive) continue;
     let guard = 0;
     while (guard++ < 12) {
       const tgt = B.players
@@ -362,13 +389,25 @@ function enemyPhase(B) {
 // atk = single hit at mult; multi = N shots at aimMod; heal; blast≈single approx.
 const ABIL_FX = {
   "Fan the Hammer": { cost: 3, kind: "multi", shots: 3, aimMod: -10 },
-  "Gut Shot": { cost: 2, kind: "atk", mult: 1.8 },
-  "Both Barrels": { cost: 2, kind: "atk", mult: 1.8 },
+  "Gut Shot": { cost: 2, kind: "atk", mult: 1.8, status: "bleed", statusN: 3 },
+  "Both Barrels": {
+    cost: 2,
+    kind: "atk",
+    mult: 1.8,
+    status: "bleed",
+    statusN: 3,
+  },
   "Pistol Whip": { cost: 2, kind: "atk", mult: 1.8 },
   "Holy Smite": { cost: 2, kind: "atk", mult: 1.6 },
   "Arc Shock": { cost: 2, kind: "atk", mult: 1.4, ic: true },
-  "Hex Bolt": { cost: 2, kind: "atk", ic: true },
-  "Called Shot": { cost: 3, kind: "atk", guaranteed: true },
+  "Hex Bolt": { cost: 2, kind: "atk", ic: true, status: "hex", statusN: 2 },
+  "Called Shot": {
+    cost: 3,
+    kind: "atk",
+    guaranteed: true,
+    status: "marked",
+    statusN: 2,
+  },
   "Aimed Shot": { cost: 2, kind: "atk", mult: 1.5 },
   "Ashfall Grenade": { cost: 2, kind: "blast" },
   "Lay on Hands": { cost: 2, kind: "heal", any: true },
@@ -389,20 +428,26 @@ function expAtkDmg(grid, att, def, fx) {
 const isHealer = (p) =>
   (p.abilities || []).some((a) => a === "Lay on Hands" || a === "Soul Drain");
 function execAtk(B, p, def, fx) {
+  const st = { status: fx.status, statusN: fx.statusN };
   if (fx.kind === "multi") {
     const sv = p.aim;
     p.aim += fx.aimMod || 0;
-    for (let i = 0; i < fx.shots && def.alive; i++) doFire(B, p, def, {});
+    for (let i = 0; i < fx.shots && def.alive; i++) doFire(B, p, def, st);
     p.aim = sv;
   } else if (fx.guaranteed) {
     const sv = p.aim;
     p.aim = 999;
-    doFire(B, p, def, {});
+    doFire(B, p, def, st);
     p.aim = sv;
   } else if (fx.kind === "blast") {
     doBlast(B, def);
   } else {
-    doFire(B, p, def, { mult: fx.mult, ignoreCover: fx.ic });
+    doFire(B, p, def, {
+      mult: fx.mult,
+      ignoreCover: fx.ic,
+      status: fx.status,
+      statusN: fx.statusN,
+    });
   }
 }
 
@@ -419,6 +464,8 @@ function playerPhaseBasic(B) {
   for (const p of order) {
     if (!p.alive) continue;
     p.ap = p.maxAp;
+    tickStatus(B, p);
+    if (!p.alive) continue;
     let guard = 0;
     while (guard++ < 12) {
       const inRange = B.enemies
@@ -446,6 +493,8 @@ function playerPhaseAbilities(B) {
   for (const p of order) {
     if (!p.alive) continue;
     p.ap = p.maxAp;
+    tickStatus(B, p);
+    if (!p.alive) continue;
     let guard = 0;
     while (guard++ < 12 && p.ap >= 2) {
       if (!B.enemies.some((e) => e.alive)) break;
