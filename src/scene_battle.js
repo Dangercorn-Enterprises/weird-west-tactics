@@ -183,6 +183,7 @@
       hexer: beh === "hexer",
       blinker: beh === "teleport",
       bomber: beh === "bomber",
+      slammer: beh === "tank", // golems slam for AoE when players cluster
       tier: spec.tier,
       boss: spec.boss,
     });
@@ -394,6 +395,27 @@
     const cost = reach(u)[q + "," + r];
     if (cost === undefined) return;
     busy = true;
+    const finalize = () => {
+      u.px = u.py = undefined;
+      u.q = q;
+      u.r = r;
+      u.ap -= cost;
+      if (u.status && u.status.bleed > 0) {
+        statusDamage(u, STATUS_META.bleed.dot, "bleed"); // bleed ticks on move
+        u.status.bleed--;
+      }
+      busy = false;
+      refreshSel();
+      checkEnd();
+      cb && cb();
+    };
+    // When the tab is hidden, requestAnimationFrame is paused — finalize the move
+    // instantly so turn flow (especially the enemy AI) never stalls. The move
+    // resolves identically; only the slide animation is skipped.
+    if (typeof document !== "undefined" && document.hidden) {
+      finalize();
+      return;
+    }
     const sx = u.q,
       sy = u.r,
       steps = 8;
@@ -405,18 +427,7 @@
       if (i < steps) {
         requestAnimationFrame(tick);
       } else {
-        u.px = u.py = undefined;
-        u.q = q;
-        u.r = r;
-        u.ap -= cost;
-        if (u.status && u.status.bleed > 0) {
-          statusDamage(u, STATUS_META.bleed.dot, "bleed"); // bleed ticks on move
-          u.status.bleed--;
-        }
-        busy = false;
-        refreshSel();
-        checkEnd();
-        cb && cb();
+        finalize();
       }
     };
     tick();
@@ -609,9 +620,12 @@
           setTimeout(step, 100);
           return;
         }
-        const tgt = players
-          .filter((p) => p.alive)
-          .sort((a, b) => dist(e, a) - dist(e, b))[0];
+        const alivePlayers = players.filter((p) => p.alive);
+        const inRng = alivePlayers.filter((p) => dist(e, p) <= e.rng + 1);
+        // focus the weakest target in range; otherwise approach the nearest
+        const tgt = inRng.length
+          ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
+          : alivePlayers.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
         if (!tgt) {
           idx++;
           setTimeout(step, 150);
@@ -620,8 +634,11 @@
         if (dist(e, tgt) <= e.rng + 1 && e.ap >= 2) {
           e.ap -= 2;
           sel = e;
-          if (e.bomber) {
-            blast(e, tgt, () => setTimeout(act, 180));
+          const cluster = alivePlayers.filter(
+            (p) => Math.abs(p.q - tgt.q) <= 1 && Math.abs(p.r - tgt.r) <= 1,
+          ).length;
+          if (e.bomber || (e.slammer && cluster >= 2)) {
+            blast(e, tgt, () => setTimeout(act, 180)); // dynamite / golem slam (AoE)
           } else fire(e, tgt, { cb: () => setTimeout(act, 180) });
           return;
         }
@@ -658,12 +675,14 @@
         }
         const rc = reach(e);
         let best = null,
-          bd = dist(e, tgt);
+          // closer to the target is better; cover breaks ties (enemies seek cover)
+          bestScore = dist(e, tgt) * 2 - (grid[e.r][e.q].cover || 0);
         Object.keys(rc).forEach((k) => {
           const [q, r] = k.split(",").map(Number);
           const d = Math.abs(q - tgt.q) + Math.abs(r - tgt.r);
-          if (d < bd) {
-            bd = d;
+          const score = d * 2 - (grid[r][q].cover || 0);
+          if (score < bestScore) {
+            bestScore = score;
             best = [q, r];
           }
         });

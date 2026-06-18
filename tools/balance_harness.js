@@ -174,6 +174,7 @@ function enemyToUnit(spec, i) {
     hexer: beh === "hexer",
     blinker: beh === "teleport",
     bomber: beh === "bomber",
+    slammer: beh === "tank",
     tier: spec.tier,
     boss: spec.boss,
   });
@@ -317,13 +318,15 @@ function checkBossPhase(B, u) {
 // ---- movement helper: step toward target along BFS-reachable tiles ----------
 function moveToward(B, u, tgt) {
   const rc = reach(B.grid, B.units, u);
+  // closer to the target is better; cover breaks ties (units seek cover)
   let best = null,
-    bd = dist(u, tgt);
+    bestScore = dist(u, tgt) * 2 - (B.grid[u.r][u.q].cover || 0);
   Object.keys(rc).forEach((k) => {
     const [q, r] = k.split(",").map(Number);
     const d = Math.abs(q - tgt.q) + Math.abs(r - tgt.r);
-    if (d < bd) {
-      bd = d;
+    const score = d * 2 - (B.grid[r][q].cover || 0);
+    if (score < bestScore) {
+      bestScore = score;
       best = [q, r];
     }
   });
@@ -352,13 +355,20 @@ function enemyPhase(B) {
     if (!e.alive) continue;
     let guard = 0;
     while (guard++ < 12) {
-      const tgt = B.players
-        .filter((p) => p.alive)
-        .sort((a, b) => dist(e, a) - dist(e, b))[0];
+      const alive = B.players.filter((p) => p.alive);
+      if (!alive.length) return;
+      const inRng = alive.filter((p) => dist(e, p) <= e.rng + 1);
+      // focus the weakest target in range; otherwise approach the nearest
+      const tgt = inRng.length
+        ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
+        : alive.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
       if (!tgt) break;
       if (dist(e, tgt) <= e.rng + 1 && e.ap >= 2) {
         e.ap -= 2;
-        if (e.bomber) doBlast(B, tgt);
+        const cluster = alive.filter(
+          (p) => Math.abs(p.q - tgt.q) <= 1 && Math.abs(p.r - tgt.r) <= 1,
+        ).length;
+        if (e.bomber || (e.slammer && cluster >= 2)) doBlast(B, tgt);
         else doFire(B, e, tgt);
         if (!B.players.some((p) => p.alive)) return;
         continue;
