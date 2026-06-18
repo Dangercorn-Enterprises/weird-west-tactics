@@ -1213,3 +1213,22 @@ if (typeof window !== "undefined") {
     WEAPON_MODS,
   };
 }
+
+// CommonJS export so the dev-only balance harness (tools/) can use the REAL
+// game data as a single source of truth. Browser <script> path is unaffected
+// (module is undefined there). Electron renderer: harmless if module exists.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    ARCHETYPES,
+    STATS,
+    EDGES,
+    HINDRANCES,
+    PREGEN,
+    GODS,
+    ENEMY_CATALOG,
+    WEAPONS,
+    ARMOR,
+    CONSUMABLES,
+    WEAPON_MODS,
+  };
+}
