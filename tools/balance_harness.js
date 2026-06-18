@@ -358,13 +358,61 @@ function enemyPhase(B) {
   }
 }
 
-// ---- PLAYER phase AI (auto-policy baseline) ---------------------------------
-// NOTE: BASELINE = basic attacks + focus-fire the lowest-HP enemy in range.
-// It does NOT use abilities, heals, or divines yet, so it UNDER-states real
-// player power (a real player has Fan-the-Hammer, heals, divine ultimates).
-// => harness win-rates are a *conservative floor*. An ability-aware policy is a
-// follow-up once Phase 1 systems land. See the morning summary.
-function playerPhase(B) {
+// ---- player ability model (mirror of doAbility(), scene_battle.js ~738-854) --
+// atk = single hit at mult; multi = N shots at aimMod; heal; blast≈single approx.
+const ABIL_FX = {
+  "Fan the Hammer": { cost: 3, kind: "multi", shots: 3, aimMod: -10 },
+  "Gut Shot": { cost: 2, kind: "atk", mult: 1.8 },
+  "Both Barrels": { cost: 2, kind: "atk", mult: 1.8 },
+  "Pistol Whip": { cost: 2, kind: "atk", mult: 1.8 },
+  "Holy Smite": { cost: 2, kind: "atk", mult: 1.6 },
+  "Arc Shock": { cost: 2, kind: "atk", mult: 1.4, ic: true },
+  "Hex Bolt": { cost: 2, kind: "atk", ic: true },
+  "Called Shot": { cost: 3, kind: "atk", guaranteed: true },
+  "Aimed Shot": { cost: 2, kind: "atk", mult: 1.5 },
+  "Ashfall Grenade": { cost: 2, kind: "blast" },
+  "Lay on Hands": { cost: 2, kind: "heal", any: true },
+  "Soul Drain": { cost: 2, kind: "heal", self: true },
+};
+// single-target divines = aim 999 (→95%), ignore cover, 2.5x; blast divines = 2 casts
+const DIVINE_BLAST = new Set(["Vulcan's Forgefire", "Perun's Thunder"]);
+
+const avgRoll = (u, mult) =>
+  ((u.wmin + u.wmax) / 2 + Math.floor(u.str / 3)) * (mult || 1);
+function expAtkDmg(grid, att, def, fx) {
+  const saved = att.aim;
+  if (fx.aimMod) att.aim += fx.aimMod;
+  const ch = fx.guaranteed ? 95 : hitChance(grid, att, def, fx.ic);
+  att.aim = saved;
+  return (((fx.shots || 1) * ch) / 100) * avgRoll(att, fx.mult);
+}
+const isHealer = (p) =>
+  (p.abilities || []).some((a) => a === "Lay on Hands" || a === "Soul Drain");
+function execAtk(B, p, def, fx) {
+  if (fx.kind === "multi") {
+    const sv = p.aim;
+    p.aim += fx.aimMod || 0;
+    for (let i = 0; i < fx.shots && def.alive; i++) doFire(B, p, def, {});
+    p.aim = sv;
+  } else if (fx.guaranteed) {
+    const sv = p.aim;
+    p.aim = 999;
+    doFire(B, p, def, {});
+    p.aim = sv;
+  } else if (fx.kind === "blast") {
+    doBlast(B, def);
+  } else {
+    doFire(B, p, def, { mult: fx.mult, ignoreCover: fx.ic });
+  }
+}
+
+// ---- PLAYER phase AI ---------------------------------------------------------
+// Two policies. BASIC (--basic) = basic attacks only, a conservative floor.
+// ABILITIES (default) = a competent player: heal when hurt, pop the once-per-fight
+// divine on the biggest threat, otherwise spend AP on the best damage-per-AP
+// action available (Gut Shot / Fan the Hammer / Called Shot / basic). Real play
+// sits between the two. Both validated against the live combat math.
+function playerPhaseBasic(B) {
   const order = B.players
     .filter((p) => p.alive)
     .sort((a, b) => (b.quick || 0) - (a.quick || 0));
@@ -389,8 +437,82 @@ function playerPhase(B) {
       break;
     }
   }
+  B.players.forEach((p) => (p.jinx = 0));
+}
+function playerPhaseAbilities(B) {
+  const order = B.players
+    .filter((p) => p.alive)
+    .sort((a, b) => (b.quick || 0) - (a.quick || 0));
+  for (const p of order) {
+    if (!p.alive) continue;
+    p.ap = p.maxAp;
+    let guard = 0;
+    while (guard++ < 12 && p.ap >= 2) {
+      if (!B.enemies.some((e) => e.alive)) break;
+      // 1) heal a badly hurt ally/self (mirror chooseAbility heal targeting)
+      if (isHealer(p)) {
+        const self = (p.abilities || []).includes("Soul Drain");
+        const pool = self ? [p] : B.players.filter((a) => a.alive);
+        const hurt = pool
+          .filter((a) => a.hp / a.maxHp < 0.4)
+          .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (hurt) {
+          hurt.hp = Math.min(hurt.maxHp, hurt.hp + randint(6, 10));
+          p.ap -= 2;
+          continue;
+        }
+      }
+      // 2) move into range if nothing is in range
+      const inRange = B.enemies.filter(
+        (e) => e.alive && dist(p, e) <= p.rng + 1,
+      );
+      if (!inRange.length) {
+        const nearest = B.enemies
+          .filter((e) => e.alive)
+          .sort((a, b) => dist(p, a) - dist(p, b))[0];
+        if (p.ap > 0 && moveToward(B, p, nearest)) continue;
+        break;
+      }
+      // 3) divine: pop once per fight on the biggest in-range threat
+      if (p.divine && !p.divineUsed) {
+        const threat = inRange.slice().sort((a, b) => b.hp - a.hp)[0];
+        if (threat.boss || threat.hp >= 12) {
+          p.divineUsed = true;
+          if (DIVINE_BLAST.has(p.divine)) {
+            doBlast(B, threat);
+            doBlast(B, threat);
+          } else {
+            const sv = p.aim;
+            p.aim = 999;
+            doFire(B, p, threat, { ignoreCover: true, mult: 2.5 });
+            p.aim = sv;
+          }
+          p.ap = 0; // divine ends the turn
+          continue;
+        }
+      }
+      // 4) best damage-per-AP action on the lowest-HP focus target
+      const focus = inRange.slice().sort((a, b) => a.hp - b.hp)[0];
+      const opts = [{ fx: { cost: 2, kind: "atk", mult: 1 } }];
+      (p.abilities || []).forEach((name) => {
+        const fx = ABIL_FX[name];
+        if (fx && fx.kind !== "heal" && fx.cost <= p.ap) opts.push({ fx });
+      });
+      const aff = opts.filter((o) => o.fx.cost <= p.ap);
+      aff.sort(
+        (a, b) =>
+          expAtkDmg(B.grid, p, focus, b.fx) / b.fx.cost -
+          expAtkDmg(B.grid, p, focus, a.fx) / a.fx.cost,
+      );
+      const choice = aff[0];
+      execAtk(B, p, focus, choice.fx);
+      p.ap -= choice.fx.cost;
+      if (!B.enemies.some((e) => e.alive)) return;
+    }
+  }
   B.players.forEach((p) => (p.jinx = 0)); // jinx clears at end of player phase (~691)
 }
+let PLAYER_POLICY = playerPhaseAbilities;
 
 // ---- one battle -------------------------------------------------------------
 function runBattle(partySpecs, enemySpecs, maxRounds) {
@@ -414,7 +536,7 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
   let round = 0;
   let enemyDeathRound = null;
   for (round = 1; round <= maxRounds; round++) {
-    playerPhase(B);
+    PLAYER_POLICY(B);
     if (!B.enemies.some((e) => e.alive)) {
       enemyDeathRound = round;
       break;
@@ -548,6 +670,8 @@ function main() {
   const seed = seedIdx >= 0 ? parseInt(args[seedIdx + 1], 10) : 1337;
   const runsArg = args.find((a) => /^\d+$/.test(a));
   const runs = runsArg ? parseInt(runsArg, 10) : 2000;
+  const basic = args.includes("--basic");
+  PLAYER_POLICY = basic ? playerPhaseBasic : playerPhaseAbilities;
   RNG = mulberry32(seed);
 
   const parties = { starter: starterParty(), full: fullParty() };
@@ -566,7 +690,9 @@ function main() {
     `\nDUSTFALL balance harness — ${runs} runs/encounter, seed ${seed}`,
   );
   console.log(
-    "  (player policy = BASIC ATTACKS ONLY → win-rates are a conservative floor)\n",
+    basic
+      ? "  (policy = BASIC ATTACKS ONLY → conservative floor)\n"
+      : "  (policy = ABILITY-AWARE: heals + divines + best dmg/AP → competent player; --basic for the floor)\n",
   );
   console.log(
     "ENCOUNTER".padEnd(34) +
