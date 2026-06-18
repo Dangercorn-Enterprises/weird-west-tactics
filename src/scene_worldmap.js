@@ -43,9 +43,8 @@
   function act1Beat(to) {
     const step = act1Step();
     DF.state.flags = DF.state.flags || {};
+    // Beat 1: Los Angeles — the Harrowed Vanguard. Advances only on a win.
     if (to.id === "losangeles" && step === 0) {
-      DF.state.act1 = { step: 1 };
-      DF.saveGame();
       DF.go("battle", {
         title: "The Harrowed Vanguard",
         enemies: enemiesByIds([
@@ -54,14 +53,19 @@
           "walkin_dead",
           "dynamite_bandit",
         ]),
-        onComplete: () => DF.go("worldmap"),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act1 = { step: 1 };
+            DF.saveGame();
+          }
+          DF.go("worldmap");
+        },
       });
       return true;
     }
-    if (to.id === "deathvalley" && step >= 1 && !DF.state.flags.act1_deacon) {
-      DF.state.flags.act1_deacon = true;
-      DF.state.flags["boss_deathvalley"] = true; // suppress the generic tier-3 reckoning
-      DF.state.act1 = { step: 2 };
+    // Beat 2: Death Valley — the Deacon. Triggers once the Vanguard is won.
+    if (to.id === "deathvalley" && step === 1) {
+      DF.state.flags["boss_deathvalley"] = true; // suppress the generic reckoning here
       DF.saveGame();
       DF.go("battle", {
         title: "The Deacon's Reckoning",
@@ -71,7 +75,134 @@
           "walkin_dead",
           "coyote_beast",
         ]),
-        onComplete: () => DF.go("worldmap"),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act1 = { step: 2 };
+            DF.state.flags.act1_deacon = true;
+            DF.saveGame();
+          }
+          DF.go("worldmap");
+        },
+      });
+      return true;
+    }
+    return false;
+  }
+
+  // ---- Act 2: the Forgeworks / Vulcan -> the Iron Foreman at Los Alamos ----
+  const ACT2_OBJ = [
+    "Act II — The Forgeworks rise from the ash. Make for Los Alamos.",
+    "Act II — Storm the foundry. Break the Iron Foreman.",
+    "Act II complete — the Foreman is scrap. Something older stirs beneath the dust.",
+  ];
+  // ---- Act 3: the Hollow Court / the Sleeper -> the Hollow Man (finale) ----
+  const ACT3_OBJ = [
+    "Act III — The Hollow Court wakes. Make for Groom Lake.",
+    "Act III — End it. Face the Hollow Man before the Sleeper rises.",
+    "The frontier is saved — for now.",
+  ];
+  function act2Active() {
+    return act1Step() >= 2;
+  }
+  function act2Step() {
+    return (DF.state && DF.state.act2 && DF.state.act2.step) || 0;
+  }
+  function act3Active() {
+    return act2Step() >= 2;
+  }
+  function act3Step() {
+    return (DF.state && DF.state.act3 && DF.state.act3.step) || 0;
+  }
+  function currentObjective() {
+    if (act3Active()) return ACT3_OBJ[act3Step()] || "";
+    if (act2Active()) return ACT2_OBJ[act2Step()] || "";
+    return ACT1_OBJ[act1Step()] || "";
+  }
+  function act2Beat(to) {
+    if (!act2Active() || act2Step() >= 2) return false;
+    DF.state.flags = DF.state.flags || {};
+    const step = act2Step();
+    // Beat 1: the first leg into Act II — a Forgeworks vanguard intercepts you.
+    if (step === 0) {
+      DF.go("battle", {
+        title: "The Forgeworks Vanguard",
+        enemies: enemiesByIds([
+          "forge_sentry",
+          "forge_sentry",
+          "ashfall_golem",
+          "dynamite_bandit",
+        ]),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act2 = { step: 1 };
+            DF.saveGame();
+          }
+          DF.go("worldmap");
+        },
+      });
+      return true;
+    }
+    // Beat 2: reach Los Alamos -> the Iron Foreman.
+    if (step === 1 && to.id === "losalamos") {
+      DF.state.flags["boss_losalamos"] = true; // suppress the generic reckoning here
+      DF.saveGame();
+      DF.go("battle", {
+        title: "The Iron Foreman",
+        enemies: enemiesByIds([
+          "iron_foreman",
+          "ashfall_golem",
+          "forge_sentry",
+        ]),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act2 = { step: 2 };
+            DF.state.flags.act2_foreman = true;
+            DF.saveGame();
+          }
+          DF.go("worldmap");
+        },
+      });
+      return true;
+    }
+    return false;
+  }
+  function act3Beat(to) {
+    if (!act3Active() || act3Step() >= 2) return false;
+    DF.state.flags = DF.state.flags || {};
+    const step = act3Step();
+    // Beat 1: the Hollow Court's heralds (the Weaver) ambush the approach.
+    if (step === 0) {
+      DF.go("battle", {
+        title: "Heralds of the Hollow Court",
+        enemies: enemiesByIds(["the_weaver", "dust_witch", "harrowed_gun"]),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act3 = { step: 1 };
+            DF.saveGame();
+          }
+          DF.go("worldmap");
+        },
+      });
+      return true;
+    }
+    // Beat 2 (finale): reach Groom Lake -> the Hollow Man -> the ending.
+    if (step === 1 && to.id === "area51") {
+      DF.state.flags["boss_area51"] = true; // suppress the generic reckoning here
+      DF.saveGame();
+      DF.go("battle", {
+        title: "The Hollow Man",
+        enemies: enemiesByIds(["hollow_man", "coyotes_shadow", "dust_devil"]),
+        onComplete: (r) => {
+          if (r && r.win) {
+            DF.state.act3 = { step: 2 };
+            DF.state.flags.act3_hollow = true;
+            DF.state.flags.campaign_complete = true;
+            DF.saveGame();
+            DF.go(DF.scenes.ending ? "ending" : "worldmap", { win: true });
+          } else {
+            DF.go("worldmap"); // the Hollow Man stands — regroup and return
+          }
+        },
       });
       return true;
     }
@@ -177,6 +308,8 @@
     DF.saveGame();
     // Act 1 story beats take precedence over generic encounters
     if (act1Beat(to)) return;
+    if (act2Beat(to)) return;
+    if (act3Beat(to)) return;
     const ENC = typeof ENEMY_CATALOG !== "undefined" ? ENEMY_CATALOG : [];
     // first arrival at a tier-3 node = a boss reckoning
     if (to.tier >= 3 && !DF.state.flags["boss_" + to.id]) {
@@ -324,7 +457,7 @@
     const lr = $("wcLore");
     if (lr) lr.textContent = cur.lore;
     const ob = $("wcObjective");
-    if (ob) ob.textContent = ACT1_OBJ[act1Step()] || "";
+    if (ob) ob.textContent = currentObjective();
   }
 
   function loop() {
@@ -343,7 +476,7 @@
       }
       // set the objective synchronously so it shows without waiting on a frame
       const ob = $("wcObjective");
-      if (ob) ob.textContent = ACT1_OBJ[act1Step()] || "";
+      if (ob) ob.textContent = currentObjective();
       raf = true;
       requestAnimationFrame(loop);
     },

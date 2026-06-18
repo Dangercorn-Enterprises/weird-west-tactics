@@ -181,6 +181,19 @@ body{
   </div>
 </section>
 
+<!-- ENDING (campaign finale epilogue + credits) -->
+<section data-scene="ending" style="display:none">
+  <div class="menu" style="max-width:680px">
+    <h1 id="endTitle">THE DUST SETTLES</h1>
+    <div class="sub">Dustfall — The Ashen Frontier</div>
+    <p id="endBody" class="lore"></p>
+    <div id="endCredits" class="hint" style="margin-top:18px;line-height:1.9"></div>
+    <div class="col">
+      <button class="btn warn" id="endTitleBtn">Return to the Frontier</button>
+    </div>
+  </div>
+</section>
+
 <!-- Classic scripts in dependency order, loaded as dynamic <script> elements
      with async=false so execution order is preserved. In dev (http/https) each
      file gets a per-load cache-buster so edits always take effect; in production

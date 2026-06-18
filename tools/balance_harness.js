@@ -749,6 +749,27 @@ const ENCOUNTERS = [
     "full",
     ["iron_foreman", "ashfall_golem", "forge_sentry"],
   ],
+  // ---- campaign Act 2 / Act 3 set-pieces (reached with a grown party) ----
+  [
+    "Act 2 · Forgeworks Vanguard",
+    "full",
+    ["forge_sentry", "forge_sentry", "ashfall_golem", "dynamite_bandit"],
+  ],
+  [
+    "Act 2 · Iron Foreman",
+    "full",
+    ["iron_foreman", "ashfall_golem", "forge_sentry"],
+  ],
+  [
+    "Act 3 · Weaver Heralds",
+    "full",
+    ["the_weaver", "dust_witch", "harrowed_gun"],
+  ],
+  [
+    "Act 3 · Hollow Man (finale)",
+    "full",
+    ["hollow_man", "coyotes_shadow", "dust_devil"],
+  ],
 ];
 
 // ---- main -------------------------------------------------------------------

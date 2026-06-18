@@ -156,6 +156,31 @@
     },
   });
 
+  // ---- ENDING (campaign finale epilogue + credits, Phase 2c) ----
+  DF.register("ending", {
+    enter(p) {
+      const h = host("ending");
+      const win = !p || p.win !== false;
+      h.querySelector("#endTitle").textContent = win
+        ? "THE DUST SETTLES"
+        : "THE FRONTIER FALLS";
+      h.querySelector("#endTitle").style.color = win ? "#d4a843" : "#c0392b";
+      h.querySelector("#endBody").textContent = win
+        ? "The Hollow Man is unmade, and the Sleeping One turns over in the deep earth — for now. Your crew rides out of Groom Lake under a bruised dawn, their names already passing into the frontier's tall tales. The gods still war over a broken country. But today, the dust belongs to the living."
+        : "The frontier swallows another posse whole, and the Hollow Court laughs in the dark.";
+      const days = (DF.state && DF.state.day) || 1;
+      const gold = (DF.state && DF.state.gold) || 0;
+      h.querySelector("#endCredits").textContent =
+        "Survived " +
+        days +
+        " days · " +
+        gold +
+        " gold · A Dangercorn Enterprises production · " +
+        "The Pantheon: Vulcan · Perun · Baron Samedi · Coyote · Anansi · the Sleeping One";
+      h.querySelector("#endTitleBtn").onclick = () => DF.go("title");
+    },
+  });
+
   // ---- WORLDMAP (Phase 1 stub — Phase 2 builds the real Southwest map) ----
   DF.register("worldmap", {
     enter() {
