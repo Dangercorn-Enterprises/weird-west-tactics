@@ -59,6 +59,21 @@ body{
 #bbanner{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,2,.86);backdrop-filter:blur(3px);z-index:10}
 #bbanner h2{font-family:'Rye',serif;font-size:54px;text-shadow:3px 3px 8px #000}
 #bbanner p{font-family:'Special Elite',cursive;letter-spacing:3px;text-transform:uppercase;font-size:13px;margin:12px 0 24px;color:#b8a88a}
+
+/* ---- turn-order / initiative bar (DOM overlay, FFT-style) ---- */
+#bturn{position:absolute;top:10px;left:12px;pointer-events:none;z-index:6}
+#bturn .tlabel{font-family:'Special Elite',cursive;font-size:8px;color:var(--rust);letter-spacing:2px;margin-bottom:3px;text-shadow:1px 1px 2px #000}
+#bturn .trow{display:flex;gap:5px;align-items:flex-end}
+.tchip{width:36px;background:var(--panel);border:1px solid var(--rust);border-radius:3px;padding:3px 2px 4px;text-align:center;backdrop-filter:blur(2px);transition:transform .15s,box-shadow .15s}
+.tchip.p{border-color:var(--teal)}
+.tchip.e{border-color:var(--blood)}
+.tchip.act{border-color:var(--amber);box-shadow:0 0 9px rgba(212,168,67,.55);transform:translateY(-4px)}
+.tchip .tn{font-family:'Special Elite',cursive;font-size:8px;color:var(--parch);line-height:1.05;height:18px;overflow:hidden}
+.tchip .tq{font-family:'Rye',serif;font-size:9px;color:var(--amber);line-height:1}
+.tchip .thp{height:3px;background:#2a1d0f;border-radius:2px;margin-top:2px;overflow:hidden}
+.tchip .thp>i{display:block;height:100%;background:var(--teal)}
+.tchip.e .thp>i{background:var(--blood)}
+.tchip .tstar{color:var(--amber);font-size:8px;line-height:1}
 </style>
 </head>
 <body>
@@ -104,6 +119,7 @@ body{
   <div id="bwrap">
     <canvas id="bc" width="900" height="620"></canvas>
     <div id="btitle"><h1>DUSTFALL</h1><div class="sub" id="bwaveLabel">Skirmish</div></div>
+    <div id="bturn"><div class="tlabel">TURN ORDER ◄ sooner</div><div class="trow"></div></div>
     <div id="blog"></div>
     <div id="bhud">
       <div class="party" id="bparty"></div>
@@ -129,13 +145,13 @@ body{
 </section>
 
 <!-- scripts: classic, in dependency order; engine boots on DOMContentLoaded -->
-<script src="data.js?v=2"></script>
-<script src="worldmap_data.js?v=2"></script>
-<script src="engine.js?v=2"></script>
-<script src="sprites.js?v=2"></script>
-<script src="scene_battle.js?v=2"></script>
-<script src="scenes_hub.js?v=2"></script>
-<script src="scene_worldmap.js?v=2"></script>
-<script src="scene_town.js?v=2"></script>
+<script src="data.js?v=4"></script>
+<script src="worldmap_data.js?v=4"></script>
+<script src="engine.js?v=4"></script>
+<script src="sprites.js?v=4"></script>
+<script src="scene_battle.js?v=4"></script>
+<script src="scenes_hub.js?v=4"></script>
+<script src="scene_worldmap.js?v=4"></script>
+<script src="scene_town.js?v=4"></script>
 </body>
 </html>

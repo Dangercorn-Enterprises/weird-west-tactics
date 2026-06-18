@@ -306,6 +306,7 @@
       ab.textContent = sel && sel.ability ? sel.ability : "Ability";
     }
     renderParty();
+    renderTurnOrder();
   }
 
   function moveTo(u, q, r, cb) {
@@ -459,7 +460,10 @@
   }
 
   function enemyTurn() {
-    const queue = enemies.filter((e) => e.alive);
+    // act fastest-first so `quick` is a real stat (the turn-order bar reflects this)
+    const queue = enemies
+      .filter((e) => e.alive)
+      .sort((a, b) => (b.quick || 0) - (a.quick || 0));
     let idx = 0;
     const step = () => {
       if (!active) return;
@@ -929,6 +933,38 @@
       }
       card.appendChild(pips);
       el.appendChild(card);
+    });
+  }
+
+  // ---- turn-order / initiative bar (DOM overlay, fastest-first) ----
+  function renderTurnOrder() {
+    const host = document.querySelector('[data-scene="battle"]');
+    const row = host && host.querySelector("#bturn .trow");
+    if (!row) return;
+    const order = all()
+      .slice()
+      .sort(
+        (a, b) => (b.quick || 0) - (a.quick || 0) || (a.side === "p" ? -1 : 1),
+      );
+    while (row.firstChild) row.removeChild(row.firstChild);
+    order.slice(0, 9).forEach((u) => {
+      const chip = document.createElement("div");
+      chip.className = "tchip " + u.side + (u === sel && u.alive ? " act" : "");
+      const n = document.createElement("div");
+      n.className = "tn";
+      n.textContent = (u.name || u.role || "?").split(" ")[0];
+      chip.appendChild(n);
+      const q = document.createElement("div");
+      q.className = "tq";
+      q.textContent = u.boss ? "★" + (u.quick || 0) : "⚡" + (u.quick || 0);
+      chip.appendChild(q);
+      const hp = document.createElement("div");
+      hp.className = "thp";
+      const fill = document.createElement("i");
+      fill.style.width = Math.max(0, (u.hp / u.maxHp) * 100) + "%";
+      hp.appendChild(fill);
+      chip.appendChild(hp);
+      row.appendChild(chip);
     });
   }
 
