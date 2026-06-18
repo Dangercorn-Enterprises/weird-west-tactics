@@ -67,7 +67,7 @@
     });
     C.addEventListener("click", onCanvasClick);
     host.querySelector("#bendBtn").onclick = endPlayerTurn;
-    host.querySelector("#babilityBtn").onclick = toggleAbility;
+    host.querySelector("#babilityBtn").onclick = openAbilityMenu;
     host.querySelector("#bbannerBtn").onclick = () => {
       if (onComplete) onComplete(lastResult);
     };
@@ -107,7 +107,25 @@
       lawdog: "Called Shot",
       drifter: "Aimed Shot",
     };
-    const ability = ABIL[p.archetype] || "Aimed Shot";
+    const ABIL2 = {
+      gunslinger: "Gut Shot",
+      hexslinger: "Soul Drain",
+      tinkerer: "Arc Shock",
+      preacher: "Holy Smite",
+      lawdog: "Pistol Whip",
+      drifter: "Both Barrels",
+    };
+    const DIVINE = {
+      gunslinger: "Coyote's Gambit",
+      hexslinger: "Samedi's Embrace",
+      tinkerer: "Vulcan's Forgefire",
+      preacher: "Perun's Thunder",
+      lawdog: "Iron Verdict",
+      drifter: "Anansi's Trick",
+    };
+    const primary = ABIL[p.archetype] || "Aimed Shot";
+    const abilities = [primary, ABIL2[p.archetype]].filter(Boolean);
+    const divine = DIVINE[p.archetype] || null;
     return mkUnit({
       id: p.uid || "p" + i,
       name: p.name || (arch ? arch.name : "Rider"),
@@ -123,7 +141,9 @@
       wmin: w.damage[0],
       wmax: w.damage[1],
       color: archColor(p.archetype),
-      ability,
+      ability: primary,
+      abilities,
+      divine,
     });
   }
   function archColor(id) {
@@ -302,8 +322,8 @@
     reachable = sel && sel.alive && sel.side === "p" ? reach(sel) : {};
     const ab = $("babilityBtn");
     if (ab) {
-      ab.disabled = !(sel && sel.ability && sel.ap >= 2 && sel.side === "p");
-      ab.textContent = sel && sel.ability ? sel.ability : "Ability";
+      ab.disabled = !(sel && sel.side === "p" && sel.ap >= 2);
+      ab.textContent = "Abilities";
     }
     renderParty();
     renderTurnOrder();
@@ -645,6 +665,7 @@
     if (occ && occ.side === "p" && occ.alive) {
       sel = occ;
       abilityMode = false;
+      hideAbilityMenu();
       refreshSel();
       return;
     }
@@ -666,13 +687,41 @@
     if (busy || turn !== "p" || !active) return;
     turn = "e";
     abilityMode = false;
+    hideAbilityMenu();
     players.forEach((p) => (p.jinx = 0));
     log("Enemies stir...");
     enemyTurn();
   }
-  function toggleAbility() {
-    if (!(sel && sel.ability && sel.ap >= 2)) return;
-    if (isHeal(sel.ability)) {
+  function hideAbilityMenu() {
+    const menu = $("babilityMenu");
+    if (menu) menu.style.display = "none";
+  }
+  function openAbilityMenu() {
+    if (!(sel && sel.side === "p" && sel.ap >= 2)) return;
+    const menu = $("babilityMenu");
+    if (!menu) return;
+    if (menu.style.display !== "none" && menu.dataset.for === sel.id) {
+      hideAbilityMenu();
+      return;
+    }
+    while (menu.firstChild) menu.removeChild(menu.firstChild);
+    const opts = (sel.abilities || [sel.ability]).slice();
+    if (sel.divine && !sel.divineUsed) opts.push(sel.divine);
+    opts.forEach((name) => {
+      const b = document.createElement("button");
+      b.className = "btn abil-opt" + (name === sel.divine ? " divine" : "");
+      b.textContent = name === sel.divine ? "✦ " + name : name;
+      b.onclick = () => chooseAbility(name);
+      menu.appendChild(b);
+    });
+    menu.dataset.for = sel.id;
+    menu.style.display = "flex";
+  }
+  function chooseAbility(name) {
+    if (!sel) return;
+    sel.ability = name;
+    hideAbilityMenu();
+    if (isHeal(name)) {
       const allies = players.filter((p) => p.alive);
       const who =
         allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] ||
@@ -680,8 +729,8 @@
       doAbility(who);
       return;
     }
-    abilityMode = !abilityMode;
-    log(abilityMode ? sel.ability + ": pick a target" : "cancelled");
+    abilityMode = true;
+    log(name + ": pick a target");
   }
   function isHeal(a) {
     return a === "Lay on Hands" || a === "Soul Drain";
@@ -689,6 +738,34 @@
   function doAbility(tgt) {
     abilityMode = false;
     const a = sel.ability;
+    if (a && a === sel.divine) {
+      if (sel.divineUsed) {
+        log("The god has already answered this fight.");
+        return;
+      }
+      sel.divineUsed = true;
+      sel.ap = 0;
+      shake = 16;
+      log(sel.name + " channels " + a + "!");
+      if (a === "Vulcan's Forgefire" || a === "Perun's Thunder") {
+        blast(sel, tgt);
+        setTimeout(() => {
+          if (tgt) blast(sel, tgt);
+        }, 220);
+      } else {
+        const sv = sel.aim;
+        sel.aim = 999;
+        fire(sel, tgt, {
+          ignoreCover: true,
+          mult: 2.5,
+          cb: () => {
+            sel.aim = sv;
+          },
+        });
+      }
+      refreshSel();
+      return;
+    }
     if (a === "Fan the Hammer") {
       sel.ap -= 3;
       log("Fan the Hammer — three shots!");
@@ -754,6 +831,22 @@
         c: PAL.teal,
       });
       refreshSel();
+    } else if (a === "Gut Shot" || a === "Both Barrels") {
+      sel.ap -= 2;
+      log(sel.name + " — " + a + "!");
+      fire(sel, tgt, { mult: 1.8 });
+    } else if (a === "Arc Shock") {
+      sel.ap -= 2;
+      log("Arc Shock crackles through the cover!");
+      fire(sel, tgt, { ignoreCover: true, mult: 1.4 });
+    } else if (a === "Holy Smite") {
+      sel.ap -= 2;
+      log(sel.name + " calls down Holy Smite!");
+      fire(sel, tgt, { mult: 1.6 });
+    } else if (a === "Pistol Whip") {
+      sel.ap -= 2;
+      log(sel.name + " pistol-whips " + tgt.name + "!");
+      fire(sel, tgt, { mult: 1.8 });
     } else {
       sel.ap -= 2;
       fire(sel, tgt, { mult: 1.5 });
@@ -1105,5 +1198,13 @@
     unitAt,
     dist,
     endPlayerTurn,
+    doAbility,
+    chooseAbility,
+    get sel() {
+      return sel;
+    },
+    set sel(u) {
+      sel = u;
+    },
   };
 })();

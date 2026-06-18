@@ -83,6 +83,11 @@ body{
 .tchip .thp>i{display:block;height:100%;background:var(--teal)}
 .tchip.e .thp>i{background:var(--blood)}
 .tchip .tstar{color:var(--amber);font-size:8px;line-height:1}
+
+/* ---- ability menu (battle) ---- */
+#babilityMenu{display:flex;flex-direction:column;gap:5px;margin-bottom:6px;align-items:flex-end}
+.abil-opt{min-width:170px;font-size:11px;padding:7px 14px}
+.abil-opt.divine{border-color:var(--amber);color:var(--amber);text-shadow:0 0 6px rgba(212,168,67,.5)}
 </style>
 </head>
 <body>
@@ -153,7 +158,8 @@ body{
     <div id="bhud">
       <div class="party" id="bparty"></div>
       <div class="actions" id="bactions">
-        <button class="btn" id="babilityBtn">Ability</button>
+        <div id="babilityMenu" style="display:none"></div>
+        <button class="btn" id="babilityBtn">Abilities</button>
         <button class="btn warn" id="bendBtn">End Turn</button>
       </div>
     </div>
@@ -174,13 +180,13 @@ body{
 </section>
 
 <!-- scripts: classic, in dependency order; engine boots on DOMContentLoaded -->
-<script src="data.js?v=8"></script>
-<script src="worldmap_data.js?v=8"></script>
-<script src="engine.js?v=8"></script>
-<script src="sprites.js?v=8"></script>
-<script src="scene_battle.js?v=8"></script>
-<script src="scenes_hub.js?v=8"></script>
-<script src="scene_worldmap.js?v=8"></script>
-<script src="scene_town.js?v=8"></script>
+<script src="data.js?v=10"></script>
+<script src="worldmap_data.js?v=10"></script>
+<script src="engine.js?v=10"></script>
+<script src="sprites.js?v=10"></script>
+<script src="scene_battle.js?v=10"></script>
+<script src="scenes_hub.js?v=10"></script>
+<script src="scene_worldmap.js?v=10"></script>
+<script src="scene_town.js?v=10"></script>
 </body>
 </html>
