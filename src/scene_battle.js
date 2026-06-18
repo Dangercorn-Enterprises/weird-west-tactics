@@ -1376,6 +1376,15 @@
     applyStatus,
     tickStatus,
     STATUS_META,
+    forceWin() {
+      // dev/test hook: instantly resolve the battle as a win (used to verify the
+      // campaign flow end-to-end without auto-playing every turn).
+      enemies.forEach((e) => {
+        e.alive = false;
+        e.hp = 0;
+      });
+      checkEnd();
+    },
     get sel() {
       return sel;
     },
