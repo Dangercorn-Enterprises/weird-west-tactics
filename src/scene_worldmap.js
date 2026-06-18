@@ -26,6 +26,58 @@
   }
   const $ = (id) => document.querySelector('[data-scene="worldmap"] #' + id);
 
+  // ---- Act 1 campaign spine: Catalina -> Los Angeles -> Death Valley (the Deacon) ----
+  const ACT1_OBJ = [
+    "Act I — Make for Los Angeles. The Deacon's harrowed raid the coast.",
+    "Act I — Into the Boneyard. Hunt the Deacon at Death Valley.",
+    "Act I complete — the Deacon is broken. The frontier lies open.",
+  ];
+  function act1Step() {
+    return (DF.state && DF.state.act1 && DF.state.act1.step) || 0;
+  }
+  function enemiesByIds(ids) {
+    const cat = typeof ENEMY_CATALOG !== "undefined" ? ENEMY_CATALOG : [];
+    return ids.map((id) => cat.find((e) => e.id === id)).filter(Boolean);
+  }
+  // Returns true if a story beat fired (and a battle was launched).
+  function act1Beat(to) {
+    const step = act1Step();
+    DF.state.flags = DF.state.flags || {};
+    if (to.id === "losangeles" && step === 0) {
+      DF.state.act1 = { step: 1 };
+      DF.saveGame();
+      DF.go("battle", {
+        title: "The Harrowed Vanguard",
+        enemies: enemiesByIds([
+          "harrowed_gun",
+          "walkin_dead",
+          "walkin_dead",
+          "dynamite_bandit",
+        ]),
+        onComplete: () => DF.go("worldmap"),
+      });
+      return true;
+    }
+    if (to.id === "deathvalley" && step >= 1 && !DF.state.flags.act1_deacon) {
+      DF.state.flags.act1_deacon = true;
+      DF.state.flags["boss_deathvalley"] = true; // suppress the generic tier-3 reckoning
+      DF.state.act1 = { step: 2 };
+      DF.saveGame();
+      DF.go("battle", {
+        title: "The Deacon's Reckoning",
+        enemies: enemiesByIds([
+          "the_deacon",
+          "walkin_dead",
+          "walkin_dead",
+          "coyote_beast",
+        ]),
+        onComplete: () => DF.go("worldmap"),
+      });
+      return true;
+    }
+    return false;
+  }
+
   function build() {
     const host = document.querySelector('[data-scene="worldmap"]');
     C = host.querySelector("#wc");
@@ -123,6 +175,8 @@
     DF.state.location = to.id;
     DF.state.visited[to.id] = true;
     DF.saveGame();
+    // Act 1 story beats take precedence over generic encounters
+    if (act1Beat(to)) return;
     const ENC = typeof ENEMY_CATALOG !== "undefined" ? ENEMY_CATALOG : [];
     // first arrival at a tier-3 node = a boss reckoning
     if (to.tier >= 3 && !DF.state.flags["boss_" + to.id]) {
@@ -269,6 +323,8 @@
     if (nm) nm.textContent = cur.name;
     const lr = $("wcLore");
     if (lr) lr.textContent = cur.lore;
+    const ob = $("wcObjective");
+    if (ob) ob.textContent = ACT1_OBJ[act1Step()] || "";
   }
 
   function loop() {
@@ -285,6 +341,9 @@
         DF.state.location = s.id;
         DF.state.visited[s.id] = true;
       }
+      // set the objective synchronously so it shows without waiting on a frame
+      const ob = $("wcObjective");
+      if (ob) ob.textContent = ACT1_OBJ[act1Step()] || "";
       raf = true;
       requestAnimationFrame(loop);
     },
