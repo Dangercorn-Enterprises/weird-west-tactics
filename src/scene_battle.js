@@ -389,7 +389,7 @@
           def.downed = 1;
           if (def.side === "e") kills++;
           log(def.name + " falls.");
-        }
+        } else checkBossPhase(def);
       } else {
         floaters.push({
           x: tgt.x,
@@ -449,7 +449,7 @@
           u.downed = 1;
           if (u.side === "e") kills++;
           log(u.name + " falls.");
-        }
+        } else checkBossPhase(u);
       });
       log(att.name + "'s dynamite catches " + caught.length + " in the blast!");
       busy = false;
@@ -457,6 +457,51 @@
       checkEnd();
       cb && cb();
     }, 300);
+  }
+
+  // ---- multi-phase boss: at 50% HP the Deacon's god answers ----
+  function triggerBossPhase(b) {
+    b.enraged = true;
+    b.str += 3;
+    b.aim += 12;
+    b.wmax += 4;
+    b.quick += 2;
+    b.hp = Math.min(b.maxHp, b.hp + Math.round(b.maxHp * 0.25)); // second wind
+    shake = 18;
+    const p = iso(b.q, b.r, grid[b.r][b.q].h);
+    floaters.push({
+      x: p.x,
+      y: p.y - 56,
+      t: "UNBOUND",
+      life: 60,
+      c: "#9a6ab8",
+    });
+    log(b.name + " rises UNBOUND — his god answers. The dead crawl up!");
+    // raise up to 2 Risen Dead at free spawns
+    const tmpl =
+      typeof ENEMY_CATALOG !== "undefined"
+        ? ENEMY_CATALOG.find((e) => e.id === "walkin_dead")
+        : null;
+    if (tmpl) {
+      const taken = new Set(all().map((u) => u.q + "," + u.r));
+      let added = 0;
+      for (const [q, r] of SPAWNS) {
+        if (added >= 2) break;
+        if (taken.has(q + "," + r)) continue;
+        const m = enemyToUnit(tmpl, 90 + added);
+        m.name = "Risen Dead";
+        m.q = q;
+        m.r = r;
+        enemies.push(m);
+        taken.add(q + "," + r);
+        added++;
+      }
+    }
+    refreshSel();
+  }
+  function checkBossPhase(u) {
+    if (u && u.boss && u.alive && !u.enraged && u.hp <= u.maxHp / 2)
+      triggerBossPhase(u);
   }
 
   function enemyTurn() {
