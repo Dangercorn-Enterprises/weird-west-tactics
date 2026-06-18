@@ -337,7 +337,18 @@
       el("p", {
         class: "flavor",
         text: g.title + " — " + g.domain + ". Corruption: " + g.corruption,
-        style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "8px" },
+        style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "4px" },
+      }),
+    );
+    c.appendChild(
+      el("p", {
+        text:
+          "Favor with " +
+          g.name +
+          ": " +
+          ((DF.state.favor && DF.state.favor[g.id]) || 0) +
+          "  (fuels divine ultimates — 1 per use, empowered at 3+)",
+        style: { color: "#d4a843", marginBottom: "8px", fontSize: "13px" },
       }),
     );
     c.appendChild(

@@ -37,6 +37,7 @@ function mulberry32(a) {
   };
 }
 let RNG = Math.random;
+let FAVOR = 1; // divine favor per unit's god (New Game seeds 1); --favor N to vary
 const rnd = () => RNG();
 const randint = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1)); // inclusive
 const chance = (pct) => rnd() * 100 < pct;
@@ -151,6 +152,7 @@ function partyToUnit(p, i) {
     wmax: w.damage[1],
     abilities: [ABIL[p.archetype], ABIL2[p.archetype]].filter(Boolean),
     divine: DIVINE[p.archetype] || null,
+    divineFavor: FAVOR,
   });
 }
 function enemyToUnit(spec, i) {
@@ -522,18 +524,28 @@ function playerPhaseAbilities(B) {
         if (p.ap > 0 && moveToward(B, p, nearest)) continue;
         break;
       }
-      // 3) divine: pop once per fight on the biggest in-range threat
-      if (p.divine && !p.divineUsed) {
+      // 3) divine: pop once per fight on the biggest in-range threat.
+      // Phase 1b: gated by favor — needs >=1 (consumes 1), empowered at >=3.
+      if (p.divine && !p.divineUsed && (p.divineFavor || 0) >= 1) {
         const threat = inRange.slice().sort((a, b) => b.hp - a.hp)[0];
-        if (threat.boss || threat.hp >= 12) {
+        if (threat.boss || threat.hp >= 18) {
+          // save the ult for real threats, not trash
+          const emp = (p.divineFavor || 0) >= 3;
+          p.divineFavor = Math.max(0, (p.divineFavor || 0) - 1);
           p.divineUsed = true;
           if (DIVINE_BLAST.has(p.divine)) {
             doBlast(B, threat);
             doBlast(B, threat);
+            if (emp) doBlast(B, threat);
           } else {
             const sv = p.aim;
             p.aim = 999;
-            doFire(B, p, threat, { ignoreCover: true, mult: 2.5 });
+            doFire(B, p, threat, {
+              ignoreCover: true,
+              mult: emp ? 3.5 : 2.5,
+              status: emp ? "marked" : null,
+              statusN: 2,
+            });
             p.aim = sv;
           }
           p.ap = 0; // divine ends the turn
@@ -721,6 +733,8 @@ function main() {
   const runs = runsArg ? parseInt(runsArg, 10) : 2000;
   const basic = args.includes("--basic");
   PLAYER_POLICY = basic ? playerPhaseBasic : playerPhaseAbilities;
+  const favorIdx = args.indexOf("--favor");
+  if (favorIdx >= 0) FAVOR = parseInt(args[favorIdx + 1], 10) || 0;
   RNG = mulberry32(seed);
 
   const parties = { starter: starterParty(), full: fullParty() };

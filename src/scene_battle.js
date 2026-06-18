@@ -131,6 +131,8 @@
       id: p.uid || "p" + i,
       name: p.name || (arch ? arch.name : "Rider"),
       role: arch ? arch.name : "Rider",
+      archetype: p.archetype, // needed for favor/god resolution (Phase 1b)
+      god: p.god || null, // a unit sworn at a shrine fuels its divine from that god
       side: "p",
       q: 1,
       r: [1, 4, 7, 2][i] || 1,
@@ -710,6 +712,18 @@
     busy = true;
     const survivors = players.filter((p) => p.alive).length;
     const xp = kills * 10 + (win ? 25 : 0);
+    // Phase 1b: victory pleases the gods of the party (+1 favor each).
+    if (win && DF.state && DF.state.favor) {
+      const gods = new Set();
+      players.forEach((p) => {
+        const g = p.god || (DF.ARCH_GOD && DF.ARCH_GOD[p.archetype]);
+        if (g) gods.add(g);
+      });
+      gods.forEach((g) => {
+        DF.state.favor[g] = (DF.state.favor[g] || 0) + 1;
+      });
+      if (DF.saveGame) DF.saveGame();
+    }
     lastResult = { win, kills, turns: turnsTaken, survivors, xp };
     const b = $("bbanner"),
       bt = $("bbannerTitle");
@@ -779,10 +793,20 @@
     const opts = (sel.abilities || [sel.ability]).slice();
     if (sel.divine && !sel.divineUsed) opts.push(sel.divine);
     opts.push("Hunker Down"); // universal defensive action (1 AP)
+    const god = sel.god || (DF.ARCH_GOD && DF.ARCH_GOD[sel.archetype]);
+    const favor =
+      DF.state && DF.state.favor && god ? DF.state.favor[god] || 0 : 0;
     opts.forEach((name) => {
       const b = document.createElement("button");
-      b.className = "btn abil-opt" + (name === sel.divine ? " divine" : "");
-      b.textContent = name === sel.divine ? "✦ " + name : name;
+      const isDiv = name === sel.divine;
+      b.className = "btn abil-opt" + (isDiv ? " divine" : "");
+      if (isDiv) {
+        b.textContent =
+          "✦ " + name + " (favor " + favor + (favor >= 3 ? "★" : "") + ")";
+        if (favor < 1) b.disabled = true; // gated until favor is earned
+      } else {
+        b.textContent = name;
+      }
       b.onclick = () => chooseAbility(name);
       menu.appendChild(b);
     });
@@ -823,21 +847,43 @@
         log("The god has already answered this fight.");
         return;
       }
+      // Phase 1b: divines require favor. Read the persistent pool (live) or the
+      // unit snapshot (harness). 1 favor is spent; 3+ favor empowers the strike.
+      const god =
+        sel.god || (DF.ARCH_GOD && DF.ARCH_GOD[sel.archetype]) || null;
+      const pool =
+        DF.state && DF.state.favor && god
+          ? DF.state.favor[god] || 0
+          : sel.favor || 0;
+      if (pool < 1) {
+        log(sel.name + "'s god is silent — earn favor at a shrine first.");
+        return;
+      }
+      const empowered = pool >= 3;
+      if (DF.state && DF.state.favor && god)
+        DF.state.favor[god] = Math.max(0, (DF.state.favor[god] || 0) - 1);
+      sel.favor = Math.max(0, (sel.favor || pool) - 1);
       sel.divineUsed = true;
       sel.ap = 0;
       shake = 16;
-      log(sel.name + " channels " + a + "!");
+      log(sel.name + " channels " + a + (empowered ? " — EMPOWERED!" : "!"));
       if (a === "Vulcan's Forgefire" || a === "Perun's Thunder") {
         blast(sel, tgt);
         setTimeout(() => {
           if (tgt) blast(sel, tgt);
         }, 220);
+        if (empowered)
+          setTimeout(() => {
+            if (tgt) blast(sel, tgt);
+          }, 440);
       } else {
         const sv = sel.aim;
         sel.aim = 999;
         fire(sel, tgt, {
           ignoreCover: true,
-          mult: 2.5,
+          mult: empowered ? 3.5 : 2.5,
+          status: empowered ? "marked" : null,
+          statusN: 2,
           cb: () => {
             sel.aim = sv;
           },
@@ -1216,6 +1262,11 @@
             ? DF.state.party
             : DF.makeStarterParty();
       players = roster.slice(0, 4).map(partyToUnit);
+      // Phase 1b: snapshot each unit's divine favor from the persistent pool
+      players.forEach((u) => {
+        const g = u.god || (DF.ARCH_GOD && DF.ARCH_GOD[u.archetype]);
+        u.favor = g && DF.state && DF.state.favor ? DF.state.favor[g] || 0 : 0;
+      });
       const specs =
         params.enemies && params.enemies.length
           ? params.enemies

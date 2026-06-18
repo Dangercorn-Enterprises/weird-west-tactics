@@ -6,6 +6,17 @@
   "use strict";
   const DF = (window.DF = window.DF || {});
 
+  // Each archetype is devoted to a god; their divine ultimate draws on that
+  // god's favor (Phase 1b). Favor is earned at shrines and by winning battles.
+  DF.ARCH_GOD = {
+    gunslinger: "coyote",
+    hexslinger: "samedi",
+    tinkerer: "vulcan",
+    preacher: "perun",
+    lawdog: "perun",
+    drifter: "anansi",
+  };
+
   // ---- Storage interface: localStorage (browser) <-> native fs (desktop/Electron) ----
   DF.storage = {
     get native() {
@@ -61,7 +72,16 @@
       day: 1,
       location: "rustwater", // overworld node id (Phase 2 maps to a real Southwest city)
       visited: {},
-      favor: {}, // god id -> favor
+      // god id -> favor. Seeded so each divine has one early use; replenished at
+      // shrines (+1 / 50g) and by winning battles. Divines consume 1, empower at 3+.
+      favor: {
+        coyote: 1,
+        samedi: 1,
+        vulcan: 1,
+        perun: 1,
+        anansi: 1,
+        sleeper: 0,
+      },
       corruption: {}, // unit id -> corruption level
       flags: {},
       version: 1,
