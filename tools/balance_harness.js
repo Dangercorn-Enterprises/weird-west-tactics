@@ -38,6 +38,7 @@ function mulberry32(a) {
 }
 let RNG = Math.random;
 let FAVOR = 1; // divine favor per unit's god (New Game seeds 1); --favor N to vary
+let SCALE = true; // party-size encounter scaling (Phase 1d); --noscale to disable
 const rnd = () => RNG();
 const randint = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1)); // inclusive
 const chance = (pct) => rnd() * 100 < pct;
@@ -626,11 +627,28 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
   };
 }
 
+// Phase 1d: normalize encounter difficulty to party size so there are no brick
+// walls. Designed around a 3-strong posse; smaller parties face weaker foes,
+// larger parties tougher ones. Mirror of DF.scaleEncounter in scene_battle.js.
+function scaleEncounter(specs, partySize) {
+  const hpF = Math.max(0.6, Math.min(1.2, 0.6 + 0.2 * (partySize - 2)));
+  const dmgF = Math.max(0.8, Math.min(1.1, 0.8 + 0.1 * (partySize - 2)));
+  if (hpF === 1 && dmgF === 1) return specs;
+  return specs.map((s) =>
+    Object.assign({}, s, {
+      hp: Math.max(4, Math.round(s.hp * hpF)),
+      wmin: Math.max(1, Math.round(s.wmin * dmgF)),
+      wmax: Math.max(2, Math.round(s.wmax * dmgF)),
+    }),
+  );
+}
+
 // ---- aggregate over N runs --------------------------------------------------
 function evalEncounter(name, party, enemyIds, runs) {
-  const enemySpecs = enemyIds
+  const raw = enemyIds
     .map((id) => ENEMY_CATALOG.find((e) => e.id === id))
     .filter(Boolean);
+  const enemySpecs = SCALE ? scaleEncounter(raw, party.length) : raw;
   let wins = 0,
     totRounds = 0,
     totDeaths = 0,
@@ -745,6 +763,7 @@ function main() {
   PLAYER_POLICY = basic ? playerPhaseBasic : playerPhaseAbilities;
   const favorIdx = args.indexOf("--favor");
   if (favorIdx >= 0) FAVOR = parseInt(args[favorIdx + 1], 10) || 0;
+  if (args.includes("--noscale")) SCALE = false;
   RNG = mulberry32(seed);
 
   const parties = { starter: starterParty(), full: fullParty() };

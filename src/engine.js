@@ -229,6 +229,23 @@
     return reached; // [] or list of new levels
   };
 
+  // ---- encounter scaling (Phase 1d) ----
+  // Normalize enemy difficulty to the current party size so there are no brick
+  // walls: a lone pair faces weaker foes, a full posse faces tougher ones.
+  // Designed around a 3-strong party. Mirrored exactly in tools/balance_harness.js.
+  DF.scaleEncounter = function (specs, partySize) {
+    const hpF = Math.max(0.6, Math.min(1.2, 0.6 + 0.2 * (partySize - 2)));
+    const dmgF = Math.max(0.8, Math.min(1.1, 0.8 + 0.1 * (partySize - 2)));
+    if (hpF === 1 && dmgF === 1) return specs;
+    return (specs || []).map((s) =>
+      Object.assign({}, s, {
+        hp: Math.max(4, Math.round(s.hp * hpF)),
+        wmin: Math.max(1, Math.round(s.wmin * dmgF)),
+        wmax: Math.max(2, Math.round(s.wmax * dmgF)),
+      }),
+    );
+  };
+
   // ---- boot ----
   // Idempotent + scene-guarded: game.html's loader calls this once the last
   // scene script has executed; the DOMContentLoaded fallback covers any page

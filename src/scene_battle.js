@@ -1297,9 +1297,13 @@
                 ENEMY_CATALOG[4],
               ]
             : [];
+      // Phase 1d: scale the encounter to the current party size (no brick walls)
+      const scaled = DF.scaleEncounter
+        ? DF.scaleEncounter(specs, players.length)
+        : specs;
       buildGrid();
       const free = SPAWNS.slice();
-      enemies = specs.map((spec, i) => {
+      enemies = scaled.map((spec, i) => {
         const u = enemyToUnit(spec, i);
         const [q, r] = free[i] || SPAWNS[i % SPAWNS.length];
         u.q = q;
