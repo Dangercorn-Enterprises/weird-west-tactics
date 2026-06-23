@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DUSTFALL — A Weird-Western Tactical RPG</title>
+<meta name="description" content="The dust remembers every bullet. Survive it. Grid-based tactical combat in a frontier where the ground exhales the dead.">
+<style>
+  :root{
+    --saddle:#B38B5E; --clay:#5C4033; --sage:#6B7B5E; --night:#2C2F3A; --bone:#EDE4D0;
+    --panel:#23262f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--night);color:var(--bone);
+    font-family:"Georgia","Iowan Old Style",Cambria,serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  header{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{font-family:"Georgia",serif;font-weight:800;letter-spacing:4px;font-size:20px;color:var(--saddle)}
+  nav a{color:#b9b2a1;text-decoration:none;margin-left:24px;font-size:14px;letter-spacing:1px}
+  nav a:hover{color:var(--bone)}
+  .hero{text-align:center;padding:90px 0 70px;
+    background:radial-gradient(900px 360px at 50% -10%, rgba(179,139,94,.18), transparent 70%)}
+  .hero h1{font-size:clamp(56px,12vw,128px);letter-spacing:10px;font-weight:800;color:var(--bone);
+    text-shadow:0 4px 30px rgba(0,0,0,.6)}
+  .hero .tag{font-size:clamp(17px,2.4vw,24px);color:var(--saddle);font-style:italic;margin-top:6px;letter-spacing:1px}
+  .cta{display:inline-block;margin-top:36px;background:var(--saddle);color:#1c1a16;font-weight:700;
+    font-family:system-ui,sans-serif;font-size:16px;letter-spacing:1px;padding:15px 38px;border-radius:4px;
+    text-decoration:none;border:1px solid #cda877;transition:transform .15s,background .15s}
+  .cta:hover{transform:translateY(-2px);background:#c89a68}
+  .cta.ghost{background:transparent;color:var(--bone);border:1px solid #4a4d57;margin-left:10px}
+  .feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;
+    background:#1a1d24;border:1px solid #1a1d24;margin:30px 0 70px;border-radius:8px;overflow:hidden}
+  .feat section{background:var(--panel);padding:30px 26px}
+  .feat h3{font-family:system-ui,sans-serif;letter-spacing:3px;font-size:15px;text-transform:uppercase;
+    color:var(--saddle);margin-bottom:12px}
+  .feat p{color:#cfc7b5;font-size:15.5px}
+  .band{text-align:center;padding:64px 24px;border-top:1px solid #1a1d24;border-bottom:1px solid #1a1d24;
+    background:linear-gradient(180deg, #262932, #20232b)}
+  .band h2{font-size:clamp(26px,4vw,40px);letter-spacing:2px;margin-bottom:14px}
+  .band p{color:#b9b2a1;max-width:560px;margin:0 auto 26px}
+  footer{text-align:center;color:#7f8794;font-size:13px;padding:32px 0;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">DUSTFALL</div>
+    <nav><a href="#features">The Game</a><a href="#wishlist">Wishlist</a></nav>
+  </header>
+  <section class="hero">
+    <h1>DUSTFALL</h1>
+    <div class="tag">The dust remembers every bullet. Survive it.</div>
+    <div>
+      <a class="cta" href="#wishlist">Wishlist on Steam</a>
+      <a class="cta ghost" href="#features">See the game</a>
+    </div>
+  </section>
+</div>
+
+<div class="wrap" id="features">
+  <div class="feat">
+    <section><h3>The Wastes</h3><p>A frontier where the ground itself exhales the dead — bleached towns, endless alkali flats, and storms that peel skin from bone.</p></section>
+    <section><h3>Gun &amp; Grit</h3><p>Grid-based tactical combat where every shot echoes. Position, cover, and the wind decide who walks away and who stays down.</p></section>
+    <section><h3>The Revenant Pact</h3><p>Five fractured factions bound by old blood oaths. Choose your dead, break their rules, or become another name carved into the dust.</p></section>
+    <section><h3>Witness the Fall</h3><p>Hand-painted maps, 3D character dioramas, and cinematic kill-cams that linger on the moment the light leaves their eyes.</p></section>
+  </div>
+</div>
+
+<section class="band" id="wishlist">
+  <h2>Add Dustfall to your wishlist.</h2>
+  <p>A weird-western tactical RPG. Out now in v1.0 — wishlist to follow the road ahead.</p>
+  <a class="cta" href="#">Wishlist on Steam</a>
+</section>
+
+<footer>DUSTFALL — Dangercorn Enterprises · a weird-western tactical RPG</footer>
+</body>
+</html>
