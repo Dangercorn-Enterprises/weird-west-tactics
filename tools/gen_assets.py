@@ -115,20 +115,20 @@ CHARACTERS = {
     "gunslinger": "full body pixel art game sprite of a lean weird-west gunslinger, wide-brim hat, long duster coat, twin revolvers, standing idle facing viewer",
     "hexslinger": "full body pixel art game sprite of a voodoo hexslinger woman, feathered hat, card deck and purple hex glow in hand, standing idle facing viewer",
     "tinkerer": "full body pixel art game sprite of a mad inventor with brass goggles, tool harness, glowing teal arc pistol, standing idle facing viewer",
-    "preacher": "full body pixel art game sprite of a frontier preacher, black coat and white collar, holy book and shotgun, standing idle facing viewer",
-    "lawdog": "full body pixel art game sprite of a marshal lawman, star badge, lever-action rifle, stern stance, standing idle facing viewer",
-    "drifter": "full body pixel art game sprite of a weathered drifter, serape poncho, sawed-off shotgun, standing idle facing viewer",
+    "preacher": "full body pixel art game sprite of a somber man of faith in a long black coat and flat-brim hat, holding a worn book, standing idle facing viewer",
+    "lawdog": "full body pixel art game sprite of a frontier sheriff with a shiny star badge, long coat, holding a rifle, standing idle facing viewer",
+    "drifter": "full body pixel art game sprite of a lone wanderer wrapped in a striped serape blanket poncho, wide hat shading his face, standing idle facing viewer",
     # enemies
-    "walkin_dead": "full body pixel art game sprite of a shambling undead cowboy zombie, rotted duster, green skin, standing idle facing viewer",
-    "rattlesnake": "full body pixel art game sprite of an outlaw gunman with red bandana mask, mean eyes, rifle, standing idle facing viewer",
+    "walkin_dead": "full body pixel art game sprite of a spooky green-skinned ghoul cowboy, tattered old coat and hat, glowing eyes, standing idle facing viewer",
+    "rattlesnake": "full body pixel art game sprite of a desperado in a red bandana and brown hat, holding a rifle at his side, standing idle facing viewer",
     "coyote_beast": "full body pixel art game sprite of a feral supernatural coyote, dusty fur, glowing eyes, four legs, side profile",
-    "forge_sentry": "full body pixel art game sprite of a brass steampunk automaton sentry turret with rifle arm, riveted plates, standing",
+    "forge_sentry": "full body pixel art game sprite of a brass clockwork robot guard, round riveted body, single glowing eye, cannon arm, standing idle facing viewer",
     "dust_devil": "full body pixel art game sprite of a small sand whirlwind elemental with glowing core, swirling dust column",
     "revenant_gun": "full body pixel art game sprite of a spectral undead gunfighter, teal ghost-glow, tattered coat, standing idle facing viewer",
     "dynamite_bandit": "full body pixel art game sprite of a wild-eyed bandit holding lit dynamite stick, bandolier of explosives, standing idle facing viewer",
     "ashfall_golem": "full body pixel art game sprite of a hulking stone ash golem, cracked gray body with ember glow in seams, standing",
-    "dust_witch": "full body pixel art game sprite of a dust storm witch, ragged violet robes, glowing purple eyes, hovering slightly",
-    "thunder_zealot": "full body pixel art game sprite of an armored storm cult zealot, blue warpaint, lightning-etched armor, war hammer, standing",
+    "dust_witch": "full body pixel art game sprite of a mysterious sorceress in flowing violet robes and hood, purple magic swirling at her hands, standing idle facing viewer",
+    "thunder_zealot": "full body pixel art game sprite of a warrior in blue-painted armor with lightning engravings, carrying a large hammer, standing idle facing viewer",
     # bosses
     "the_deacon": "full body pixel art game sprite of an undead preacher boss, tall black coat, purple vodou glow, skull face paint, raised bone staff",
     "iron_foreman": "full body pixel art game sprite of a massive brass industrial golem boss, furnace chest, crane arm, smokestacks on shoulders",
@@ -169,6 +169,11 @@ def main():
         jobs.append(("tiles", name, prompt, 1024, 1024, tile_process))
     for name, prompt in CHARACTERS.items():
         jobs.append(("sprites", name, prompt + CHAR_SUFFIX, 768, 1024, sprite_process))
+        # HD-2D facings: back + side views (side mirrors for the 4th facing)
+        back = prompt.replace("facing viewer", "seen directly from behind, back view")                      .replace("side profile", "seen directly from behind, back view")
+        side = prompt.replace("facing viewer", "in full side profile view facing left")                      .replace("side profile", "in full side profile view facing left")
+        jobs.append(("sprites", name + "_back", back + CHAR_SUFFIX, 768, 1024, sprite_process))
+        jobs.append(("sprites", name + "_side", side + CHAR_SUFFIX, 768, 1024, sprite_process))
     for name, prompt in PROPS.items():
         jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
                      lambda r, o: sprite_process(r, o, target_h=72)))

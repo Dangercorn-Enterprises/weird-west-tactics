@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://357by71e8i6b"
-path="res://.godot/imported/lawdog.png-b99e773bc507fe132c07122adcff19fb.ctex"
+uid="uid://dri8h0e7xxjge"
+path="res://.godot/imported/iron_foreman_back.png-af3bf09ba8b2c7adf4f59b6db29beb9b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/lawdog.png"
-dest_files=["res://.godot/imported/lawdog.png-b99e773bc507fe132c07122adcff19fb.ctex"]
+source_file="res://assets/sprites/iron_foreman_back.png"
+dest_files=["res://.godot/imported/iron_foreman_back.png-af3bf09ba8b2c7adf4f59b6db29beb9b.ctex"]
 
 [params]
 

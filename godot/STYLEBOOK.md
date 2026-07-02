@@ -67,6 +67,19 @@ reserved for the supernatural** (Ashfall, spirits, the Hollow).
 - ✅ Tiles seam-blended (edge cross-fade)
 - ✅ Trail network + settlement glyphs baked into worldmap art at true node positions
 
+## Facings (added same night)
+Units now render **4 facings** (front / back / side+mirror) picked from the angle
+between unit facing and camera; facing updates on move/attack, enemies face the
+nearest rider. Missing views fall back to front automatically.
+**Flux safety-filter lore (hard-won):** certain weapon phrasings ("rifle resting
+on his shoulder"), "blood-red", and — late in a heavy session — increasingly many
+prompts return ALL-BLACK images (free-tier degradation after ~150 gens; 429s
+follow). `tools/qa_sprites.py` sweeps for blank sprites and repairs with
+seed-retries + dud detection; blank PNGs must be DELETED (not left in place) so
+the engine falls back to pixel-data sprites instead of invisible units.
+**Pending on fresh quota or sorceress:** dust_witch, lawdog, preacher (all views);
+preacher rear/side and the_deacon back (front-lookalike) resist all phrasings.
+
 ## Known gaps → pass 3 (sorceress.games territory)
 1. Sprites have one idle pose — need 4 facings + walk/attack frame sheets
    (frame-to-frame consistency is where flux struggles; use sorceress).

@@ -282,6 +282,18 @@ func _floater(text: String, pos: Vector3, col: Color) -> void:
 	tw.chain().tween_callback(l.queue_free)
 
 # ---- unit sprites -----------------------------------------------------------------
+# HD-2D facings: front / back / side (side mirrors for the 4th quadrant).
+# Missing views fall back to front so partial art never breaks a battle.
+func _sprite_textures(u: Dictionary) -> Dictionary:
+	var id := str(u.get("archetype", ""))
+	var front := _sprite_texture(u)
+	var out := {"front": front, "back": front, "side": front}
+	for k in ["back", "side"]:
+		var path := "res://assets/sprites/%s_%s.png" % [id, k]
+		if ResourceLoader.exists(path):
+			out[k] = load(path)
+	return out
+
 func _sprite_texture(u: Dictionary) -> Texture2D:
 	var id := str(u.get("archetype", ""))
 	var art := "res://assets/sprites/%s.png" % id
@@ -307,11 +319,14 @@ func _sprite_texture(u: Dictionary) -> Texture2D:
 
 func _build_units() -> void:
 	for u in battle["units"]:
+		u["facing"] = Vector2(1, 0) if u["side"] == "p" else Vector2(-1, 0)
 		var spr := Sprite3D.new()
-		spr.texture = _sprite_texture(u)
+		var texset := _sprite_textures(u)
+		spr.set_meta("texset", texset)
+		spr.set_meta("view", "front")
+		spr.texture = texset["front"]
 		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		# normalize world height to ~1.35 tiles regardless of source resolution
 		var world_h := 2.1 if u.get("boss", false) else 1.35
 		spr.pixel_size = world_h / float(spr.texture.get_height())
 		spr.shaded = false
@@ -361,8 +376,12 @@ func _sync_units() -> void:
 			_build_unit_node(u)
 
 func _build_unit_node(u: Dictionary) -> void:
+	u["facing"] = Vector2(-1, 0)
 	var spr := Sprite3D.new()
-	spr.texture = _sprite_texture(u)
+	var texset := _sprite_textures(u)
+	spr.set_meta("texset", texset)
+	spr.set_meta("view", "front")
+	spr.texture = texset["front"]
 	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	spr.pixel_size = 1.35 / float(spr.texture.get_height())
@@ -548,6 +567,7 @@ func _exec_pending_on(target: Dictionary) -> void:
 		return
 	var aname := pending_ability
 	pending_ability = ""
+	sel["facing"] = Vector2(int(target["q"]) - int(sel["q"]), int(target["r"]) - int(sel["r"])).normalized()
 	if aname == sel.get("divine"):
 		_cast_divine(target)
 		return
@@ -651,6 +671,35 @@ func _process(_delta: float) -> void:
 	if absf(d) > 0.0005:
 		cam_azimuth += d * 0.14
 		_place_camera()
+	_update_facings()
+
+# pick front/back/side (+mirror) from the angle between unit facing and camera
+func _update_facings() -> void:
+	# camera forward projected on the ground plane (from camera toward board)
+	var cam_fwd := Vector2(-sin(cam_azimuth), -cos(cam_azimuth))
+	for u in battle["units"]:
+		if not unit_nodes.has(u["id"]):
+			continue
+		var spr: Sprite3D = unit_nodes[u["id"]]["sprite"]
+		if not spr.has_meta("texset"):
+			continue
+		var f: Vector2 = u.get("facing", Vector2(1, 0))
+		var dot := f.dot(cam_fwd)
+		var cross := f.x * cam_fwd.y - f.y * cam_fwd.x
+		var view: String
+		var flip := false
+		if dot > 0.5:
+			view = "back" # walking away from the camera
+		elif dot < -0.5:
+			view = "front"
+		else:
+			view = "side" # art faces LEFT; mirror when moving screen-right
+			flip = cross < 0.0
+		if str(spr.get_meta("view")) != view or spr.flip_h != flip:
+			var texset: Dictionary = spr.get_meta("texset")
+			spr.texture = texset[view]
+			spr.flip_h = flip
+			spr.set_meta("view", view)
 
 func _click(screen_pos: Vector2) -> void:
 	var from := cam.project_ray_origin(screen_pos)
@@ -675,6 +724,7 @@ func _click(screen_pos: Vector2) -> void:
 			return
 		if core.dist(sel, occ) <= int(sel["rng"]) + 1 and int(sel["ap"]) >= 2:
 			sel["ap"] = int(sel["ap"]) - 2
+			sel["facing"] = Vector2(int(occ["q"]) - int(sel["q"]), int(occ["r"]) - int(sel["r"])).normalized()
 			var hp0: int = occ["hp"]
 			var landed: bool = core.do_fire(battle, sel, occ, {"ignoreCover": sel.get("wIC", false)})
 			_log("%s %s %s%s" % [sel["name"], "hits" if landed else "misses", occ["name"],
@@ -686,6 +736,7 @@ func _click(screen_pos: Vector2) -> void:
 	var key := "%d,%d" % [q, r]
 	if not sel.is_empty() and pending_ability == "" and reach_map.has(key):
 		sel["ap"] = int(sel["ap"]) - int(reach_map[key])
+		sel["facing"] = Vector2(q - int(sel["q"]), r - int(sel["r"])).normalized()
 		sel["q"] = q
 		sel["r"] = r
 		if int(sel["status"]["bleed"]) > 0:
@@ -697,7 +748,25 @@ func _end_turn() -> void:
 	if ended:
 		return
 	_log("Enemies stir...")
+	var pre := {}
+	for e in battle["enemies"]:
+		pre[e["id"]] = Vector2(e["q"], e["r"])
 	core.enemy_phase(battle)
+	for e in battle["enemies"]:
+		if not e["alive"]:
+			continue
+		var moved: Vector2 = Vector2(e["q"], e["r"]) - pre.get(e["id"], Vector2(e["q"], e["r"]))
+		if moved.length() > 0.1:
+			e["facing"] = moved.normalized()
+		else:
+			var best := {}
+			var bd := 9999
+			for pl in battle["players"]:
+				if pl["alive"] and core.dist(e, pl) < bd:
+					bd = core.dist(e, pl)
+					best = pl
+			if not best.is_empty():
+				e["facing"] = Vector2(int(best["q"]) - int(e["q"]), int(best["r"]) - int(e["r"])).normalized()
 	for p in battle["players"]:
 		if p["alive"]:
 			p["ap"] = p["maxAp"]

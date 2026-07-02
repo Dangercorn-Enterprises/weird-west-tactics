@@ -59,8 +59,14 @@ func _process(delta: float) -> void:
 					"enemies": enemies_by_ids(["the_deacon", "walkin_dead", "coyote_beast", "dust_devil"]),
 					"context": {}})
 			4:
-				pass # linger one beat on the battle for its screenshot
+				var sc := get_tree().current_scene
+				if sc != null and "cam_target_azimuth" in sc:
+					sc.cam_target_azimuth += PI # 180° — should show unit BACKS
 			5:
+				var img2 := get_viewport().get_texture().get_image()
+				img2.save_png("user://shot_battle_rotated.png")
+				print("AUTOPILOT shot: BattleRotated")
+			6:
 				print("AUTOPILOT done")
 				get_tree().quit()
 

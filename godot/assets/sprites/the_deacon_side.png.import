@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://brxobsq7k1dkl"
-path="res://.godot/imported/dust_witch.png-c4867c6522c02583812c6d8842d5a182.ctex"
+uid="uid://clm6s0easycit"
+path="res://.godot/imported/the_deacon_side.png-095323e96b7565c631f57e1ef4ef4539.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/dust_witch.png"
-dest_files=["res://.godot/imported/dust_witch.png-c4867c6522c02583812c6d8842d5a182.ctex"]
+source_file="res://assets/sprites/the_deacon_side.png"
+dest_files=["res://.godot/imported/the_deacon_side.png-095323e96b7565c631f57e1ef4ef4539.ctex"]
 
 [params]
 

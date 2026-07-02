@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bgwaqip8j30cd"
-path="res://.godot/imported/preacher.png-bfda96620090f3d18d1290f8dbc7ec68.ctex"
+uid="uid://bijk7xy7i45pk"
+path="res://.godot/imported/dust_devil_back.png-18de6a6db8533ae297a81aabb9fb7347.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/preacher.png"
-dest_files=["res://.godot/imported/preacher.png-bfda96620090f3d18d1290f8dbc7ec68.ctex"]
+source_file="res://assets/sprites/dust_devil_back.png"
+dest_files=["res://.godot/imported/dust_devil_back.png-18de6a6db8533ae297a81aabb9fb7347.ctex"]
 
 [params]
 
