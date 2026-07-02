@@ -122,6 +122,14 @@
     if (act2Active()) return ACT2_OBJ[act2Step()] || "";
     return ACT1_OBJ[act1Step()] || "";
   }
+  // Pass 17 (v1.1): where the campaign wants you next (null once it's done)
+  function objectiveNodeId() {
+    if (act3Active()) return act3Step() >= 2 ? null : "area51";
+    if (act2Active()) return "losalamos";
+    if (act1Step() === 0) return "losangeles";
+    if (act1Step() === 1) return "deathvalley";
+    return null;
+  }
   function act2Beat(to) {
     if (!act2Active() || act2Step() >= 2) return false;
     DF.state.flags = DF.state.flags || {};
@@ -424,6 +432,7 @@
       X.setLineDash([]);
     });
     // nodes
+    const objId = objectiveNodeId();
     nodes.forEach((n) => {
       const reachable = adj[cur.id] && adj[cur.id].indexOf(n.id) >= 0;
       const r = n.id === cur.id ? 11 : 8;
@@ -433,12 +442,28 @@
       X.fill();
       X.beginPath();
       X.arc(n.px, n.py, r, 0, 7);
+      // Pass 17: places you haven't ridden through yet sit faded on the map
+      X.globalAlpha = DF.state.visited[n.id] || n.id === cur.id ? 1 : 0.55;
       X.fillStyle = godColor(n.god);
       X.fill();
+      X.globalAlpha = 1;
       X.strokeStyle =
         n.id === cur.id ? "#fff" : reachable ? "#f4e7c8" : "#2a1d0f";
       X.lineWidth = n.id === cur.id ? 2.5 : reachable ? 2 : 1;
       X.stroke();
+      // Pass 17: pulsing objective marker — the campaign's next stop
+      if (objId && n.id === objId) {
+        const pulse = 3 + Math.sin(Date.now() / 260) * 2;
+        X.beginPath();
+        X.arc(n.px, n.py, r + 6 + pulse, 0, 7);
+        X.strokeStyle = "#d4a843";
+        X.lineWidth = 2;
+        X.stroke();
+        X.font = "13px 'Special Elite', monospace";
+        X.textAlign = "center";
+        X.fillStyle = "#8a5a10";
+        X.fillText("★", n.px, n.py - r - 16);
+      }
       if (hover && hover.id === n.id) {
         X.beginPath();
         X.arc(n.px, n.py, r + 6, 0, 7);
@@ -480,10 +505,42 @@
         DF.state.day +
         (mt ? "  ·  " + mt.name : "");
     }
+    // Pass 17: hovering another town previews it — with the ride's cost
+    const shown = hover && hover.id !== cur.id ? hover : cur;
     const nm = $("wcName");
-    if (nm) nm.textContent = cur.name;
+    if (nm) nm.textContent = shown.name;
     const lr = $("wcLore");
-    if (lr) lr.textContent = cur.lore;
+    if (lr) {
+      let txt = shown.lore;
+      if (shown !== cur) {
+        const reachable = adj[cur.id] && adj[cur.id].indexOf(shown.id) >= 0;
+        if (reachable) {
+          const mt = mount();
+          const days = Math.max(
+            1,
+            Math.round(travelTime(cur, shown) * (mt ? mt.travelF : 1)),
+          );
+          const risk = riskOf(cur, shown);
+          const riskTxt =
+            risk >= 3
+              ? "wilderness (wild)"
+              : risk === 2
+                ? "trail (risky)"
+                : "road (safe)";
+          txt =
+            "Ride: " +
+            days +
+            (days === 1 ? " day" : " days") +
+            " · " +
+            riskTxt +
+            " — " +
+            txt;
+        } else {
+          txt = "No trail from " + cur.name + ". — " + txt;
+        }
+      }
+      lr.textContent = txt;
+    }
     const ob = $("wcObjective");
     if (ob) ob.textContent = currentObjective();
   }
