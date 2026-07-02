@@ -5,6 +5,7 @@
 # =============================================================================
 extends Node
 
+const DT = preload("res://scripts/ui_theme.gd")
 const SAVE_PATH := "user://save.json"
 
 var design: Dictionary = {}
@@ -13,6 +14,12 @@ var state: Dictionary = {}
 # handoff: worldmap/town set this before switching to the battle scene
 var pending_battle: Dictionary = {}
 var last_result: Dictionary = {}
+
+func apply_theme(c: Control) -> void:
+	c.theme = DT.get_theme()
+
+func headline(l: Label, size: int) -> void:
+	DT.headline(l, size)
 
 func _ready() -> void:
 	var f := FileAccess.open("res://data/design.json", FileAccess.READ)

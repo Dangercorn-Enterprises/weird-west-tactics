@@ -44,6 +44,7 @@ func _ready() -> void:
 	core = CombatCoreScript.new()
 	core.design = GS.design
 	core.seed_rng(int(Time.get_ticks_usec()) & 0x7FFFFFFF)
+	core.on_damage = _on_unit_damaged
 	params = GS.pending_battle if not GS.pending_battle.is_empty() else {
 		"title": "Skirmish at the Crossing", "biome": "mesa",
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
@@ -98,8 +99,10 @@ func _build_biome_grid(biome: Dictionary) -> Array:
 		g[p[1]][p[0]]["h"] = 2
 	for p in biome.get("hard", []):
 		g[p[1]][p[0]]["cover"] = 0.4
+		g[p[1]][p[0]]["deco"] = biome.get("hardDeco", "crate")
 	for p in biome.get("soft", []):
 		g[p[1]][p[0]]["cover"] = 0.2
+		g[p[1]][p[0]]["deco"] = biome.get("softDeco", "cactus")
 	return g
 
 func _apply_blessing() -> void:
@@ -197,16 +200,86 @@ func _build_board() -> void:
 			body.set_meta("r", r)
 			mi.add_child(body)
 			if float(cell["cover"]) > 0.0:
-				var deco := BoxMesh.new()
-				var big := float(cell["cover"]) > 0.3
-				deco.size = Vector3(0.34, 0.5 if big else 0.3, 0.34)
-				var dmat := StandardMaterial3D.new()
-				dmat.albedo_color = Color("#6b4a26") if big else Color("#5a7a4a")
-				deco.material = dmat
-				var dmi := MeshInstance3D.new()
-				dmi.mesh = deco
-				dmi.position = Vector3(_tx(q), h + deco.size.y / 2.0, _tz(r))
-				add_child(dmi)
+				_add_prop(str(cell.get("deco", "crate")), q, r, h,
+					float(cell["cover"]) > 0.3)
+
+func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
+	var path := "res://assets/props/%s.png" % deco
+	if ResourceLoader.exists(path):
+		var spr := Sprite3D.new()
+		spr.texture = load(path)
+		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		var world_h := 0.78 if big else 0.6
+		spr.pixel_size = world_h / float(spr.texture.get_height())
+		spr.shaded = false
+		spr.position = Vector3(_tx(q), h + world_h / 2.0 - 0.02, _tz(r))
+		add_child(spr)
+		_add_ground_shadow(Vector3(_tx(q), h, _tz(r)), 0.4)
+	else:
+		var deco_mesh := BoxMesh.new()
+		deco_mesh.size = Vector3(0.34, 0.5 if big else 0.3, 0.34)
+		var dmat := StandardMaterial3D.new()
+		dmat.albedo_color = Color("#6b4a26") if big else Color("#5a7a4a")
+		deco_mesh.material = dmat
+		var dmi := MeshInstance3D.new()
+		dmi.mesh = deco_mesh
+		dmi.position = Vector3(_tx(q), h + deco_mesh.size.y / 2.0, _tz(r))
+		add_child(dmi)
+
+static var _blob_tex: ImageTexture = null
+func _blob_texture() -> ImageTexture:
+	if _blob_tex != null:
+		return _blob_tex
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var d := Vector2(x - 32, y - 32).length() / 30.0
+			img.set_pixel(x, y, Color(0, 0, 0, clampf(0.55 * (1.0 - d), 0.0, 0.55)))
+	_blob_tex = ImageTexture.create_from_image(img)
+	return _blob_tex
+
+func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(size * 2.0, size * 1.2)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _blob_texture()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	qm.material = mat
+	mi.mesh = qm
+	mi.rotation_degrees.x = -90
+	mi.position = pos + Vector3(0, 0.012, 0)
+	add_child(mi)
+	return mi
+
+# ---- damage feedback: floaters + hit flash ------------------------------------
+func _on_unit_damaged(u: Dictionary, dmg: int) -> void:
+	var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
+	_floater("-%d" % dmg, Vector3(_tx(u["q"]), y + 1.7, _tz(u["r"])),
+		Color("#c0392b") if u["side"] == "p" else Color("#d4a843"))
+	if unit_nodes.has(u["id"]):
+		var spr: Sprite3D = unit_nodes[u["id"]]["sprite"]
+		spr.modulate = Color(3, 3, 3)
+		var tw := create_tween()
+		tw.tween_property(spr, "modulate", Color.WHITE, 0.28)
+
+func _floater(text: String, pos: Vector3, col: Color) -> void:
+	var l := Label3D.new()
+	l.text = text
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.font_size = 56
+	l.pixel_size = 0.007
+	l.outline_size = 10
+	l.modulate = col
+	l.position = pos
+	add_child(l)
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(l, "position:y", pos.y + 0.9, 0.9)
+	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.25)
+	tw.chain().tween_callback(l.queue_free)
 
 # ---- unit sprites -----------------------------------------------------------------
 func _sprite_texture(u: Dictionary) -> Texture2D:
@@ -239,7 +312,8 @@ func _build_units() -> void:
 		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		# normalize world height to ~1.35 tiles regardless of source resolution
-		spr.pixel_size = 1.35 / float(spr.texture.get_height())
+		var world_h := 2.1 if u.get("boss", false) else 1.35
+		spr.pixel_size = world_h / float(spr.texture.get_height())
 		spr.shaded = false
 		add_child(spr)
 		var lbl := Label3D.new()
@@ -260,7 +334,8 @@ func _build_units() -> void:
 		ring.scale = Vector3(1, 0.08, 1)
 		ring.visible = false
 		add_child(ring)
-		unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring}
+		var shadow := _add_ground_shadow(Vector3.ZERO, 0.5)
+		unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "shadow": shadow}
 	_sync_units()
 
 func _sync_units() -> void:
@@ -269,9 +344,13 @@ func _sync_units() -> void:
 			continue # boss-phase summons get nodes on demand below
 		var n: Dictionary = unit_nodes[u["id"]]
 		var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
-		n["sprite"].position = Vector3(_tx(u["q"]), y + 0.7, _tz(u["r"]))
+		var half := 1.07 if u.get("boss", false) else 0.7
+		n["sprite"].position = Vector3(_tx(u["q"]), y + half, _tz(u["r"]))
 		n["sprite"].visible = u["alive"]
-		n["label"].position = Vector3(_tx(u["q"]), y + 1.6, _tz(u["r"]))
+		if n.has("shadow"):
+			n["shadow"].position = Vector3(_tx(u["q"]), y + 0.012, _tz(u["r"]))
+			n["shadow"].visible = u["alive"]
+		n["label"].position = Vector3(_tx(u["q"]), y + (2.35 if u.get("boss", false) else 1.6), _tz(u["r"]))
 		n["label"].text = "%d" % maxi(0, int(u["hp"]))
 		n["label"].visible = u["alive"]
 		n["ring"].position = Vector3(_tx(u["q"]), y + 0.03, _tz(u["r"]))

@@ -38,6 +38,8 @@ const ACT3_OBJ := [
 
 func _ready() -> void:
 	GS = get_node("/root/GameState")
+	GS.apply_theme(self)
+	GS.headline(info_name, 26)
 	if GS.state.is_empty():
 		if not GS.load_game():
 			GS.new_game()

@@ -137,6 +137,18 @@ CHARACTERS = {
     "the_weaver": "full body pixel art game sprite of a spider spirit boss woman, six arms weaving glowing green threads, elegant and sinister",
 }
 CHAR_SUFFIX = ", plain solid white background, single character centered, no text, " + STYLE_PIXEL
+# battle cover props (billboarded in the 3D battle scene) — same recipe as characters
+PROPS = {
+    "crate": "single wooden supply crate with rope, pixel art game object",
+    "barrel": "single old west wooden barrel with iron bands, pixel art game object",
+    "cactus": "single tall saguaro cactus with two arms, pixel art game object",
+    "rock": "single large desert boulder, pixel art game object",
+    "grave": "single weathered stone gravestone with cracks, pixel art game object",
+    "bone": "single bleached longhorn cattle skull with horns, pixel art game object",
+    "pipe": "single brass steam pipe stack with valve and rivets, pixel art game object",
+    "ember": "single glowing forge ember vent grate with orange fire glow, pixel art game object",
+    "spire": "single dark alien void stone spire with faint teal glowing veins, pixel art game object",
+}
 SCENES = {
     "town_street": "wide establishing shot of a weird-west frontier town main street at dusk, wooden buildings, saloon lights, distant mesas, hitching posts, " + STYLE_PAINT,
     "saloon": "interior of an old west saloon, piano, poker tables, oil lamps, long bar with bottles, wanted posters, " + STYLE_PAINT,
@@ -157,6 +169,9 @@ def main():
         jobs.append(("tiles", name, prompt, 1024, 1024, tile_process))
     for name, prompt in CHARACTERS.items():
         jobs.append(("sprites", name, prompt + CHAR_SUFFIX, 768, 1024, sprite_process))
+    for name, prompt in PROPS.items():
+        jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
+                     lambda r, o: sprite_process(r, o, target_h=72)))
     for name, prompt in SCENES.items():
         w, h = (1344, 768)
         jobs.append(("scenes", name, prompt, w, h, scene_process))
@@ -165,7 +180,7 @@ def main():
         if only and only not in (kind, name):
             continue
         out = os.path.join(ASSETS, kind, name + ".png")
-        raw = os.path.join(ASSETS, "_raw", kind, name + ".png")
+        raw = os.path.join(ROOT, "assets_raw", kind, name + ".png")
         if os.path.exists(out):
             skipped += 1
             continue

@@ -5,6 +5,8 @@ var GS
 
 func _ready() -> void:
 	GS = get_node("/root/GameState")
+	GS.apply_theme(self)
+	GS.headline($Logo, 84)
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")
 	$Menu/NewBtn.pressed.connect(func():

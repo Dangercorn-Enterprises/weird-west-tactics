@@ -50,6 +50,7 @@ const DIVINE_BLAST := ["Vulcan's Forgefire", "Perun's Thunder"]
 var design: Dictionary = {} # design.json (enemies/weapons/armor/mods/pregen...)
 var favor := 1 # divine favor snapshot per unit (New Game seeds 1)
 var scale_enabled := true
+var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
 
 # ---- seeded RNG: exact mulberry32 port so runs are reproducible -------------
 var _rng_state: int = 0
@@ -256,6 +257,8 @@ func reach(grid: Array, units: Array, u: Dictionary) -> Dictionary:
 # ---- damage / statuses / boss phase -------------------------------------------
 func apply_damage(b: Dictionary, def: Dictionary, dmg: int) -> void:
 	def["hp"] -= dmg
+	if on_damage.is_valid():
+		on_damage.call(def, dmg)
 	if def["hp"] <= 0:
 		def["alive"] = false
 		if def["side"] == "e":

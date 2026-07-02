@@ -37,6 +37,8 @@ const RUMORS := [
 
 func _ready() -> void:
 	GS = get_node("/root/GameState")
+	GS.apply_theme(self)
+	GS.headline(header, 24)
 	node_data = GS.node_by_id(str(GS.state["location"]))
 	if node_data.is_empty():
 		node_data = {"name": "Rustwater", "region": "Neutral ground",

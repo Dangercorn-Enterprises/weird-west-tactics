@@ -3,6 +3,8 @@ extends Control
 
 func _ready() -> void:
 	var GS = get_node("/root/GameState")
+	GS.apply_theme(self)
+	GS.headline($Box/Heading, 52)
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")
 	$Box/Body.text = ("The Hollow Man is unmade, and the Sleeping One turns over in the deep earth — for now. "
