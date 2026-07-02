@@ -60,17 +60,19 @@ reserved for the supernatural** (Ashfall, spirits, the Hollow).
 - **Workhorse (free):** NVIDIA NIM flux.1-dev via tools/gen_assets.py.
 - **Approved upgrade path:** [sorceress.games](https://sorceress.games/) — Tim OK'd a one-time fee for game asset generation (2026-07-01). Use it for the pass-3 items below (facing/walk sprite sheets especially — consistency across frames is where flux struggles). Tim sets up the account/payment; prompts + palette in this book carry over.
 
-## Known gaps → pass 2
-1. Battle cover decos are still flat colored boxes — generate crate/cactus/
-   grave/pipe/spire prop sprites and billboard them (same recipe as characters).
-2. Sprites have one idle pose — need 4 facings + walk/attack frames
-   (generate sheets, or animate via frame interpolation on the singles).
-3. Worldmap node positions are geographic, art is fictional — consider
-   generating the map FROM the node layout (img2img over a plotted guide).
-4. Tile sets: 3 variants per biome for less repetition; true seamless tiling.
-5. UI skin: parchment/brass theme (Godot Theme resource) to replace default
-   gray Controls; the web build's Rye/Special Elite fonts.
-6. Boss-scale sprites (Iron Foreman should tower ~2 tiles).
+## Pass 2 — DONE 2026-07-01
+- ✅ 9 prop sprites billboarded as battle cover (crate/barrel/cactus/rock/grave/bone/pipe/ember/spire)
+- ✅ UI theme: parchment/brass, Rye + Special Elite bundled (ui_theme.gd)
+- ✅ Damage floaters + hit flash (core on_damage hook), blob ground shadows, 2.1-tile bosses
+- ✅ Tiles seam-blended (edge cross-fade)
+- ✅ Trail network + settlement glyphs baked into worldmap art at true node positions
+
+## Known gaps → pass 3 (sorceress.games territory)
+1. Sprites have one idle pose — need 4 facings + walk/attack frame sheets
+   (frame-to-frame consistency is where flux struggles; use sorceress).
+2. Tile sets: 3 variants per biome for less repetition; true tiling textures.
+3. Battle animations: attack lunge/recoil tweens, projectile tracers, AoE bursts.
+4. Ambient audio port (the web build's synth design → AudioStreamGenerator or stems).
 
 ## Rules (carried from sprites.js, still binding)
 - Every sprite must be **screenshot-verified in-engine** before it's "done".
