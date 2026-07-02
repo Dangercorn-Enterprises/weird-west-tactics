@@ -69,7 +69,7 @@ func new_game(lead_archetype := "gunslinger", lead_name := "") -> void:
 	var comp := "hexslinger" if lead_archetype == "gunslinger" else "gunslinger"
 	state = {
 		"party": [_mk_member(lead_archetype, "p0", lead_name), _mk_member(comp, "p1", "")],
-		"gold": 300, "day": 1, "location": "rustwater",
+		"gold": 300, "day": 1, "location": "catalina", # Act I opens off the coast
 		"visited": {}, "inventory": {}, "mount": null,
 		"favor": {"coyote": 1, "samedi": 1, "vulcan": 1, "perun": 1, "anansi": 1, "sleeper": 0},
 		"flags": {}, "act1": {"step": 0}, "act2": {"step": 0}, "act3": {"step": 0},

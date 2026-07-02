@@ -131,10 +131,10 @@ func _process_battle_result() -> void:
 # ---- geometry ---------------------------------------------------------------------
 func _node_pos(n: Dictionary) -> Vector2:
 	var r := _map_rect()
-	# map the node graph onto the art's ground plane (sky occupies the top ~28%)
+	# MUST match tools/compose_map.py — the art is drawn from these same coords
 	return r.position + Vector2(
-		(0.08 + float(n["x"]) * 0.84) * r.size.x,
-		(0.30 + float(n["y"]) * 0.62) * r.size.y)
+		(0.06 + float(n["x"]) * 0.88) * r.size.x,
+		(0.08 + float(n["y"]) * 0.84) * r.size.y)
 
 func _map_rect() -> Rect2:
 	return Rect2(Vector2.ZERO, overlay.size)
@@ -163,7 +163,7 @@ func _draw_overlay() -> void:
 		var p := _node_pos(n)
 		var reachable: bool = adj[cur["id"]].has(n["id"])
 		var visited: bool = GS.state["visited"].has(n["id"]) or n["id"] == cur["id"]
-		var r := 11.0 if n["id"] == cur["id"] else 8.0
+		var r := 8.0 if n["id"] == cur["id"] else 5.5 # art carries the glyphs now
 		overlay.draw_circle(p, r + 3, Color("#2a1d0f"))
 		var c := _god_color(n.get("god"))
 		c.a = 1.0 if visited else 0.55
