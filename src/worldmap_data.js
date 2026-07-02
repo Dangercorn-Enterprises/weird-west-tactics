@@ -354,3 +354,8 @@ if (typeof window !== "undefined") {
   window.DFDATA.WORLD_NODES = WORLD_NODES;
   window.DFDATA.WORLD_EDGES = WORLD_EDGES;
 }
+
+// CommonJS export for tools/export_data.js (browser path unaffected)
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { WORLD_NODES, WORLD_EDGES };
+}

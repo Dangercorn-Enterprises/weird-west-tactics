@@ -7,8 +7,12 @@ config_version=5
 [application]
 
 config/name="Dustfall: The Ashen Frontier"
-run/main_scene="res://scenes/battle.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7")
+
+[autoload]
+
+GameState="*res://scripts/game_state.gd"
 
 [display]
 

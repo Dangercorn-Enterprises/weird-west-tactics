@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/worldmap.gd" id="1"]
+
+[node name="Worldmap" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="MapArt" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Overlay" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 340.0
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="Status" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "Gold 0 · Day 1"
+
+[node name="Objective" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Objective"
+
+[node name="NodeName" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "—"
+
+[node name="Lore" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
+[node name="EnterBtn" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+text = "Enter Town"
+
+[node name="TitleBtn" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+text = "Title"

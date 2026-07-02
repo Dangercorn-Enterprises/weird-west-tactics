@@ -12,6 +12,7 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const D = require(path.join(ROOT, "src", "data.js"));
 const S = require(path.join(ROOT, "src", "sprites.js"));
+const W = require(path.join(ROOT, "src", "worldmap_data.js"));
 
 const out = path.join(ROOT, "godot", "data");
 fs.mkdirSync(out, { recursive: true });
@@ -31,6 +32,8 @@ fs.writeFileSync(
       weapon_mods: D.WEAPON_MODS,
       mounts: D.MOUNTS,
       biomes: D.BIOMES,
+      world_nodes: W.WORLD_NODES,
+      world_edges: W.WORLD_EDGES,
     },
     null,
     2,

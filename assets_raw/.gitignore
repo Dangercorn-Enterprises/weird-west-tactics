@@ -1,0 +1,4 @@
+# raw 1024px generations are reproducible from tools/gen_assets.py — keep the
+# repo lean; only the processed game assets under godot/assets/ are tracked.
+*
+!.gitignore
