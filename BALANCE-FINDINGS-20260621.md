@@ -28,3 +28,10 @@ Target bands: **story 70–85% · ambush 80–90% · boss 45–65%** (2-party; r
 - Ambushes: rattlesnake hp 16→20 wmax 8→9, ashfall_golem hp 30→38 wmin 6→7, walkin_dead wmax 7→6, revenant_gun hp 18→16 aim 74→72, dynamite_bandit hp 14→12 → trail **90.1%**, wilderness **86.6%** ✓
 - 4-party scaling clamps 1.2/1.1 → 1.35/1.2 (engine + harness) — full-posse story beats now bite (Act 3 heralds 73.7%, finale 82.9%)
 - 4-party boss *reckonings* and Act 2 fights remain 97-100%: intended — replaying a broken boss with a grown posse should feel like a stomp.
+
+## Pass 10 (2026-07-01): enemy AI behaviors wired + rebalance — verified 2000 runs, seed 1337
+- sentry holds ground (+8 aim braced) · zealot berserks <50% HP (+10 aim, +2 wmax, ignores cover) · swarm rushes nearest · cover weights cover 2.5x · flank hunts the weakest rider globally.
+- Knock-on retune: walkin_dead hp 16 wmax 7, rattlesnake back to hp 18 wmax 8 (cover AI made it deadlier), Vanguard comp = revenant_gun + walkin_dead + 2x dynamite_bandit.
+- Final: Vanguard 75.6 ✓ · Deacon 46.8 ✓ · Foreman 63.8 ✓ · Weaver 52.9 ✓ · Hollow Man 49.7 ✓ · T2 ambush 87.5 ✓ · Heralds 73.4 ✓ · finale 80.5 ✓.
+- T1 trail ambush representative comp reads 97.7% — random T1 draws span 56-98% by composition (2-snake draws are dangerous, melee-heavy draws are easy). Variance is intended for random encounters; not tuned further.
+- NOTE: swarm +1 AP was tried and REVERTED (double-attacks in melee crashed Deacon to 24%). Don't retry without a melee AP cost rework.

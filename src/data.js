@@ -791,29 +791,33 @@ const ENEMY_CATALOG = [
     faction: "samedi",
     icon: "💀",
     color: "#7c9a6a",
-    hp: 12,
+    // balance 2026-07-01 (Pass 10): swarm AI rushes into gunfire — needs the
+    // bulk to actually reach melee. hp 12→16, wmax back to 7.
+    hp: 16,
     str: 7,
     quick: 3,
     aim: 55,
     rng: 1,
     wmin: 4,
-    wmax: 6,
+    wmax: 7,
     behavior: "swarm",
   },
   {
+    // balance 2026-07-01 (Pass 10): cover AI made the snake far deadlier —
+    // walked the earlier buff back to hp 18 / wmax 8.
     id: "rattlesnake",
     name: "Rattlesnake",
     tier: 1,
     faction: "coyote",
     icon: "🤠",
     color: "#c0392b",
-    hp: 20,
+    hp: 18,
     str: 6,
     quick: 5,
     aim: 78,
     rng: 6,
     wmin: 5,
-    wmax: 9,
+    wmax: 8,
     behavior: "cover",
   },
   {

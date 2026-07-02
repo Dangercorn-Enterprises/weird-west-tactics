@@ -54,6 +54,7 @@
           "revenant_gun",
           "walkin_dead",
           "dynamite_bandit",
+          "dynamite_bandit",
         ]),
         onComplete: (r) => {
           if (r && r.win) {

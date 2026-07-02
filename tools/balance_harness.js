@@ -173,7 +173,7 @@ function partyToUnit(p, i) {
 }
 function enemyToUnit(spec, i) {
   const beh = spec.behavior || "";
-  return mkUnit({
+  const u = mkUnit({
     id: "e" + i,
     archetype: spec.id,
     name: spec.name,
@@ -183,7 +183,8 @@ function enemyToUnit(spec, i) {
     hp: spec.hp,
     str: spec.str,
     quick: spec.quick,
-    aim: spec.aim,
+    // Pass 10 mirror: braced sentries shoot straighter
+    aim: spec.aim + (beh === "sentry" ? 8 : 0),
     rng: spec.rng,
     wmin: spec.wmin,
     wmax: spec.wmax,
@@ -191,9 +192,16 @@ function enemyToUnit(spec, i) {
     blinker: beh === "teleport",
     bomber: beh === "bomber",
     slammer: beh === "tank",
+    // Pass 10 mirror: behavior flags
+    sentry: beh === "sentry",
+    zealot: beh === "zealot",
+    swarmer: beh === "swarm",
+    coverer: beh === "cover",
+    flanker: beh === "flank",
     tier: spec.tier,
     boss: spec.boss,
   });
+  return u;
 }
 
 // ---- combat math (verbatim mirror of scene_battle.js) -----------------------
@@ -339,13 +347,16 @@ function checkBossPhase(B, u) {
 // ---- movement helper: step toward target along BFS-reachable tiles ----------
 function moveToward(B, u, tgt) {
   const rc = reach(B.grid, B.units, u);
+  // Pass 10 mirror: cover appetite varies by temperament (players keep weight 1)
+  const coverW =
+    u.side === "e" ? (u.coverer ? 2.5 : u.berserk || u.swarmer ? 0 : 1) : 1;
   // closer to the target is better; cover breaks ties (units seek cover)
   let best = null,
-    bestScore = dist(u, tgt) * 2 - (B.grid[u.r][u.q].cover || 0);
+    bestScore = dist(u, tgt) * 2 - coverW * (B.grid[u.r][u.q].cover || 0);
   Object.keys(rc).forEach((k) => {
     const [q, r] = k.split(",").map(Number);
     const d = Math.abs(q - tgt.q) + Math.abs(r - tgt.r);
-    const score = d * 2 - (B.grid[r][q].cover || 0);
+    const score = d * 2 - coverW * (B.grid[r][q].cover || 0);
     if (score < bestScore) {
       bestScore = score;
       best = [q, r];
@@ -378,12 +389,28 @@ function enemyPhase(B) {
     while (guard++ < 12) {
       const alive = B.players.filter((p) => p.alive);
       if (!alive.length) return;
-      const inRng = alive.filter((p) => dist(e, p) <= e.rng + 1);
-      // focus the weakest target in range; otherwise approach the nearest
-      const tgt = inRng.length
-        ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
-        : alive.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+      // Pass 10 mirror: zealots berserk once bloodied
+      if (e.zealot && !e.berserk && e.hp <= e.maxHp / 2) {
+        e.berserk = true;
+        e.aim += 10;
+        e.wmax += 2;
+      }
+      // Pass 10 mirror: behavior-driven target selection
+      let tgt;
+      if (e.flanker) {
+        tgt = alive.slice().sort((a, b) => a.hp - b.hp)[0];
+      } else if (e.swarmer) {
+        tgt = alive.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+      } else {
+        const inRng = alive.filter((p) => dist(e, p) <= e.rng + 1);
+        // focus the weakest target in range; otherwise approach the nearest
+        tgt = inRng.length
+          ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
+          : alive.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+      }
       if (!tgt) break;
+      // Pass 10 mirror: sentries never chase
+      if (e.sentry && dist(e, tgt) > e.rng + 1) break;
       if (dist(e, tgt) <= e.rng + 1 && e.ap >= 2) {
         e.ap -= 2;
         const cluster = alive.filter(
@@ -728,7 +755,7 @@ const ENCOUNTERS = [
   [
     "Act 1 · Revenant Vanguard",
     "starter",
-    ["revenant_gun", "walkin_dead", "dynamite_bandit"],
+    ["revenant_gun", "walkin_dead", "dynamite_bandit", "dynamite_bandit"],
   ],
   [
     "Act 1 · The Deacon (boss)",

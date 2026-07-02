@@ -187,7 +187,7 @@
 
   function enemyToUnit(spec, i) {
     const beh = spec.behavior || "";
-    return mkUnit({
+    const u = mkUnit({
       id: "e" + i,
       archetype: spec.id,
       name: spec.name,
@@ -199,7 +199,8 @@
       hp: spec.hp,
       str: spec.str,
       quick: spec.quick,
-      aim: spec.aim,
+      // a braced emplacement shoots straighter than anything on the move
+      aim: spec.aim + (beh === "sentry" ? 8 : 0),
       rng: spec.rng,
       wmin: spec.wmin,
       wmax: spec.wmax,
@@ -207,9 +208,16 @@
       blinker: beh === "teleport",
       bomber: beh === "bomber",
       slammer: beh === "tank", // golems slam for AoE when players cluster
+      // Pass 10 (v1.1): the rest of the catalog behaviors, finally wired
+      sentry: beh === "sentry", // emplacement — holds ground, never chases
+      zealot: beh === "zealot", // berserks below half HP (+aim, +dmg, no cover)
+      swarmer: beh === "swarm", // rushes the closest target
+      coverer: beh === "cover", // weights cover heavily when moving
+      flanker: beh === "flank", // hunts the weakest rider on the field
       tier: spec.tier,
       boss: spec.boss,
     });
+    return u;
   }
 
   // ---- status effects (Phase 1a) -------------------------------------------
@@ -832,14 +840,44 @@
           return;
         }
         const alivePlayers = players.filter((p) => p.alive);
-        const inRng = alivePlayers.filter((p) => dist(e, p) <= e.rng + 1);
-        // focus the weakest target in range; otherwise approach the nearest
-        const tgt = inRng.length
-          ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
-          : alivePlayers.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+        // Pass 10: zealots berserk once they're bloodied
+        if (e.zealot && !e.berserk && e.hp <= e.maxHp / 2) {
+          e.berserk = true;
+          e.aim += 10;
+          e.wmax += 2;
+          const zp = iso(e.q, e.r, grid[e.r][e.q].h);
+          floaters.push({
+            x: zp.x,
+            y: zp.y - 52,
+            t: "ZEALOTRY",
+            life: 48,
+            c: "#5B7FAA",
+          });
+          log(e.name + " burns with zealotry — nothing holds them back!");
+        }
+        // Pass 10: behavior-driven target selection
+        let tgt;
+        if (e.flanker) {
+          // wolves cut the weakest straggler from the herd
+          tgt = alivePlayers.slice().sort((a, b) => a.hp - b.hp)[0];
+        } else if (e.swarmer) {
+          tgt = alivePlayers.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+        } else {
+          const inRng = alivePlayers.filter((p) => dist(e, p) <= e.rng + 1);
+          // focus the weakest target in range; otherwise approach the nearest
+          tgt = inRng.length
+            ? inRng.slice().sort((a, b) => a.hp - b.hp)[0]
+            : alivePlayers.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
+        }
         if (!tgt) {
           idx++;
           setTimeout(step, 150);
+          return;
+        }
+        // Pass 10: sentries are emplacements — they never chase
+        if (e.sentry && dist(e, tgt) > e.rng + 1) {
+          idx++;
+          setTimeout(step, 120);
           return;
         }
         if (dist(e, tgt) <= e.rng + 1 && e.ap >= 2) {
@@ -885,13 +923,16 @@
           }
         }
         const rc = reach(e);
+        // Pass 10: cover appetite varies by temperament — cover-users prize it,
+        // berserk zealots and swarmers charge straight in.
+        const coverW = e.coverer ? 2.5 : e.berserk || e.swarmer ? 0 : 1;
         let best = null,
           // closer to the target is better; cover breaks ties (enemies seek cover)
-          bestScore = dist(e, tgt) * 2 - (grid[e.r][e.q].cover || 0);
+          bestScore = dist(e, tgt) * 2 - coverW * (grid[e.r][e.q].cover || 0);
         Object.keys(rc).forEach((k) => {
           const [q, r] = k.split(",").map(Number);
           const d = Math.abs(q - tgt.q) + Math.abs(r - tgt.r);
-          const score = d * 2 - (grid[r][q].cover || 0);
+          const score = d * 2 - coverW * (grid[r][q].cover || 0);
           if (score < bestScore) {
             bestScore = score;
             best = [q, r];
