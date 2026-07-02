@@ -77,12 +77,28 @@ prompts return ALL-BLACK images (free-tier degradation after ~150 gens; 429s
 follow). `tools/qa_sprites.py` sweeps for blank sprites and repairs with
 seed-retries + dud detection; blank PNGs must be DELETED (not left in place) so
 the engine falls back to pixel-data sprites instead of invisible units.
-**Pending on fresh quota or sorceress:** dust_witch, lawdog, preacher (all views);
-preacher rear/side and the_deacon back (front-lookalike) resist all phrasings.
+**Safety duds are PROMPT-triggered, not seed-triggered** (2026-07-01 side_r
+batch): seed shifts never rescue them — rephrase instead. Confirmed dud
+phrasings and the workarounds that shipped (now baked into gen_assets.py):
+- lawdog: "sheriff … holding a rifle" → always black. Works: "frontier marshal
+  with a brass star badge … hands resting on his belt".
+- dust_witch: "sorceress … purple magic swirling" and "mystic … wisps of purple
+  light" → black. Works: "fortune teller woman in a deep purple cloak and hood,
+  holding a small glowing lantern".
+- preacher: "man of faith + worn book", "gentleman + book tucked", "white
+  collar, hands clasped", "gentleman undertaker" → ALL black. Works: "quiet
+  traveling chaplain, long dark wool coat, round flat hat, kind weathered face".
+- Also dud: rattlesnake/"holding a rifle at his side" + "facing right" combo
+  (works facing left!); the_weaver "elegant and sinister" facing right (works
+  as "graceful spider spirit queen").
+**2026-07-01 second run: full coverage** — all 21 characters × 4 facings
+(front/back/side/side_r) are real flux art, 0 pixel fallbacks, QA-verified
+(84/84 opaque ≥ 10%).
 
 ## Known gaps → pass 3 (sorceress.games territory)
-1. Sprites have one idle pose — need 4 facings + walk/attack frame sheets
-   (frame-to-frame consistency is where flux struggles; use sorceress).
+1. Sprites have one idle pose per facing (all 4 facings done) — still need
+   walk/attack frame sheets (frame-to-frame consistency is where flux
+   struggles; use sorceress).
 2. Tile sets: 3 variants per biome for less repetition; true tiling textures.
 3. Battle animations: attack lunge/recoil tweens, projectile tracers, AoE bursts.
 4. Ambient audio port (the web build's synth design → AudioStreamGenerator or stems).

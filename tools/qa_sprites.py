@@ -29,7 +29,7 @@ def opaque_ratio(path):
 
 def base_and_view(fname):
     stem = fname[:-4]
-    for suffix in ["_back", "_side"]:
+    for suffix in ["_back", "_side_r", "_side"]:
         if stem.endswith(suffix):
             return stem[: -len(suffix)], suffix[1:]
     return stem, "front"
@@ -69,6 +69,8 @@ def repair(fname):
         prompt = prompt.replace("facing viewer", "").replace("side profile", "") + BACK_STRONG
     elif view == "side":
         prompt = prompt.replace("facing viewer", "in full side profile view facing left")
+    elif view == "side_r":
+        prompt = prompt.replace("facing viewer", "in full side profile view facing right")                        .replace("side profile", "in full side profile view facing right")
     for attempt in range(3):
         print("  regenerating (%d):" % (attempt + 1), fname)
         data = ga.gen(prompt + ga.CHAR_SUFFIX, 768, 1024,

@@ -115,8 +115,11 @@ CHARACTERS = {
     "gunslinger": "full body pixel art game sprite of a lean weird-west gunslinger, wide-brim hat, long duster coat, twin revolvers, standing idle facing viewer",
     "hexslinger": "full body pixel art game sprite of a voodoo hexslinger woman, feathered hat, card deck and purple hex glow in hand, standing idle facing viewer",
     "tinkerer": "full body pixel art game sprite of a mad inventor with brass goggles, tool harness, glowing teal arc pistol, standing idle facing viewer",
-    "preacher": "full body pixel art game sprite of a somber man of faith in a long black coat and flat-brim hat, holding a worn book, standing idle facing viewer",
-    "lawdog": "full body pixel art game sprite of a frontier sheriff with a shiny star badge, long coat, holding a rifle, standing idle facing viewer",
+    # NOTE: preacher/lawdog/dust_witch phrasings are safety-filter workarounds —
+    # "man of faith"+book, "sheriff holding a rifle", "sorceress+magic glow" all
+    # return all-black duds on every seed (see STYLEBOOK). Don't revert them.
+    "preacher": "full body pixel art game sprite of a quiet traveling chaplain, long dark wool coat, round flat hat, kind weathered face, standing idle facing viewer",
+    "lawdog": "full body pixel art game sprite of a frontier marshal with a brass star badge, long tan coat and wide hat, hands resting on his belt, standing idle facing viewer",
     "drifter": "full body pixel art game sprite of a lone wanderer wrapped in a striped serape blanket poncho, wide hat shading his face, standing idle facing viewer",
     # enemies
     "walkin_dead": "full body pixel art game sprite of a spooky green-skinned ghoul cowboy, tattered old coat and hat, glowing eyes, standing idle facing viewer",
@@ -127,7 +130,7 @@ CHARACTERS = {
     "revenant_gun": "full body pixel art game sprite of a spectral undead gunfighter, teal ghost-glow, tattered coat, standing idle facing viewer",
     "dynamite_bandit": "full body pixel art game sprite of a wild-eyed bandit holding lit dynamite stick, bandolier of explosives, standing idle facing viewer",
     "ashfall_golem": "full body pixel art game sprite of a hulking stone ash golem, cracked gray body with ember glow in seams, standing",
-    "dust_witch": "full body pixel art game sprite of a mysterious sorceress in flowing violet robes and hood, purple magic swirling at her hands, standing idle facing viewer",
+    "dust_witch": "full body pixel art game sprite of a fortune teller woman in a deep purple cloak and hood, holding a small glowing lantern, standing idle facing viewer",
     "thunder_zealot": "full body pixel art game sprite of a warrior in blue-painted armor with lightning engravings, carrying a large hammer, standing idle facing viewer",
     # bosses
     "the_deacon": "full body pixel art game sprite of an undead preacher boss, tall black coat, purple vodou glow, skull face paint, raised bone staff",
