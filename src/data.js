@@ -1213,6 +1213,34 @@ const WEAPON_MODS = [
   },
 ];
 
+// ---- Mounts (Pass 16, v1.1): one team carries the whole posse ----
+const MOUNTS = [
+  {
+    id: "horse_team",
+    name: "Horse Team",
+    cost: 150,
+    travelF: 0.6,
+    ambushMod: -0.1,
+    note: "Cuts travel time near half; outruns most trouble.",
+  },
+  {
+    id: "camel_team",
+    name: "Camel Team",
+    cost: 220,
+    travelF: 0.55,
+    ambushMod: -0.1,
+    note: "Hardy and mean. Faster still on the long hauls.",
+  },
+  {
+    id: "clockwork_steed",
+    name: "Clockwork Steed",
+    cost: 450,
+    travelF: 0.4,
+    ambushMod: -0.15,
+    note: "Hisses steam, never tires. Vulcan's finest.",
+  },
+];
+
 // expose for scenes + scripted tests
 if (typeof window !== "undefined") {
   window.DFDATA = {
@@ -1227,6 +1255,7 @@ if (typeof window !== "undefined") {
     ARMOR,
     CONSUMABLES,
     WEAPON_MODS,
+    MOUNTS,
   };
 }
 
@@ -1246,5 +1275,6 @@ if (typeof module !== "undefined" && module.exports) {
     ARMOR,
     CONSUMABLES,
     WEAPON_MODS,
+    MOUNTS,
   };
 }

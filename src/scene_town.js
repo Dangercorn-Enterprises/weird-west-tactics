@@ -603,14 +603,51 @@
       );
     });
   }
+  // Pass 16 (v1.1): the Stables are open — one team carries the whole posse.
   function stable(c) {
+    const cur =
+      typeof MOUNTS !== "undefined"
+        ? MOUNTS.find((m) => m.id === DF.state.mount)
+        : null;
     c.appendChild(
       el("p", {
         class: "flavor",
-        text: "Horses, camels, and one clockwork steed that hisses steam. Mounts cut travel time — coming in a later pass.",
-        style: { color: "#9a8a6a", fontStyle: "italic" },
+        text:
+          "Horses, camels, and one clockwork steed that hisses steam. " +
+          (cur
+            ? "Your " + cur.name + " waits at the rail."
+            : "The posse walks — for now."),
+        style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "8px" },
       }),
     );
+    (typeof MOUNTS !== "undefined" ? MOUNTS : []).forEach((m) => {
+      const owned = DF.state.mount === m.id;
+      c.appendChild(
+        row(
+          m.name +
+            " — " +
+            m.note +
+            "  (travel ×" +
+            m.travelF +
+            ", ambush " +
+            Math.round(m.ambushMod * 100) +
+            "%)  [" +
+            m.cost +
+            "g]",
+          owned ? "Hitched" : "Buy",
+          {
+            warn: !owned,
+            disabled: owned || DF.state.gold < m.cost,
+            onclick: () => {
+              DF.state.gold -= m.cost;
+              DF.state.mount = m.id;
+              DF.saveGame();
+              flash("The " + m.name + " is yours. The frontier just shrank.");
+            },
+          },
+        ),
+      );
+    });
   }
 
   DF.register("town", {

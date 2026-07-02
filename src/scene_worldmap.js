@@ -307,9 +307,19 @@
     }
   }
 
+  function mount() {
+    return typeof MOUNTS !== "undefined"
+      ? MOUNTS.find((m) => m.id === DF.state.mount)
+      : null;
+  }
   function travel(from, to) {
-    const days = travelTime(from, to),
-      risk = riskOf(from, to);
+    // Pass 16 (v1.1): a mount team cuts travel days and ambush odds
+    const mt = mount();
+    const days = Math.max(
+      1,
+      Math.round(travelTime(from, to) * (mt ? mt.travelF : 1)),
+    );
+    const risk = riskOf(from, to);
     DF.state.day += days;
     DF.state.location = to.id;
     DF.state.visited[to.id] = true;
@@ -335,7 +345,8 @@
       });
       return;
     }
-    const chance = risk >= 3 ? 0.6 : risk === 2 ? 0.3 : 0;
+    let chance = risk >= 3 ? 0.6 : risk === 2 ? 0.3 : 0;
+    if (mt && chance > 0) chance = Math.max(0.05, chance + mt.ambushMod); // outrun trouble
     if (Math.random() < chance) {
       // ambush on the trail — enemies scaled to the destination's tier
       const pool =
@@ -460,8 +471,15 @@
     X.fill();
     // HUD text
     const gold = $("wcGold");
-    if (gold)
-      gold.textContent = "Gold " + DF.state.gold + "  ·  Day " + DF.state.day;
+    if (gold) {
+      const mt = mount();
+      gold.textContent =
+        "Gold " +
+        DF.state.gold +
+        "  ·  Day " +
+        DF.state.day +
+        (mt ? "  ·  " + mt.name : "");
+    }
     const nm = $("wcName");
     if (nm) nm.textContent = cur.name;
     const lr = $("wcLore");
