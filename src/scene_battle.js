@@ -202,6 +202,10 @@
     marked: { tag: "MRK", col: "#d4a843" },
     hunker: { tag: "HNK", col: "#4ecdc4" },
   };
+
+  // ---- per-ability AP costs (mirrored in tools/balance_harness.js ABIL_FX) ----
+  const ABIL_COST = { "Fan the Hammer": 3, "Called Shot": 3, "Hunker Down": 1 };
+  const abilCost = (name) => ABIL_COST[name] || 2;
   function applyStatus(u, key, dur) {
     if (!u || !u.alive || !u.status) return;
     u.status[key] = Math.max(u.status[key] || 0, dur); // refresh to longest duration
@@ -384,7 +388,8 @@
     reachable = sel && sel.alive && sel.side === "p" ? reach(sel) : {};
     const ab = $("babilityBtn");
     if (ab) {
-      ab.disabled = !(sel && sel.side === "p" && sel.ap >= 2);
+      // 1 AP is enough for Hunker Down; individual options gate by their own cost
+      ab.disabled = !(sel && sel.side === "p" && sel.ap >= 1);
       ab.textContent = "Abilities";
     }
     renderParty();
@@ -801,7 +806,7 @@
     if (menu) menu.style.display = "none";
   }
   function openAbilityMenu() {
-    if (!(sel && sel.side === "p" && sel.ap >= 2)) return;
+    if (!(sel && sel.side === "p" && sel.ap >= 1)) return;
     const menu = $("babilityMenu");
     if (!menu) return;
     if (menu.style.display !== "none" && menu.dataset.for === sel.id) {
@@ -822,9 +827,11 @@
       if (isDiv) {
         b.textContent =
           "✦ " + name + " (favor " + favor + (favor >= 3 ? "★" : "") + ")";
-        if (favor < 1) b.disabled = true; // gated until favor is earned
+        // needs favor AND enough AP (divine consumes the whole turn)
+        if (favor < 1 || sel.ap < 2) b.disabled = true;
       } else {
-        b.textContent = name;
+        b.textContent = name + " · " + abilCost(name) + " AP";
+        if (sel.ap < abilCost(name)) b.disabled = true; // can't afford it
       }
       b.onclick = () => chooseAbility(name);
       menu.appendChild(b);
@@ -843,10 +850,20 @@
       refreshSel();
       return;
     }
+    if (name !== sel.divine && sel.ap < abilCost(name)) {
+      log("Not enough AP for " + name + ".");
+      return;
+    }
     sel.ability = name;
     if (isHeal(name)) {
+      // Lay on Hands prefers a fallen ally (revive) over a hurt one
+      const fallen =
+        name === "Lay on Hands"
+          ? players.find((p) => p.downed && !p.alive)
+          : null;
       const allies = players.filter((p) => p.alive);
       const who =
+        fallen ||
         allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] ||
         sel;
       doAbility(who);
@@ -861,6 +878,12 @@
   function doAbility(tgt) {
     abilityMode = false;
     const a = sel.ability;
+    // safety net: never let a non-divine ability drive AP negative
+    if (a && a !== sel.divine && sel.ap < abilCost(a)) {
+      log("Not enough AP for " + a + ".");
+      refreshSel();
+      return;
+    }
     if (a && a === sel.divine) {
       if (sel.divineUsed) {
         log("The god has already answered this fight.");
@@ -912,7 +935,7 @@
       return;
     }
     if (a === "Fan the Hammer") {
-      sel.ap -= 3;
+      sel.ap -= abilCost(a);
       log("Fan the Hammer — three shots!");
       let n = 0;
       const s = () => {
@@ -937,7 +960,7 @@
       log(sel.name + " lobs an Ashfall grenade!");
       blast(sel, tgt);
     } else if (a === "Called Shot") {
-      sel.ap -= 3;
+      sel.ap -= abilCost(a);
       log("Called Shot — dead to rights, and marked.");
       const sv = sel.aim;
       sel.aim = 999;
@@ -949,14 +972,15 @@
         },
       });
     } else if (a === "Lay on Hands" || a === "Soul Drain") {
-      sel.ap -= 2;
+      sel.ap -= abilCost(a);
       const amt = 6 + Math.floor(Math.random() * 5);
       const who = a === "Soul Drain" ? sel : tgt;
       if (who.downed) {
         who.alive = true;
-        who.downed = false;
-        who.bleed = 0;
+        who.downed = 0;
+        who.status = { burn: 0, bleed: 0, hex: 0, marked: 0, hunker: 0 };
         who.hp = amt;
+        who.ap = 0; // revived — back on their feet next turn
         log(sel.name + " pulls " + who.name + " back from the brink.");
       } else {
         who.hp = Math.min(who.maxHp, who.hp + amt);
