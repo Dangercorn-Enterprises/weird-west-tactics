@@ -1213,6 +1213,191 @@ const WEAPON_MODS = [
   },
 ];
 
+// ---- Battle-map biomes (Pass 9; moved here v1.3 for the Godot port) ----
+const BIOMES = {
+  mesa: {
+    floors: ["#3a2c18", "#4a3820", "#5a4428"],
+    h1: [
+      [3, 2],
+      [6, 7],
+      [2, 6],
+      [7, 3],
+    ],
+    h2: [
+      [4, 4],
+      [5, 5],
+    ],
+    hard: [
+      [2, 3],
+      [7, 6],
+      [4, 7],
+      [5, 2],
+      [1, 5],
+      [8, 4],
+    ],
+    soft: [
+      [3, 5],
+      [6, 4],
+      [2, 8],
+      [7, 8],
+      [4, 1],
+      [5, 8],
+    ],
+    hardDeco: "crate",
+    softDeco: "cactus",
+  },
+  canyon: {
+    floors: ["#42291a", "#553522", "#68422a"],
+    h1: [
+      [4, 1],
+      [5, 2],
+      [4, 8],
+      [5, 7],
+      [6, 6],
+    ],
+    h2: [
+      [5, 4],
+      [4, 5],
+    ],
+    hard: [
+      [2, 4],
+      [7, 5],
+      [3, 3],
+      [6, 8],
+      [2, 7],
+      [7, 2],
+    ],
+    soft: [
+      [1, 3],
+      [8, 6],
+      [3, 8],
+      [6, 1],
+      [2, 5],
+      [7, 7],
+    ],
+    hardDeco: "rock",
+    softDeco: "cactus",
+  },
+  town: {
+    floors: ["#3d3020", "#4d3d28", "#5d4a30"],
+    h1: [
+      [3, 3],
+      [3, 4],
+      [6, 5],
+      [6, 6],
+    ],
+    h2: [
+      [3, 7],
+      [6, 2],
+    ],
+    hard: [
+      [2, 5],
+      [5, 4],
+      [7, 7],
+      [4, 6],
+      [5, 1],
+      [2, 2],
+    ],
+    soft: [
+      [1, 7],
+      [4, 3],
+      [7, 4],
+      [3, 8],
+      [6, 8],
+      [5, 6],
+    ],
+    hardDeco: "crate",
+    softDeco: "barrel",
+  },
+  boneyard: {
+    floors: ["#33302a", "#413d35", "#4f4a40"],
+    h1: [
+      [5, 5],
+      [2, 3],
+      [7, 6],
+    ],
+    h2: [[4, 3]],
+    hard: [
+      [3, 6],
+      [6, 3],
+      [2, 7],
+      [7, 2],
+      [5, 8],
+      [4, 1],
+    ],
+    soft: [
+      [2, 5],
+      [7, 5],
+      [4, 7],
+      [5, 2],
+      [3, 1],
+      [6, 8],
+    ],
+    hardDeco: "grave",
+    softDeco: "bone",
+  },
+  foundry: {
+    floors: ["#2e2418", "#3e3020", "#544022"],
+    h1: [
+      [2, 2],
+      [7, 7],
+      [4, 5],
+      [5, 4],
+    ],
+    h2: [
+      [3, 6],
+      [6, 3],
+    ],
+    hard: [
+      [1, 4],
+      [8, 6],
+      [4, 2],
+      [5, 7],
+      [2, 8],
+      [7, 1],
+    ],
+    soft: [
+      [3, 3],
+      [6, 6],
+      [2, 6],
+      [7, 4],
+      [4, 8],
+      [5, 1],
+    ],
+    hardDeco: "pipe",
+    softDeco: "ember",
+  },
+  hollow: {
+    floors: ["#20262a", "#2b3338", "#364046"],
+    h1: [
+      [4, 4],
+      [5, 5],
+      [3, 7],
+      [6, 2],
+    ],
+    h2: [],
+    hard: [
+      [2, 4],
+      [7, 5],
+      [5, 2],
+      [4, 7],
+      [3, 3],
+      [6, 8],
+    ],
+    soft: [
+      [1, 6],
+      [8, 3],
+      [3, 2],
+      [6, 7],
+      [2, 8],
+      [7, 8],
+    ],
+    hardDeco: "spire",
+    softDeco: "wisp",
+  },
+};
+Object.keys(BIOMES).forEach((k) => (BIOMES[k].id = k));
+
 // ---- Mounts (Pass 16, v1.1): one team carries the whole posse ----
 const MOUNTS = [
   {
@@ -1256,6 +1441,7 @@ if (typeof window !== "undefined") {
     CONSUMABLES,
     WEAPON_MODS,
     MOUNTS,
+    BIOMES,
   };
 }
 
@@ -1276,5 +1462,6 @@ if (typeof module !== "undefined" && module.exports) {
     CONSUMABLES,
     WEAPON_MODS,
     MOUNTS,
+    BIOMES,
   };
 }

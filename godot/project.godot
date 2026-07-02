@@ -1,0 +1,21 @@
+; Engine configuration file.
+; Dustfall: The Ashen Frontier — Godot 4 port (HD-2D).
+; Design data is generated from ../src/data.js via `node tools/export_data.js`.
+
+config_version=5
+
+[application]
+
+config/name="Dustfall: The Ashen Frontier"
+run/main_scene="res://scenes/battle.tscn"
+config/features=PackedStringArray("4.7")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+textures/canvas_textures/default_texture_filter=0

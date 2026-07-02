@@ -512,3 +512,9 @@ if (typeof window !== "undefined") {
   window.drawSprite = drawSprite;
   window.spriteFor = spriteFor;
 }
+
+// CommonJS export so tools/export_data.js can ship the pixel data to the
+// Godot port (browser <script> path unaffected — module is undefined there).
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { SPRITE_PAL, SPRITES };
+}
