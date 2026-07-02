@@ -68,6 +68,8 @@
     C.addEventListener("click", onCanvasClick);
     host.querySelector("#bendBtn").onclick = endPlayerTurn;
     host.querySelector("#babilityBtn").onclick = openAbilityMenu;
+    const ib = host.querySelector("#bitemsBtn");
+    if (ib) ib.onclick = openItemMenu;
     host.querySelector("#bbannerBtn").onclick = () => {
       if (onComplete) onComplete(lastResult);
     };
@@ -413,6 +415,8 @@
       ab.disabled = !(sel && sel.side === "p" && sel.ap >= 1);
       ab.textContent = "Abilities";
     }
+    const ib = $("bitemsBtn");
+    if (ib) ib.disabled = !(sel && sel.side === "p" && sel.ap >= 1);
     renderParty();
     renderTurnOrder();
   }
@@ -526,7 +530,8 @@
       opts.cb && opts.cb();
     }, 260);
   }
-  function blast(att, def, cb) {
+  function blast(att, def, cb, opts) {
+    opts = opts || {}; // {dmgMin, dmgMax, label} — items/divines can hit harder
     busy = true;
     const tgt = iso(def.q, def.r, grid[def.r][def.q].h);
     for (let k = 0; k < 10; k++)
@@ -552,8 +557,10 @@
       const caught = all().filter(
         (u) => Math.abs(u.q - def.q) <= 1 && Math.abs(u.r - def.r) <= 1,
       );
+      const lo = opts.dmgMin || 4,
+        hi = opts.dmgMax || 7;
       caught.forEach((u) => {
-        let dmg = Math.floor(Math.random() * 4) + 4;
+        let dmg = Math.floor(Math.random() * (hi - lo + 1)) + lo;
         if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks (Pass 6)
         u.hp -= dmg;
         u.flash = 10;
@@ -572,7 +579,14 @@
           log(u.name + " falls.");
         } else checkBossPhase(u);
       });
-      log(att.name + "'s dynamite catches " + caught.length + " in the blast!");
+      log(
+        att.name +
+          "'s " +
+          (opts.label || "dynamite") +
+          " catches " +
+          caught.length +
+          " in the blast!",
+      );
       busy = false;
       refreshSel();
       checkEnd();
@@ -808,11 +822,25 @@
     if (occ && occ.side === "p" && occ.alive) {
       sel = occ;
       abilityMode = false;
+      itemMode = null;
       hideAbilityMenu();
+      hideItemMenu();
       refreshSel();
       return;
     }
     if (occ && occ.side === "e" && occ.alive && sel) {
+      if (itemMode === "ashfall_charge") {
+        itemMode = null;
+        if (sel.ap < 1) return;
+        sel.ap -= 1;
+        consumeItem("ashfall_charge");
+        blast(sel, occ, null, {
+          dmgMin: 6,
+          dmgMax: 10,
+          label: "Ashfall charge",
+        });
+        return;
+      }
       if (abilityMode) {
         doAbility(occ);
         return;
@@ -830,7 +858,9 @@
     if (busy || turn !== "p" || !active) return;
     turn = "e";
     abilityMode = false;
+    itemMode = null;
     hideAbilityMenu();
+    hideItemMenu();
     players.forEach((p) => (p.jinx = 0));
     log("Enemies stir...");
     enemyTurn();
@@ -838,6 +868,96 @@
   function hideAbilityMenu() {
     const menu = $("babilityMenu");
     if (menu) menu.style.display = "none";
+  }
+
+  // ---- Pass 7 (v1.1): consumables usable in battle (1 AP each) -------------
+  let itemMode = null; // consumable id awaiting a target click (ashfall_charge)
+  function invCount(id) {
+    return (DF.state && DF.state.inventory && DF.state.inventory[id]) || 0;
+  }
+  function consumeItem(id) {
+    if (!DF.state) return;
+    DF.state.inventory = DF.state.inventory || {};
+    DF.state.inventory[id] = Math.max(0, (DF.state.inventory[id] || 0) - 1);
+    if (DF.saveGame) DF.saveGame();
+  }
+  function hideItemMenu() {
+    const m = $("bitemMenu");
+    if (m) m.style.display = "none";
+  }
+  function openItemMenu() {
+    if (busy || turn !== "p" || !(sel && sel.side === "p" && sel.ap >= 1))
+      return;
+    const m = $("bitemMenu");
+    if (!m) return;
+    if (m.style.display !== "none") {
+      hideItemMenu();
+      return;
+    }
+    hideAbilityMenu();
+    while (m.firstChild) m.removeChild(m.firstChild);
+    const defs = [
+      { id: "bandages", label: "Bandages — heal 8" },
+      { id: "ashfall_charge", label: "Ashfall Charge — AoE 6-10" },
+      { id: "smelling_salts", label: "Smelling Salts — revive the fallen" },
+    ];
+    let any = false;
+    defs.forEach((d) => {
+      const n = invCount(d.id);
+      if (!n) return;
+      any = true;
+      const b = document.createElement("button");
+      b.className = "btn abil-opt";
+      b.textContent = d.label + " ×" + n + " · 1 AP";
+      b.onclick = () => useItem(d.id);
+      m.appendChild(b);
+    });
+    if (!any) {
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = "Saddlebags empty — stock up at an Outfitter.";
+      m.appendChild(p);
+    }
+    m.style.display = "flex";
+  }
+  function useItem(id) {
+    hideItemMenu();
+    if (!sel || sel.ap < 1 || busy) return;
+    if (id === "bandages") {
+      sel.ap -= 1;
+      consumeItem(id);
+      const amt = 8;
+      sel.hp = Math.min(sel.maxHp, sel.hp + amt);
+      const p = iso(sel.q, sel.r, grid[sel.r][sel.q].h);
+      floaters.push({
+        x: p.x,
+        y: p.y - 40,
+        t: "+" + amt,
+        life: 42,
+        c: PAL.teal,
+      });
+      log(sel.name + " ties off the wound (+" + amt + ").");
+      refreshSel();
+    } else if (id === "smelling_salts") {
+      const fallen = players.find((p) => p.downed && !p.alive);
+      if (!fallen) {
+        log("No one needs the salts — the crew still stands.");
+        return;
+      }
+      sel.ap -= 1;
+      consumeItem(id);
+      fallen.alive = true;
+      fallen.downed = 0;
+      fallen.hp = 5;
+      fallen.ap = 0;
+      fallen.status = { burn: 0, bleed: 0, hex: 0, marked: 0, hunker: 0 };
+      log(sel.name + " brings " + fallen.name + " around with the salts.");
+      refreshSel();
+    } else if (id === "ashfall_charge") {
+      itemMode = id;
+      abilityMode = false;
+      log("Ashfall Charge: pick a target");
+    }
   }
   function openAbilityMenu() {
     if (!(sel && sel.side === "p" && sel.ap >= 1)) return;
@@ -1375,6 +1495,7 @@
       particles = [];
       floaters = [];
       abilityMode = false;
+      itemMode = null;
       busy = false;
       kills = 0;
       turnsTaken = 0;
