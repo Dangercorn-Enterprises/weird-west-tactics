@@ -146,6 +146,281 @@
     camera.updateMatrixWorld();
   }
 
+  // ---- pixel-art toolkit (v1.2.1): scale2x + ink outline + top-light shade ---
+  // scale2x doubles resolution while smoothing stair-steps; run twice for 4x.
+  function scale2x(img) {
+    const { data, w, h } = img;
+    const out = new Uint32Array(w * h * 4);
+    const W = w * 2;
+    const px = (x, y) =>
+      x < 0 || y < 0 || x >= w || y >= h ? 0 : data[y * w + x];
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const P = px(x, y),
+          A = px(x, y - 1),
+          B = px(x + 1, y),
+          C = px(x - 1, y),
+          D = px(x, y + 1);
+        let e0 = P,
+          e1 = P,
+          e2 = P,
+          e3 = P;
+        if (C === A && C !== D && A !== B) e0 = A;
+        if (A === B && A !== C && B !== D) e1 = B;
+        if (D === C && D !== B && C !== A) e2 = C;
+        if (B === D && B !== A && D !== C) e3 = D;
+        const o = y * 2 * W + x * 2;
+        out[o] = e0;
+        out[o + 1] = e1;
+        out[o + W] = e2;
+        out[o + W + 1] = e3;
+      }
+    return { data: out, w: W, h: h * 2 };
+  }
+  // 1px dark ink outline around every opaque region (the FFT silhouette pop)
+  function inkOutline(img) {
+    const { data, w, h } = img;
+    const INK = 0xff050c12; // ABGR: near-black warm ink
+    const out = data.slice();
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (data[i] !== 0) continue;
+        const n =
+          (x > 0 && data[i - 1]) ||
+          (x < w - 1 && data[i + 1]) ||
+          (y > 0 && data[i - w]) ||
+          (y < h - 1 && data[i + w]);
+        if (n) out[i] = INK;
+      }
+    img.data = out;
+  }
+  // vertical light: heads catch the sun, boots sit in dust
+  function topLight(img) {
+    const { data, w, h } = img;
+    for (let y = 0; y < h; y++) {
+      const f = 1.08 - (y / h) * 0.28;
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        const c = data[i];
+        if (c === 0) continue;
+        const a = c & 0xff000000;
+        let r = (c >> 16) & 0xff,
+          g = (c >> 8) & 0xff,
+          b = c & 0xff;
+        b = Math.min(255, (b * f) | 0);
+        g = Math.min(255, (g * f) | 0);
+        r = Math.min(255, (r * f) | 0);
+        data[i] = a | (r << 16) | (g << 8) | b;
+      }
+    }
+  }
+  // integer nearest upscale — chunky pixels, no smoothing (FFT keeps its jaggies)
+  function nearestScale(img, k) {
+    const { data, w, h } = img;
+    const out = new Uint32Array(w * k * h * k);
+    for (let y = 0; y < h * k; y++)
+      for (let x = 0; x < w * k; x++)
+        out[y * w * k + x] = data[((y / k) | 0) * w + ((x / k) | 0)];
+    return { data: out, w: w * k, h: h * k };
+  }
+  // horizontal light: the sun sits up-left of the camera home angle
+  function sideLight(img) {
+    const { data, w, h } = img;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        const c = data[i];
+        if (c === 0) continue;
+        const f = 1.05 - (x / w) * 0.12;
+        const a = c & 0xff000000;
+        let r = (c >> 16) & 0xff,
+          g = (c >> 8) & 0xff,
+          b = c & 0xff;
+        b = Math.min(255, (b * f) | 0);
+        g = Math.min(255, (g * f) | 0);
+        r = Math.min(255, (r * f) | 0);
+        data[i] = a | (r << 16) | (g << 8) | b;
+      }
+  }
+  function imgToCanvas(img) {
+    const c = document.createElement("canvas");
+    c.width = img.w;
+    c.height = img.h;
+    const x = c.getContext("2d");
+    const id = x.createImageData(img.w, img.h);
+    new Uint32Array(id.data.buffer).set(img.data);
+    x.putImageData(id, 0, 0);
+    return c;
+  }
+  const hexToU32 = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    // canvas ImageData is little-endian RGBA -> u32 ABGR
+    return (
+      ((0xff << 24) |
+        ((n & 0xff) << 16) |
+        (n & 0xff00) |
+        ((n >> 16) & 0xff)) >>>
+      0
+    );
+  };
+
+  // ---- terrain textures (v1.2.1): generated per-biome tops + strata sides ----
+  function tileTopTexture(biomeId, base, level, variant) {
+    const key = "top:" + biomeId + ":" + level + ":" + variant;
+    if (texCache.has(key)) return texCache.get(key);
+    const size = 48;
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const x = c.getContext("2d");
+    x.fillStyle = base;
+    x.fillRect(0, 0, size, size);
+    // deterministic per-variant noise
+    let seed = variant * 9973 + level * 131 + biomeId.length * 17 + 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 110; i++) {
+      x.fillStyle = rnd() < 0.55 ? "rgba(0,0,0,.10)" : "rgba(255,255,255,.06)";
+      x.fillRect((rnd() * size) | 0, (rnd() * size) | 0, 1 + ((rnd() * 2) | 0), 1);
+    }
+    // hairline cracks
+    x.strokeStyle = "rgba(0,0,0,.16)";
+    x.lineWidth = 1;
+    for (let i = 0; i < 2 + (variant % 2); i++) {
+      x.beginPath();
+      let cx = rnd() * size,
+        cy = rnd() * size;
+      x.moveTo(cx, cy);
+      for (let sgm = 0; sgm < 3; sgm++) {
+        cx += rnd() * 14 - 7;
+        cy += rnd() * 14 - 7;
+        x.lineTo(cx, cy);
+      }
+      x.stroke();
+    }
+    // biome accents
+    if (biomeId === "mesa") {
+      for (let i = 0; i < 5; i++) {
+        x.fillStyle = "rgba(0,0,0,.15)";
+        x.beginPath();
+        x.ellipse(rnd() * size, rnd() * size, 1.5 + rnd() * 1.5, 1 + rnd(), 0, 0, 7);
+        x.fill();
+      }
+      x.strokeStyle = "rgba(150,150,80,.35)";
+      for (let i = 0; i < 3; i++) {
+        const gx = rnd() * size,
+          gy = rnd() * size;
+        x.beginPath();
+        x.moveTo(gx, gy);
+        x.lineTo(gx - 1, gy - 3);
+        x.moveTo(gx, gy);
+        x.lineTo(gx + 1, gy - 3);
+        x.stroke();
+      }
+    } else if (biomeId === "canyon") {
+      for (let i = 0; i < 4; i++) {
+        x.fillStyle = i % 2 ? "rgba(120,50,25,.10)" : "rgba(0,0,0,.08)";
+        x.fillRect(0, (rnd() * size) | 0, size, 2 + ((rnd() * 3) | 0));
+      }
+    } else if (biomeId === "town") {
+      // worn cobbles / boardwalk seams
+      x.strokeStyle = "rgba(0,0,0,.15)";
+      for (let gy = 8 + ((rnd() * 4) | 0); gy < size; gy += 12) {
+        x.beginPath();
+        x.moveTo(0, gy);
+        x.lineTo(size, gy);
+        x.stroke();
+      }
+      for (let i = 0; i < 4; i++) {
+        const bx = (rnd() * size) | 0,
+          by = 8 + ((rnd() * 3) | 0) * 12;
+        x.beginPath();
+        x.moveTo(bx, by - 12);
+        x.lineTo(bx, by);
+        x.stroke();
+      }
+    } else if (biomeId === "boneyard") {
+      for (let i = 0; i < 26; i++) {
+        x.fillStyle = "rgba(216,210,192,.14)";
+        x.fillRect((rnd() * size) | 0, (rnd() * size) | 0, 1, 1);
+      }
+      x.fillStyle = "rgba(216,210,192,.30)";
+      x.fillRect((rnd() * size) | 0, (rnd() * size) | 0, 4, 1);
+    } else if (biomeId === "foundry") {
+      // riveted plate seams
+      x.strokeStyle = "rgba(0,0,0,.22)";
+      const sy = 12 + ((rnd() * 8) | 0),
+        sx2 = 12 + ((rnd() * 8) | 0);
+      x.beginPath();
+      x.moveTo(0, sy);
+      x.lineTo(size, sy);
+      x.moveTo(sx2, 0);
+      x.lineTo(sx2, size);
+      x.stroke();
+      x.fillStyle = "rgba(180,140,60,.45)";
+      [4, 20, 36].forEach((d) => {
+        x.fillRect(sx2 - 1, d, 2, 2);
+        x.fillRect(d, sy - 1, 2, 2);
+      });
+    } else if (biomeId === "hollow") {
+      x.strokeStyle = "rgba(42,250,199,.12)";
+      for (let i = 0; i < 3; i++) {
+        x.beginPath();
+        let vx = rnd() * size,
+          vy = rnd() * size;
+        x.moveTo(vx, vy);
+        for (let sgm = 0; sgm < 4; sgm++) {
+          vx += rnd() * 10 - 5;
+          vy += rnd() * 10 - 5;
+          x.lineTo(vx, vy);
+        }
+        x.stroke();
+      }
+    }
+    // FFT tile bevel: sunlit top-left lip, shaded bottom-right
+    x.fillStyle = "rgba(255,235,200,.18)";
+    x.fillRect(0, 0, size, 2);
+    x.fillRect(0, 0, 2, size);
+    x.fillStyle = "rgba(0,0,0,.30)";
+    x.fillRect(0, size - 3, size, 3);
+    x.fillRect(size - 3, 0, 3, size);
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    texCache.set(key, tex);
+    return tex;
+  }
+  function tileSideTexture(biomeId, base, variant) {
+    const key = "side:" + biomeId + ":" + variant;
+    if (texCache.has(key)) return texCache.get(key);
+    const size = 48;
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const x = c.getContext("2d");
+    x.fillStyle = base;
+    x.fillRect(0, 0, size, size);
+    x.fillStyle = "rgba(0,0,0,.42)"; // sides sit in their own shade
+    x.fillRect(0, 0, size, size);
+    let seed = variant * 7919 + biomeId.length * 23 + 3;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    // sediment strata
+    for (let i = 0; i < 5; i++) {
+      x.fillStyle = i % 2 ? "rgba(0,0,0,.16)" : "rgba(255,220,170,.05)";
+      x.fillRect(0, (rnd() * size) | 0, size, 2 + ((rnd() * 3) | 0));
+    }
+    for (let i = 0; i < 40; i++) {
+      x.fillStyle = rnd() < 0.5 ? "rgba(0,0,0,.12)" : "rgba(255,255,255,.04)";
+      x.fillRect((rnd() * size) | 0, (rnd() * size) | 0, 2, 1);
+    }
+    // dark lip under the tile top
+    x.fillStyle = "rgba(0,0,0,.35)";
+    x.fillRect(0, 0, size, 3);
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    texCache.set(key, tex);
+    return tex;
+  }
+
   // ---- board ------------------------------------------------------------------
   const shade = (hex, f) => new THREE.Color(hex).multiplyScalar(f);
   function buildBoard(grid, biome) {
@@ -165,12 +440,16 @@
         const cell = grid[r][q];
         const h = topY(cell.h);
         const geo = new THREE.BoxGeometry(TILE * 0.98, h, TILE * 0.98);
-        const vary = 0.94 + ((q * 7 + r * 13) % 5) * 0.03; // subtle checker life
+        const variant = (q * 7 + r * 13) % 3; // 3 texture variants per biome
+        const vary = 0.96 + ((q * 5 + r * 11) % 4) * 0.025; // checker life
+        const bid = (biome && biome.id) || "mesa";
         const top = new THREE.MeshLambertMaterial({
-          color: shade(floors[Math.min(2, cell.h)], vary),
+          map: tileTopTexture(bid, floors[Math.min(2, cell.h)], cell.h, variant),
+          color: new THREE.Color(vary, vary, vary),
         });
         const side = new THREE.MeshLambertMaterial({
-          color: shade(floors[0], 0.52 * vary),
+          map: tileSideTexture(bid, floors[0], variant),
+          color: new THREE.Color(vary, vary, vary),
         });
         const mesh = new THREE.Mesh(geo, [side, side, top, side, side, side]);
         mesh.position.set(tx(q), h / 2, tz(r));
@@ -254,18 +533,36 @@
     const rows = typeof spriteFor === "function" ? spriteFor(u) : null;
     const key = "unit:" + (u.archetype || u.name) + (flash ? ":f" : "");
     if (texCache.has(key)) return texCache.get(key);
-    const SC = 6;
-    const c = document.createElement("canvas");
-    c.width = 16 * SC;
-    c.height = 20 * SC;
-    const x = c.getContext("2d");
-    if (rows && typeof drawSprite === "function")
-      drawSprite(x, rows, 0, 0, SC, { flash });
-    else {
+    let canvas;
+    if (rows && typeof SPRITE_PAL !== "undefined") {
+      // rasterize the 16x20 pixel data, then polish: scale2x x2 (64x80,
+      // smoothed stair-steps) + ink outline + top-light shading — the same
+      // character designs with an Ivalice-grade read.
+      const w = rows[0].length,
+        h = rows.length;
+      let img = { data: new Uint32Array(w * h), w, h };
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const col = SPRITE_PAL[rows[y][x]];
+          if (col) img.data[y * w + x] = flash ? 0xffffffff : hexToU32(col);
+        }
+      img = scale2x(img); // one pass: de-stairs without going blobby
+      if (!flash) {
+        topLight(img);
+        sideLight(img);
+      }
+      inkOutline(img); // 1px at 32x40 -> bold 2px after the chunky upscale
+      img = nearestScale(img, 2); // 64x80, hard pixel edges preserved
+      canvas = imgToCanvas(img);
+    } else {
+      canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 80;
+      const x = canvas.getContext("2d");
       x.fillStyle = flash ? "#fff" : u.color || "#d4c5a9";
-      x.fillRect(4 * SC, 4 * SC, 8 * SC, 14 * SC);
+      x.fillRect(16, 16, 32, 56);
     }
-    const tex = new THREE.CanvasTexture(c);
+    const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
     texCache.set(key, tex);
@@ -295,7 +592,7 @@
       if (!rec) {
         const mat = new THREE.SpriteMaterial({ transparent: true });
         const sprite = new THREE.Sprite(mat);
-        sprite.scale.set(0.98, 1.22, 1);
+        sprite.scale.set(1.08, 1.35, 1); // FFT units loom a little over their tile
         const shadow = new THREE.Sprite(
           new THREE.SpriteMaterial({
             map: blobTexture(),

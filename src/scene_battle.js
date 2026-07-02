@@ -489,6 +489,7 @@
       softDeco: "wisp",
     },
   };
+  Object.keys(BIOMES).forEach((k) => (BIOMES[k].id = k)); // texture keys (v1.2.1)
   let biome = BIOMES.mesa;
   function buildGrid(biomeId) {
     biome = BIOMES[biomeId] || BIOMES.mesa;
