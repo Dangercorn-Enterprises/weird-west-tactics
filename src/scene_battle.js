@@ -272,8 +272,195 @@
     });
   }
 
-  // ---- grid setup ----
-  function buildGrid() {
+  // ---- grid setup (Pass 9, v1.1): biome battle maps -------------------------
+  // Every biome keeps a comparable tactical budget (~4-5 h1, 0-2 h2, ~6 hard
+  // cover, ~6 soft cover) so the balance harness's canonical mesa map stays
+  // representative. Spawn tiles (players q=1; SPAWNS) are never h2-blocked.
+  const BIOMES = {
+    mesa: {
+      floors: ["#3a2c18", "#4a3820", "#5a4428"],
+      h1: [
+        [3, 2],
+        [6, 7],
+        [2, 6],
+        [7, 3],
+      ],
+      h2: [
+        [4, 4],
+        [5, 5],
+      ],
+      hard: [
+        [2, 3],
+        [7, 6],
+        [4, 7],
+        [5, 2],
+        [1, 5],
+        [8, 4],
+      ],
+      soft: [
+        [3, 5],
+        [6, 4],
+        [2, 8],
+        [7, 8],
+        [4, 1],
+        [5, 8],
+      ],
+      hardDeco: "crate",
+      softDeco: "cactus",
+    },
+    canyon: {
+      floors: ["#42291a", "#553522", "#68422a"],
+      h1: [
+        [4, 1],
+        [5, 2],
+        [4, 8],
+        [5, 7],
+        [6, 6],
+      ],
+      h2: [
+        [5, 4],
+        [4, 5],
+      ],
+      hard: [
+        [2, 4],
+        [7, 5],
+        [3, 3],
+        [6, 8],
+        [2, 7],
+        [7, 2],
+      ],
+      soft: [
+        [1, 3],
+        [8, 6],
+        [3, 8],
+        [6, 1],
+        [2, 5],
+        [7, 7],
+      ],
+      hardDeco: "rock",
+      softDeco: "cactus",
+    },
+    town: {
+      floors: ["#3d3020", "#4d3d28", "#5d4a30"],
+      h1: [
+        [3, 3],
+        [3, 4],
+        [6, 5],
+        [6, 6],
+      ],
+      h2: [
+        [3, 7],
+        [6, 2],
+      ],
+      hard: [
+        [2, 5],
+        [5, 4],
+        [7, 7],
+        [4, 6],
+        [5, 1],
+        [2, 2],
+      ],
+      soft: [
+        [1, 7],
+        [4, 3],
+        [7, 4],
+        [3, 8],
+        [6, 8],
+        [5, 6],
+      ],
+      hardDeco: "crate",
+      softDeco: "barrel",
+    },
+    boneyard: {
+      floors: ["#33302a", "#413d35", "#4f4a40"],
+      h1: [
+        [5, 5],
+        [2, 3],
+        [7, 6],
+      ],
+      h2: [[4, 3]],
+      hard: [
+        [3, 6],
+        [6, 3],
+        [2, 7],
+        [7, 2],
+        [5, 8],
+        [4, 1],
+      ],
+      soft: [
+        [2, 5],
+        [7, 5],
+        [4, 7],
+        [5, 2],
+        [3, 1],
+        [6, 8],
+      ],
+      hardDeco: "grave",
+      softDeco: "bone",
+    },
+    foundry: {
+      floors: ["#2e2418", "#3e3020", "#544022"],
+      h1: [
+        [2, 2],
+        [7, 7],
+        [4, 5],
+        [5, 4],
+      ],
+      h2: [
+        [3, 6],
+        [6, 3],
+      ],
+      hard: [
+        [1, 4],
+        [8, 6],
+        [4, 2],
+        [5, 7],
+        [2, 8],
+        [7, 1],
+      ],
+      soft: [
+        [3, 3],
+        [6, 6],
+        [2, 6],
+        [7, 4],
+        [4, 8],
+        [5, 1],
+      ],
+      hardDeco: "pipe",
+      softDeco: "ember",
+    },
+    hollow: {
+      floors: ["#20262a", "#2b3338", "#364046"],
+      h1: [
+        [4, 4],
+        [5, 5],
+        [3, 7],
+        [6, 2],
+      ],
+      h2: [],
+      hard: [
+        [2, 4],
+        [7, 5],
+        [5, 2],
+        [4, 7],
+        [3, 3],
+        [6, 8],
+      ],
+      soft: [
+        [1, 6],
+        [8, 3],
+        [3, 2],
+        [6, 7],
+        [2, 8],
+        [7, 8],
+      ],
+      hardDeco: "spire",
+      softDeco: "wisp",
+    },
+  };
+  let biome = BIOMES.mesa;
+  function buildGrid(biomeId) {
+    biome = BIOMES[biomeId] || BIOMES.mesa;
     grid = [];
     for (let r = 0; r < ROWS; r++) {
       grid.push([]);
@@ -281,32 +468,14 @@
         grid[r].push({ h: 0, cover: 0, deco: null });
     }
     const set = (q, r, o) => Object.assign(grid[r][q], o);
-    [
-      [3, 2],
-      [6, 7],
-      [2, 6],
-      [7, 3],
-    ].forEach(([q, r]) => set(q, r, { h: 1, deco: "mesa" }));
-    [
-      [4, 4],
-      [5, 5],
-    ].forEach(([q, r]) => set(q, r, { h: 2, deco: "mesa" }));
-    [
-      [2, 3],
-      [7, 6],
-      [4, 7],
-      [5, 2],
-      [1, 5],
-      [8, 4],
-    ].forEach(([q, r]) => set(q, r, { cover: 0.4, deco: "crate" }));
-    [
-      [3, 5],
-      [6, 4],
-      [2, 8],
-      [7, 8],
-      [4, 1],
-      [5, 8],
-    ].forEach(([q, r]) => set(q, r, { cover: 0.2, deco: "cactus" }));
+    biome.h1.forEach(([q, r]) => set(q, r, { h: 1, deco: "mesa" }));
+    biome.h2.forEach(([q, r]) => set(q, r, { h: 2, deco: "mesa" }));
+    biome.hard.forEach(([q, r]) =>
+      set(q, r, { cover: 0.4, deco: biome.hardDeco }),
+    );
+    biome.soft.forEach(([q, r]) =>
+      set(q, r, { cover: 0.2, deco: biome.softDeco }),
+    );
   }
 
   const all = () => [...players, ...enemies].filter((u) => u.alive);
@@ -1179,7 +1348,7 @@
   }
 
   function tileColor(cell) {
-    return cell.h === 2 ? "#5a4428" : cell.h === 1 ? "#4a3820" : "#3a2c18";
+    return biome.floors[Math.min(2, cell.h)];
   }
   function drawTile(q, r) {
     const cell = grid[r][q];
@@ -1253,6 +1422,79 @@
       X.lineTo(p.x + 8, p.y + TH / 2 - 20);
       X.stroke();
       X.lineWidth = 1;
+    }
+    // ---- Pass 9 biome decos (cheap canvas prims, same silhouette budget) ----
+    const fy = p.y + TH / 2; // feet line of the tile
+    if (cell.deco === "rock") {
+      X.fillStyle = "#6e523a";
+      X.beginPath();
+      X.ellipse(p.x, fy - 8, 12, 9, 0, 0, 7);
+      X.fill();
+      X.fillStyle = "#54402c";
+      X.beginPath();
+      X.ellipse(p.x + 5, fy - 5, 7, 5, 0, 0, 7);
+      X.fill();
+    }
+    if (cell.deco === "barrel") {
+      X.fillStyle = "#7a5a30";
+      X.fillRect(p.x - 8, fy - 18, 16, 18);
+      X.strokeStyle = "#3a2814";
+      X.strokeRect(p.x - 8, fy - 18, 16, 18);
+      X.beginPath();
+      X.moveTo(p.x - 8, fy - 9);
+      X.lineTo(p.x + 8, fy - 9);
+      X.stroke();
+    }
+    if (cell.deco === "grave") {
+      X.fillStyle = "#8a857a";
+      X.fillRect(p.x - 7, fy - 18, 14, 18);
+      X.beginPath();
+      X.arc(p.x, fy - 18, 7, Math.PI, 0);
+      X.fill();
+      X.strokeStyle = "#4f4a40";
+      X.strokeRect(p.x - 7, fy - 14, 14, 2);
+    }
+    if (cell.deco === "bone") {
+      X.strokeStyle = "#d8d2c0";
+      X.lineWidth = 3;
+      X.beginPath();
+      X.moveTo(p.x - 8, fy - 4);
+      X.quadraticCurveTo(p.x, fy - 20, p.x + 8, fy - 4);
+      X.stroke();
+      X.lineWidth = 1;
+    }
+    if (cell.deco === "pipe") {
+      X.fillStyle = "#8899aa";
+      X.fillRect(p.x - 4, fy - 26, 8, 26);
+      X.fillStyle = "#b08830";
+      X.fillRect(p.x - 6, fy - 26, 12, 4);
+    }
+    if (cell.deco === "ember") {
+      const g2 = Math.sin(Date.now() / 260 + q * 3 + r) * 0.5 + 0.5;
+      X.fillStyle = "rgba(232,112,79," + (0.35 + 0.4 * g2) + ")";
+      X.beginPath();
+      X.arc(p.x, fy - 6, 6, 0, 7);
+      X.fill();
+      X.fillStyle = "#d4763a";
+      X.beginPath();
+      X.arc(p.x, fy - 6, 2.5, 0, 7);
+      X.fill();
+    }
+    if (cell.deco === "spire") {
+      X.fillStyle = "#3d4a50";
+      X.beginPath();
+      X.moveTo(p.x - 7, fy);
+      X.lineTo(p.x, fy - 28);
+      X.lineTo(p.x + 7, fy);
+      X.closePath();
+      X.fill();
+    }
+    if (cell.deco === "wisp") {
+      const g3 = Math.sin(Date.now() / 340 + q + r * 2) * 0.5 + 0.5;
+      X.fillStyle = "rgba(42,250,199," + (0.2 + 0.35 * g3) + ")";
+      X.beginPath();
+      X.arc(p.x, fy - 12 - g3 * 4, 4, 0, 7);
+      X.fill();
     }
   }
   function drawUnit(u) {
@@ -1564,7 +1806,7 @@
       const scaled = DF.scaleEncounter
         ? DF.scaleEncounter(specs, players.length)
         : specs;
-      buildGrid();
+      buildGrid(params.biome); // Pass 9: biome map (defaults to mesa)
       const free = SPAWNS.slice();
       enemies = scaled.map((spec, i) => {
         const u = enemyToUnit(spec, i);

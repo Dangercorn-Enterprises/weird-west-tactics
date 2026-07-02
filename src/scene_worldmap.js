@@ -49,6 +49,7 @@
         // balance 2026-07-01: dropped one walkin_dead — the campaign's first
         // story fight sat at 66% for the starter duo (target 70-85%).
         title: "The Revenant Vanguard",
+        biome: "boneyard",
         enemies: enemiesByIds([
           "revenant_gun",
           "walkin_dead",
@@ -70,6 +71,7 @@
       DF.saveGame();
       DF.go("battle", {
         title: "The Deacon's Reckoning",
+        biome: "boneyard",
         enemies: enemiesByIds([
           "the_deacon",
           "walkin_dead",
@@ -127,6 +129,7 @@
     if (step === 0) {
       DF.go("battle", {
         title: "The Forgeworks Vanguard",
+        biome: "foundry",
         enemies: enemiesByIds([
           "forge_sentry",
           "forge_sentry",
@@ -149,6 +152,7 @@
       DF.saveGame();
       DF.go("battle", {
         title: "The Iron Foreman",
+        biome: "foundry",
         enemies: enemiesByIds([
           "iron_foreman",
           "ashfall_golem",
@@ -175,6 +179,7 @@
     if (step === 0) {
       DF.go("battle", {
         title: "Heralds of the Hollow Court",
+        biome: "canyon",
         enemies: enemiesByIds(["the_weaver", "dust_witch", "revenant_gun"]),
         onComplete: (r) => {
           if (r && r.win) {
@@ -192,6 +197,7 @@
       DF.saveGame();
       DF.go("battle", {
         title: "The Hollow Man",
+        biome: "hollow",
         enemies: enemiesByIds(["hollow_man", "coyotes_shadow", "dust_devil"]),
         onComplete: (r) => {
           if (r && r.win) {
@@ -322,6 +328,7 @@
       const minions = ENC.filter((e) => e.tier <= 2 && !e.boss).slice(0, 2);
       DF.go("battle", {
         title: "Reckoning at " + to.name,
+        biome: DF.biomeFor(to.god),
         enemies: [boss].concat(minions).filter(Boolean),
         onComplete: () => DF.go("worldmap"),
       });
@@ -342,6 +349,7 @@
         enemies.push(pool[Math.floor(Math.random() * pool.length)]);
       DF.go("battle", {
         title: "Ambush on the " + (risk === 3 ? "wilderness" : "trail"),
+        biome: DF.biomeFor(to.god),
         enemies,
         onComplete: () => DF.go("worldmap"),
       });

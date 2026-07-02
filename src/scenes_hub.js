@@ -27,6 +27,7 @@
         const minions = cat.length ? [cat[0], cat[0], cat[2]] : [];
         DF.go("battle", {
           title: "The Deacon's Reckoning",
+          biome: "boneyard",
           enemies: deacon ? [deacon].concat(minions) : minions,
         });
       };

@@ -500,6 +500,7 @@
               enemies.push(pool[Math.floor(Math.random() * pool.length)]);
             DF.go("battle", {
               title: "Bounty: " + n.name,
+              biome: DF.biomeFor(n.god),
               enemies,
               onComplete: (res) => {
                 if (res && res.win) {

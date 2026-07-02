@@ -17,6 +17,19 @@
     drifter: "anansi",
   };
 
+  // Pass 9 (v1.1): which battle-map biome each god's turf uses
+  DF.GOD_BIOME = {
+    coyote: "mesa",
+    vulcan: "foundry",
+    samedi: "boneyard",
+    anansi: "canyon",
+    perun: "town",
+    sleeper: "hollow",
+  };
+  DF.biomeFor = function (god) {
+    return (god && DF.GOD_BIOME[god]) || "mesa";
+  };
+
   // ---- Storage interface: localStorage (browser) <-> native fs (desktop/Electron) ----
   DF.storage = {
     get native() {
