@@ -234,8 +234,10 @@
   // walls: a lone pair faces weaker foes, a full posse faces tougher ones.
   // Designed around a 3-strong party. Mirrored exactly in tools/balance_harness.js.
   DF.scaleEncounter = function (specs, partySize) {
-    const hpF = Math.max(0.6, Math.min(1.2, 0.6 + 0.2 * (partySize - 2)));
-    const dmgF = Math.max(0.8, Math.min(1.1, 0.8 + 0.1 * (partySize - 2)));
+    // balance 2026-07-01: 4-party clamps raised 1.2/1.1 -> 1.35/1.2 so a full
+    // posse doesn't trivialize bosses (was 96-100% win on every reckoning).
+    const hpF = Math.max(0.6, Math.min(1.35, 0.6 + 0.25 * (partySize - 2)));
+    const dmgF = Math.max(0.8, Math.min(1.2, 0.8 + 0.1 * (partySize - 2)));
     if (hpF === 1 && dmgF === 1) return specs;
     return (specs || []).map((s) =>
       Object.assign({}, s, {

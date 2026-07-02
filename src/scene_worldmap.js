@@ -46,10 +46,11 @@
     // Beat 1: Los Angeles — the Revenant Vanguard. Advances only on a win.
     if (to.id === "losangeles" && step === 0) {
       DF.go("battle", {
+        // balance 2026-07-01: dropped one walkin_dead — the campaign's first
+        // story fight sat at 66% for the starter duo (target 70-85%).
         title: "The Revenant Vanguard",
         enemies: enemiesByIds([
           "revenant_gun",
-          "walkin_dead",
           "walkin_dead",
           "dynamite_bandit",
         ]),

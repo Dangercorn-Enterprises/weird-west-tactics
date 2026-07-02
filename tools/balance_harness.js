@@ -631,8 +631,9 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
 // walls. Designed around a 3-strong posse; smaller parties face weaker foes,
 // larger parties tougher ones. Mirror of DF.scaleEncounter in scene_battle.js.
 function scaleEncounter(specs, partySize) {
-  const hpF = Math.max(0.6, Math.min(1.2, 0.6 + 0.2 * (partySize - 2)));
-  const dmgF = Math.max(0.8, Math.min(1.1, 0.8 + 0.1 * (partySize - 2)));
+  // balance 2026-07-01: 4-party clamps 1.35/1.2 (mirror of DF.scaleEncounter)
+  const hpF = Math.max(0.6, Math.min(1.35, 0.6 + 0.25 * (partySize - 2)));
+  const dmgF = Math.max(0.8, Math.min(1.2, 0.8 + 0.1 * (partySize - 2)));
   if (hpF === 1 && dmgF === 1) return specs;
   return specs.map((s) =>
     Object.assign({}, s, {
@@ -707,7 +708,7 @@ const ENCOUNTERS = [
   [
     "Act 1 · Revenant Vanguard",
     "starter",
-    ["revenant_gun", "walkin_dead", "walkin_dead", "dynamite_bandit"],
+    ["revenant_gun", "walkin_dead", "dynamite_bandit"],
   ],
   [
     "Act 1 · The Deacon (boss)",

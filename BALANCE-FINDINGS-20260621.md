@@ -18,3 +18,13 @@ Target bands: **story 70–85% · ambush 80–90% · boss 45–65%** (2-party; r
 - Weaver / Hollow Man: nudge up ~10–15%.
 - Ambushes: minor +5%.
 - Re-run `node tools/balance_harness.js` after any change to confirm it lands back in band.
+
+---
+## APPLIED 2026-07-01 (Pass 3 of the v1.1 improvement loop) — verified 2000 runs, seed 1337
+- Iron Foreman: hp 60→48, str 9→8, aim 65→63, dmg 7-12→6-10 → **54.1%** ✓
+- The Weaver: hp 30→38, str 5→6, quick 5→6, aim 73→74, dmg 4-8→4-10 → **52.5%** ✓
+- Hollow Man: hp 35→44, str 6→7, aim 74→76, wmax 9→11 → **52.0%** ✓
+- Revenant Vanguard: dropped one walkin_dead from the comp → **79.3%** ✓ (was 65-66, below story band)
+- Ambushes: rattlesnake hp 16→20 wmax 8→9, ashfall_golem hp 30→38 wmin 6→7, walkin_dead wmax 7→6, revenant_gun hp 18→16 aim 74→72, dynamite_bandit hp 14→12 → trail **90.1%**, wilderness **86.6%** ✓
+- 4-party scaling clamps 1.2/1.1 → 1.35/1.2 (engine + harness) — full-posse story beats now bite (Act 3 heralds 73.7%, finale 82.9%)
+- 4-party boss *reckonings* and Act 2 fights remain 97-100%: intended — replaying a broken boss with a grown posse should feel like a stomp.
