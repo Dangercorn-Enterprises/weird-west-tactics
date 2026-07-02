@@ -232,6 +232,9 @@
     hex: { tag: "HEX", col: "#9a6ab8" },
     marked: { tag: "MRK", col: "#d4a843" },
     hunker: { tag: "HNK", col: "#4ecdc4" },
+    // Pass 11 (v1.1): divine riders — consumed at the victim's activation
+    stun: { tag: "STN", col: "#5B7FAA" }, // Perun: loses the whole activation
+    conf: { tag: "CNF", col: "#3a8f6a" }, // Anansi: lashes out at whoever's nearest
   };
 
   // ---- per-ability AP costs (mirrored in tools/balance_harness.js ABIL_FX) ----
@@ -832,6 +835,14 @@
       e.ap = e.maxAp;
       tickStatus(e); // burn/decrements at the start of this enemy's turn
       if (checkEnd()) return;
+      // Pass 11: Perun's stun costs the whole activation
+      if (e.alive && e.status && e.status.stun > 0) {
+        e.status.stun--;
+        log(e.name + " reels, thunderstruck.");
+        idx++;
+        setTimeout(step, 150);
+        return;
+      }
       const act = () => {
         if (!active) return;
         if (!e.alive) {
@@ -840,6 +851,19 @@
           return;
         }
         const alivePlayers = players.filter((p) => p.alive);
+        // Pass 11: Anansi's confusion — lash out at whoever is nearest, any side
+        if (e.status && e.status.conf > 0 && e.ap >= 2) {
+          e.status.conf--;
+          const near = all()
+            .filter((u) => u !== e)
+            .sort((a, b) => dist(e, a) - dist(e, b))[0];
+          if (near && dist(e, near) <= e.rng + 1) {
+            e.ap -= 2;
+            log(e.name + " lashes out blindly — Anansi giggles.");
+            fire(e, near, { cb: () => setTimeout(act, 180) });
+            return;
+          }
+        }
         // Pass 10: zealots berserk once they're bloodied
         if (e.zealot && !e.berserk && e.hp <= e.maxHp / 2) {
           e.berserk = true;
@@ -1273,10 +1297,30 @@
       sel.ap = 0;
       shake = 16;
       log(sel.name + " channels " + a + (empowered ? " — EMPOWERED!" : "!"));
+      // Pass 11 (v1.1): every god answers in their own voice.
       if (a === "Vulcan's Forgefire" || a === "Perun's Thunder") {
+        const riderKey = a === "Vulcan's Forgefire" ? "burn" : "stun";
+        const applyRider = () => {
+          all()
+            .filter(
+              (u) =>
+                u.side === "e" &&
+                Math.abs(u.q - tgt.q) <= 1 &&
+                Math.abs(u.r - tgt.r) <= 1,
+            )
+            .forEach((u) =>
+              applyStatus(u, riderKey, riderKey === "burn" ? 2 : 1),
+            );
+          log(
+            riderKey === "burn"
+              ? "The forge-fire clings and keeps burning."
+              : "Thunder rolls — the survivors stand stunned.",
+          );
+        };
         blast(sel, tgt);
         setTimeout(() => {
           if (tgt) blast(sel, tgt);
+          applyRider();
         }, 220);
         if (empowered)
           setTimeout(() => {
@@ -1292,6 +1336,29 @@
           statusN: 2,
           cb: () => {
             sel.aim = sv;
+            if (a === "Coyote's Gambit") {
+              applyStatus(sel, "hunker", 2);
+              log(sel.name + " melts into the dust-haze.");
+            } else if (a === "Samedi's Embrace") {
+              const amt = empowered ? 9 : 6;
+              sel.hp = Math.min(sel.maxHp, sel.hp + amt);
+              const hp = iso(sel.q, sel.r, grid[sel.r][sel.q].h);
+              floaters.push({
+                x: hp.x,
+                y: hp.y - 40,
+                t: "+" + amt,
+                life: 42,
+                c: PAL.teal,
+              });
+              log("The Baron pays in stolen life (+" + amt + ").");
+            } else if (a === "Iron Verdict" && tgt.alive) {
+              applyStatus(tgt, "marked", 2);
+              log("The verdict is read — " + tgt.name + " is marked.");
+            } else if (a === "Anansi's Trick" && tgt.alive) {
+              applyStatus(tgt, "conf", 1);
+              log(tgt.name + " hears whispers in the web...");
+            }
+            refreshSel();
           },
         });
       }

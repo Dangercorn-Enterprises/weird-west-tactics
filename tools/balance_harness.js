@@ -385,10 +385,27 @@ function enemyPhase(B) {
     e.ap = e.maxAp;
     tickStatus(B, e); // burn/decrements at the start of this enemy's turn
     if (!e.alive) continue;
+    // Pass 11 mirror: Perun's stun costs the whole activation
+    if ((e.status.stun || 0) > 0) {
+      e.status.stun--;
+      continue;
+    }
     let guard = 0;
     while (guard++ < 12) {
       const alive = B.players.filter((p) => p.alive);
       if (!alive.length) return;
+      // Pass 11 mirror: Anansi's confusion — lash out at the nearest unit
+      if ((e.status.conf || 0) > 0 && e.ap >= 2) {
+        e.status.conf--;
+        const near = B.units
+          .filter((u) => u.alive && u !== e)
+          .sort((a, b) => dist(e, a) - dist(e, b))[0];
+        if (near && dist(e, near) <= e.rng + 1) {
+          e.ap -= 2;
+          doFire(B, e, near);
+          continue;
+        }
+      }
       // Pass 10 mirror: zealots berserk once bloodied
       if (e.zealot && !e.berserk && e.hp <= e.maxHp / 2) {
         e.berserk = true;
@@ -595,6 +612,21 @@ function playerPhaseAbilities(B) {
             doBlast(B, threat);
             doBlast(B, threat);
             if (emp) doBlast(B, threat);
+            // Pass 11 mirror: Vulcan burns, Perun stuns the survivors
+            const rk = p.divine === "Vulcan's Forgefire" ? "burn" : "stun";
+            B.enemies
+              .filter(
+                (x) =>
+                  x.alive &&
+                  Math.abs(x.q - threat.q) <= 1 &&
+                  Math.abs(x.r - threat.r) <= 1,
+              )
+              .forEach((x) => {
+                x.status[rk] = Math.max(
+                  x.status[rk] || 0,
+                  rk === "burn" ? 2 : 1,
+                );
+              });
           } else {
             const sv = p.aim;
             p.aim = 999;
@@ -605,6 +637,15 @@ function playerPhaseAbilities(B) {
               statusN: 2,
             });
             p.aim = sv;
+            // Pass 11 mirror: single-target divine riders
+            if (p.divine === "Samedi's Embrace")
+              p.hp = Math.min(p.maxHp, p.hp + (emp ? 9 : 6));
+            else if (p.divine === "Coyote's Gambit")
+              p.status.hunker = Math.max(p.status.hunker, 2);
+            else if (p.divine === "Iron Verdict" && threat.alive)
+              threat.status.marked = Math.max(threat.status.marked, 2);
+            else if (p.divine === "Anansi's Trick" && threat.alive)
+              threat.status.conf = Math.max(threat.status.conf || 0, 1);
           }
           p.ap = 0; // divine ends the turn
           continue;

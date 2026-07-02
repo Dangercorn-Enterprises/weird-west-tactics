@@ -35,3 +35,8 @@ Target bands: **story 70–85% · ambush 80–90% · boss 45–65%** (2-party; r
 - Final: Vanguard 75.6 ✓ · Deacon 46.8 ✓ · Foreman 63.8 ✓ · Weaver 52.9 ✓ · Hollow Man 49.7 ✓ · T2 ambush 87.5 ✓ · Heralds 73.4 ✓ · finale 80.5 ✓.
 - T1 trail ambush representative comp reads 97.7% — random T1 draws span 56-98% by composition (2-snake draws are dangerous, melee-heavy draws are easy). Variance is intended for random encounters; not tuned further.
 - NOTE: swarm +1 AP was tried and REVERTED (double-attacks in melee crashed Deacon to 24%). Don't retry without a melee AP cost rework.
+
+## Pass 11 (2026-07-01): divine riders — verified 2000 runs, seed 1337
+- Perun stuns the blast survivors (new STN status: lose activation) · Vulcan's fire clings (burn 2) · Samedi pays in stolen life (+6/+9) · Coyote melts into dust (hunker 2) · Iron Verdict marks · Anansi confuses (new CNF status: victim lashes out at whoever's nearest, any side).
+- Riders buffed the posse ~5-15pts → compensated: iron_foreman hp 48→60, the_weaver hp 38→40, ashfall_golem 38→40, hollow_man wmax 11→12.
+- Final: Vanguard 75.6 · Deacon 51.1 · Foreman 62.3 · Weaver 59.1 · Hollow Man 59.1 · T2 89.5 · Heralds 83.0 · finale 84.0 — all in band.
