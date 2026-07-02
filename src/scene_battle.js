@@ -1227,6 +1227,13 @@
     if (C.hoverTile && C.hoverTile.q === q && C.hoverTile.r === r) {
       X.fillStyle = "rgba(212,168,67,.16)";
       X.fill();
+      // Pass 8: show the AP cost of moving to the hovered reachable tile
+      if (turn === "p" && sel && !abilityMode && reachable[k] !== undefined) {
+        X.fillStyle = "rgba(212,197,169,.95)";
+        X.font = "10px 'Special Elite'";
+        X.textAlign = "center";
+        X.fillText(reachable[k] + " AP", p.x, p.y + TH / 2 + 4);
+      }
     }
     if (cell.deco === "crate") {
       X.fillStyle = "#6b4a26";
@@ -1360,8 +1367,86 @@
       X.fillText(f.t, f.x, f.y);
       X.globalAlpha = 1;
     });
+    drawPreview();
     X.restore();
     requestAnimationFrame(frame);
+  }
+
+  // ---- Pass 8 (v1.1): combat preview — hover an enemy to see the odds ------
+  // Mirrors doAbility's numbers; divines assume the unempowered strike.
+  const PREVIEW_FX = {
+    "Fan the Hammer": { shots: 3, aimMod: -10 },
+    "Hex Bolt": { ic: true },
+    "Ashfall Grenade": { blast: [4, 7] },
+    "Called Shot": { guaranteed: true },
+    "Gut Shot": { mult: 1.8 },
+    "Both Barrels": { mult: 1.8 },
+    "Arc Shock": { mult: 1.4, ic: true },
+    "Holy Smite": { mult: 1.6 },
+    "Pistol Whip": { mult: 1.8 },
+    "Aimed Shot": { mult: 1.5 },
+    "Coyote's Gambit": { guaranteed: true, ic: true, mult: 2.5 },
+    "Samedi's Embrace": { guaranteed: true, ic: true, mult: 2.5 },
+    "Iron Verdict": { guaranteed: true, ic: true, mult: 2.5 },
+    "Anansi's Trick": { guaranteed: true, ic: true, mult: 2.5 },
+    "Vulcan's Forgefire": { blast: [8, 14] },
+    "Perun's Thunder": { blast: [8, 14] },
+  };
+  function drawPreview() {
+    if (turn !== "p" || busy || !sel || !sel.alive || sel.side !== "p") return;
+    const t = C.hoverTile;
+    if (!t) return;
+    const occ = unitAt(t.q, t.r);
+    if (!occ || occ.side !== "e" || !occ.alive) return;
+    const fx = abilityMode ? PREVIEW_FX[sel.ability] || {} : { ic: sel.wIC };
+    const inRange = dist(sel, occ) <= sel.rng + 1;
+    let lines;
+    if (fx.blast) {
+      lines = [sel.ability, "AoE " + fx.blast[0] + "-" + fx.blast[1] + " dmg"];
+    } else {
+      const sv = sel.aim;
+      if (fx.aimMod) sel.aim += fx.aimMod;
+      const ch = fx.guaranteed ? 95 : hitChance(sel, occ, fx.ic);
+      sel.aim = sv;
+      const mult = fx.mult || 1;
+      const markedF = occ.status && occ.status.marked > 0 ? 1.3 : 1;
+      let lo = Math.round(
+        (sel.wmin + Math.floor(sel.str / 3)) * mult * markedF,
+      );
+      let hi = Math.round(
+        (sel.wmax + Math.floor(sel.str / 3)) * mult * markedF,
+      );
+      if (occ.armorDef) {
+        lo = Math.max(1, lo - occ.armorDef);
+        hi = Math.max(1, hi - occ.armorDef);
+      }
+      lines = [
+        ch + "% to hit" + (fx.shots ? " ×" + fx.shots : ""),
+        lo + "-" + hi + " dmg",
+      ];
+    }
+    if (!inRange && !abilityMode) lines.push("OUT OF RANGE");
+    const p = iso(occ.q, occ.r, grid[occ.r][occ.q].h);
+    const w = 112,
+      h = 15 * lines.length + 12;
+    let px = p.x - w / 2,
+      py = p.y - 84 - (lines.length - 2) * 8;
+    px = Math.max(4, Math.min(C.width - w - 4, px));
+    py = Math.max(4, py);
+    X.fillStyle = "rgba(20,12,5,.88)";
+    X.strokeStyle = "#a0522d";
+    X.lineWidth = 1;
+    X.beginPath();
+    X.rect(px, py, w, h);
+    X.fill();
+    X.stroke();
+    X.font = "11px 'Special Elite'";
+    X.textAlign = "center";
+    lines.forEach((ln, i) => {
+      X.fillStyle =
+        ln === "OUT OF RANGE" ? "#c0392b" : i === 0 ? "#d4a843" : "#d4c5a9";
+      X.fillText(ln, px + w / 2, py + 15 + i * 15);
+    });
   }
   function renderParty() {
     const el = $("bparty");
