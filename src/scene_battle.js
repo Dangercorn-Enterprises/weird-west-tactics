@@ -1940,6 +1940,23 @@
       $("bwaveLabel").textContent = params.title || "Skirmish at the Crossing";
       $("bbanner").style.display = "none";
       active = true;
+      // Pass 12 (v1.1): a shrine blessing is SPENT on this fight — +5 aim to
+      // the crew, +10 to riders sworn to the blessing god.
+      if (DF.state && DF.state.flags && DF.state.flags.blessing) {
+        const bg = DF.state.flags.blessing;
+        players.forEach((u) => {
+          const ug = u.god || (DF.ARCH_GOD && DF.ARCH_GOD[u.archetype]);
+          u.aim += ug === bg ? 10 : 5;
+        });
+        const bgod =
+          typeof GODS !== "undefined" ? GODS.find((g) => g.id === bg) : null;
+        delete DF.state.flags.blessing;
+        if (DF.saveGame) DF.saveGame();
+        log(
+          (bgod ? bgod.name : "A god") +
+            "'s blessing steadies every hand (+aim).",
+        );
+      }
       refreshSel();
       requestAnimationFrame(frame);
       log("— Your move —");
