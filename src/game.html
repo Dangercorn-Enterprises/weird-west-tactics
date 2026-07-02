@@ -73,6 +73,7 @@ body{
 
 /* ---- turn-order / initiative bar (DOM overlay, FFT-style) ---- */
 #bturn{position:absolute;top:10px;left:12px;pointer-events:none;z-index:6}
+#bturn .trow{pointer-events:auto}
 #bturn .tlabel{font-family:'Special Elite',cursive;font-size:8px;color:var(--rust);letter-spacing:2px;margin-bottom:3px;text-shadow:1px 1px 2px #000}
 #bturn .trow{display:flex;gap:5px;align-items:flex-end}
 .tchip{width:36px;background:var(--panel);border:1px solid var(--rust);border-radius:3px;padding:3px 2px 4px;text-align:center;backdrop-filter:blur(2px);transition:transform .15s,box-shadow .15s}
@@ -169,7 +170,7 @@ body{
     </div>
     <div id="bbanner"><h2 id="bbannerTitle"></h2><p id="bbannerSub"></p><button class="btn warn" id="bbannerBtn">Continue</button></div>
   </div>
-  <div class="hint">Click a glowing tile to move · click an enemy in range to fire · cover &amp; high ground change your odds</div>
+  <div class="hint">Click a glowing tile to move · click an enemy in range to fire · cover &amp; high ground change your odds · Tab/1-4 select · A abilities · I items · H hunker · Esc cancel · Enter end turn</div>
 </section>
 
 <!-- RESULTS -->

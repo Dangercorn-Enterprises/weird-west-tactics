@@ -1886,6 +1886,19 @@
     order.slice(0, 9).forEach((u) => {
       const chip = document.createElement("div");
       chip.className = "tchip " + u.side + (u === sel && u.alive ? " act" : "");
+      // Pass 18: clicking a friendly chip selects that rider
+      if (u.side === "p" && u.alive) {
+        chip.style.cursor = "pointer";
+        chip.onclick = () => {
+          if (busy || turn !== "p") return;
+          sel = u;
+          abilityMode = false;
+          itemMode = null;
+          hideAbilityMenu();
+          hideItemMenu();
+          refreshSel();
+        };
+      }
       const n = document.createElement("div");
       n.className = "tn";
       n.textContent = (u.name || u.role || "?").split(" ")[0];
@@ -1988,8 +2001,59 @@
     exit() {
       active = false;
     },
-    onKey(k) {
-      if (k === "Enter" || k === " ") endPlayerTurn();
+    onKey(k, ev) {
+      if (k === "Enter" || k === " ") {
+        endPlayerTurn();
+        return;
+      }
+      // Pass 18 (v1.1): battle hotkeys
+      if (busy || turn !== "p" || !active) return;
+      if (k === "Escape") {
+        abilityMode = false;
+        itemMode = null;
+        hideAbilityMenu();
+        hideItemMenu();
+        refreshSel();
+        return;
+      }
+      if (k === "Tab") {
+        if (ev) ev.preventDefault();
+        const alive = players.filter((p) => p.alive);
+        if (!alive.length) return;
+        const i = alive.indexOf(sel);
+        sel = alive[(i + 1) % alive.length];
+        abilityMode = false;
+        itemMode = null;
+        hideAbilityMenu();
+        hideItemMenu();
+        refreshSel();
+        return;
+      }
+      if (k >= "1" && k <= "4") {
+        const alive = players.filter((p) => p.alive);
+        const pick = alive[Number(k) - 1];
+        if (pick) {
+          sel = pick;
+          abilityMode = false;
+          itemMode = null;
+          hideAbilityMenu();
+          hideItemMenu();
+          refreshSel();
+        }
+        return;
+      }
+      if (k === "a" || k === "A") {
+        openAbilityMenu();
+        return;
+      }
+      if (k === "i" || k === "I") {
+        openItemMenu();
+        return;
+      }
+      if (k === "h" || k === "H") {
+        chooseAbility("Hunker Down");
+        return;
+      }
     },
   });
 
