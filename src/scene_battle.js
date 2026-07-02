@@ -136,7 +136,7 @@
       side: "p",
       q: 1,
       r: [1, 4, 7, 2][i] || 1,
-      hp: 10 + vigor * 2 - (p.hpDamage || 0),
+      hp: Math.max(1, 10 + vigor * 2 - (p.hpDamage || 0)), // wounds never spawn you dead
       str,
       quick,
       aim: w.accuracy + (deft - 5) * 2,
@@ -736,6 +736,17 @@
     busy = true;
     const survivors = players.filter((p) => p.alive).length;
     const xp = kills * 10 + (win ? 25 : 0);
+    // Pass 4 (v1.1): wounds persist — write battle damage back to the roster.
+    // The fallen aren't dead-dead; they cling on at 1 HP until a Rest/Doc/heal.
+    if (DF.state && DF.state.party && DF.state.party.length) {
+      players.forEach((u) => {
+        const m = DF.state.party.find((p) => p.uid === u.id);
+        if (!m) return;
+        m.hpDamage = u.alive
+          ? Math.max(0, u.maxHp - u.hp)
+          : Math.max(0, u.maxHp - 1);
+      });
+    }
     // Phase 1b: victory pleases the gods of the party (+1 favor each).
     if (win && DF.state && DF.state.favor) {
       const gods = new Set();
@@ -746,8 +757,8 @@
       gods.forEach((g) => {
         DF.state.favor[g] = (DF.state.favor[g] || 0) + 1;
       });
-      if (DF.saveGame) DF.saveGame();
     }
+    if (DF.saveGame) DF.saveGame();
     lastResult = { win, kills, turns: turnsTaken, survivors, xp };
     const b = $("bbanner"),
       bt = $("bbannerTitle");

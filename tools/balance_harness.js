@@ -144,7 +144,7 @@ function partyToUnit(p, i) {
     side: "p",
     q: 1,
     r: [1, 4, 7, 2][i] || 1,
-    hp: 10 + vigor * 2 - (p.hpDamage || 0),
+    hp: Math.max(1, 10 + vigor * 2 - (p.hpDamage || 0)), // mirror: wounds never spawn you dead
     str,
     quick,
     aim: w.accuracy + (deft - 5) * 2,

@@ -150,6 +150,18 @@
             body.textContent + "  ·  LEVEL UP — " + ups.join(", ");
         }
       }
+      // Pass 4 (v1.1): wounds persist now — tell the player who needs patching up
+      if (DF.state && DF.state.party) {
+        const hurt = DF.state.party.filter((p) => (p.hpDamage || 0) > 0);
+        if (hurt.length) {
+          const body = h.querySelector("#rBody");
+          body.textContent =
+            body.textContent +
+            "  ·  WOUNDED: " +
+            hurt.map((p) => p.name).join(", ") +
+            " — rest at a saloon or see a Doc.";
+        }
+      }
       h.querySelector("#rContinue").onclick = () => {
         DF.go(DF.scenes.worldmap ? "worldmap" : "title");
       };
