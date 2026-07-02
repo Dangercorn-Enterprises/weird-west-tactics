@@ -287,7 +287,10 @@ function doFire(B, att, def, opts) {
   opts = opts || {};
   const ch = hitChance(B.grid, att, def, opts.ignoreCover || att.wIC);
   if (chance(ch)) {
-    let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+    // Pass 19 mirror: flat 10% crit at 1.5x, both sides
+    let dmg = Math.round(
+      rollDmg(att) * (opts.mult || 1) * (chance(10) ? 1.5 : 1),
+    );
     if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
     if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks (Pass 6 mirror)
     applyDamage(B, def, dmg);

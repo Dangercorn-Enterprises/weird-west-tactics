@@ -45,6 +45,7 @@
     turn,
     reachable,
     shake,
+    hitPause = 0, // Pass 19: freeze-frames on a crit
     particles,
     floaters,
     abilityMode,
@@ -672,12 +673,14 @@
       });
     setTimeout(() => {
       if (hit) {
-        let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
+        const crit = Math.random() < 0.1; // Pass 19: flat 10% crit, both sides
+        let dmg = Math.round(rollDmg(att) * (opts.mult || 1) * (crit ? 1.5 : 1));
         if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
         if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks (Pass 6)
         def.hp -= dmg;
-        def.flash = 10;
-        shake = 8;
+        def.flash = crit ? 14 : 10;
+        shake = crit ? 13 : 8;
+        if (crit) hitPause = 7; // freeze-frame beat
         for (let k = 0; k < 12; k++)
           particles.push({
             x: tgt.x,
@@ -690,12 +693,12 @@
         floaters.push({
           x: tgt.x,
           y: tgt.y - 40,
-          t: "-" + dmg,
-          life: 42,
-          c: PAL.blood,
+          t: (crit ? "CRIT -" : "-") + dmg,
+          life: crit ? 52 : 42,
+          c: crit ? PAL.amber : PAL.blood,
         });
         if (DF.sfx) DF.sfx.hit();
-        log(att.name + " hits " + def.name + " for " + dmg);
+        log(att.name + (crit ? " CRITS " : " hits ") + def.name + " for " + dmg);
         if (opts.status && def.alive)
           applyStatus(def, opts.status, opts.statusN || 2);
         if (att.hexer && def.alive) {
@@ -1716,12 +1719,16 @@
     all()
       .sort((a, b) => a.q + a.r - (b.q + b.r))
       .forEach(drawUnit);
+    const frozen = hitPause > 0; // Pass 19: crit freeze-frame
+    if (frozen) hitPause--;
     particles = particles.filter((pt) => pt.life > 0);
     particles.forEach((pt) => {
-      pt.x += pt.vx;
-      pt.y += pt.vy;
-      pt.vy += 0.15;
-      pt.life--;
+      if (!frozen) {
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vy += 0.15;
+        pt.life--;
+      }
       X.globalAlpha = pt.life / 18;
       X.fillStyle = pt.c;
       X.fillRect(pt.x, pt.y, 3, 3);
@@ -1729,8 +1736,10 @@
     });
     floaters = floaters.filter((f) => f.life > 0);
     floaters.forEach((f) => {
-      f.y -= 0.7;
-      f.life--;
+      if (!frozen) {
+        f.y -= 0.7;
+        f.life--;
+      }
       X.globalAlpha = Math.min(1, f.life / 20);
       X.fillStyle = f.c;
       X.font = "bold 16px 'Special Elite'";
@@ -1738,6 +1747,15 @@
       X.fillText(f.t, f.x, f.y);
       X.globalAlpha = 1;
     });
+    // Pass 19: someone's bleeding out — the edges of the world go red
+    if (players && players.some((p) => p.alive && p.hp / p.maxHp < 0.3)) {
+      const a = 0.12 + 0.05 * Math.sin(Date.now() / 300);
+      const vg = X.createRadialGradient(450, 310, 240, 450, 310, 560);
+      vg.addColorStop(0, "rgba(192,57,43,0)");
+      vg.addColorStop(1, "rgba(192,57,43," + a + ")");
+      X.fillStyle = vg;
+      X.fillRect(0, 0, 900, 620);
+    }
     drawPreview();
     X.restore();
     requestAnimationFrame(frame);
