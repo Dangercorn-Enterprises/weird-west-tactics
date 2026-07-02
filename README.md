@@ -2,7 +2,7 @@
 
 A turn-based tactical RPG set in a supernatural weird western world — inspired by games like XCOM, Fallout Tactics, and classic tabletop RPG systems.
 
-**Status:** Playable vertical slice (worldmap · towns · iso combat · leveling) — Active Development
+**Status:** v1.1.0 — full 3-act campaign, shipped installer, active development
 
 ## ▶ Play
 
@@ -15,6 +15,22 @@ Open `index.html` (or `src/game.html` directly) in a browser, or run the dev ser
 ## What Is This?
 
 A browser-based tactical combat game where you command a posse of gunslingers, mystics, and mad inventors against supernatural horrors in a post-apocalyptic weird western setting. Think XCOM meets the Wild West with steampunk and the occult.
+
+## New in v1.1 (2026-07-01 — the 20-pass improvement loop)
+
+- **Equipment matters** — buy weapons/armor at the Outfitter and *equip them* (damage/range/accuracy overrides, armor soak, speed costs, class/god-locked gear)
+- **The Forge is open** — weapon mods (Ashfall Chamber, Hair Trigger, Extended Barrel, Hollow Points), one fitted per rider
+- **The Stables are open** — mount teams cut travel days and ambush odds
+- **Items in battle** — bandages, Ashfall Charges, smelling salts (revive!) from your saddlebags, 1 AP each
+- **Wounds persist** — battle damage follows the roster; the fallen cling on at 1 HP; Rest/Doc finally earn their keep
+- **Enemy AI temperaments** — sentries hold ground and shoot straighter, zealots berserk when bloodied, swarms rush, wolves cut the weakest from the herd, cover-users actually use cover
+- **Divine signatures** — Perun stuns, Vulcan burns, Samedi steals life, Coyote vanishes, Anansi confuses, the Iron Verdict marks
+- **Six battle biomes** — mesa, canyon, town street, boneyard, foundry, hollow — keyed to the ruling god's turf
+- **Combat preview** — hover an enemy for live hit% + damage estimates; move tiles show AP cost
+- **Audio** — fully synthesized SFX + a generative western ambient layer (5 scene moods, boss-aware), zero assets, `M` to mute
+- **Juice** — 10% crits with freeze-frames, low-HP blood vignette, shrine blessings that actually bless
+- **Hotkeys** — Tab/1-4 select, A abilities, I items, H hunker, Esc cancel
+- **Balance pass** — every encounter measured into its target band (2000-run harness, `npm run balance`); `npm test` gates every change
 
 ## Features (Current)
 
