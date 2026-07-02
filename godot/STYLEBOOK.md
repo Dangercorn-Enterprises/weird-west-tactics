@@ -56,6 +56,10 @@ reserved for the supernatural** (Ashfall, spirits, the Hollow).
 | Worldmap | parchment frontier territory | ✅ RDR2-flavor; node graph overlaid |
 | Title/ending | sunset riders vista | ✅ |
 
+## Tools
+- **Workhorse (free):** NVIDIA NIM flux.1-dev via tools/gen_assets.py.
+- **Approved upgrade path:** [sorceress.games](https://sorceress.games/) — Tim OK'd a one-time fee for game asset generation (2026-07-01). Use it for the pass-3 items below (facing/walk sprite sheets especially — consistency across frames is where flux struggles). Tim sets up the account/payment; prompts + palette in this book carry over.
+
 ## Known gaps → pass 2
 1. Battle cover decos are still flat colored boxes — generate crate/cactus/
    grave/pipe/spire prop sprites and billboard them (same recipe as characters).
