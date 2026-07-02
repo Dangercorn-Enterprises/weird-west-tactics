@@ -150,6 +150,12 @@
         console.error(e);
       }
     }
+    // Pass 14 (v1.1): scene-aware ambient music (battle sets its own mood)
+    if (DF.music && DF.music.onScene) {
+      try {
+        DF.music.onScene(name, params);
+      } catch (e) {}
+    }
   };
 
   // ---- Fixed internal resolution, letterboxed to the window (fullscreen-friendly) ----

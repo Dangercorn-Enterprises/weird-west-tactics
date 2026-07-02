@@ -646,6 +646,7 @@
     busy = true;
     const ch = hitChance(att, def, opts.ignoreCover);
     const hit = Math.random() * 100 < ch;
+    if (DF.sfx) DF.sfx.shot();
     const muzzle = iso(att.q, att.r, grid[att.r][att.q].h);
     const tgt = iso(def.q, def.r, grid[def.r][def.q].h);
     for (let k = 0; k < 8; k++)
@@ -681,6 +682,7 @@
           life: 42,
           c: PAL.blood,
         });
+        if (DF.sfx) DF.sfx.hit();
         log(att.name + " hits " + def.name + " for " + dmg);
         if (opts.status && def.alive)
           applyStatus(def, opts.status, opts.statusN || 2);
@@ -702,6 +704,7 @@
           life: 42,
           c: PAL.parch,
         });
+        if (DF.sfx) DF.sfx.miss();
         log(att.name + " misses " + def.name + ".");
       }
       busy = false;
@@ -725,6 +728,7 @@
       });
     setTimeout(() => {
       shake = 14;
+      if (DF.sfx) DF.sfx.blast();
       for (let k = 0; k < 26; k++)
         particles.push({
           x: tgt.x,
@@ -838,6 +842,7 @@
       // Pass 11: Perun's stun costs the whole activation
       if (e.alive && e.status && e.status.stun > 0) {
         e.status.stun--;
+        if (DF.sfx) DF.sfx.stun();
         log(e.name + " reels, thunderstruck.");
         idx++;
         setTimeout(step, 150);
@@ -1033,6 +1038,7 @@
     lastResult = { win, kills, turns: turnsTaken, survivors, xp };
     const b = $("bbanner"),
       bt = $("bbannerTitle");
+    if (DF.sfx) (win ? DF.sfx.win() : DF.sfx.lose());
     bt.textContent = win ? "THE DUST SETTLES" : "WIPED OUT";
     bt.style.color = win ? PAL.amber : PAL.blood;
     $("bbannerSub").textContent =
@@ -1170,6 +1176,7 @@
         life: 42,
         c: PAL.teal,
       });
+      if (DF.sfx) DF.sfx.heal();
       log(sel.name + " ties off the wound (+" + amt + ").");
       refreshSel();
     } else if (id === "smelling_salts") {
@@ -1296,6 +1303,7 @@
       sel.divineUsed = true;
       sel.ap = 0;
       shake = 16;
+      if (DF.sfx) DF.sfx.divine();
       log(sel.name + " channels " + a + (empowered ? " — EMPOWERED!" : "!"));
       // Pass 11 (v1.1): every god answers in their own voice.
       if (a === "Vulcan's Forgefire" || a === "Perun's Thunder") {
@@ -1424,6 +1432,7 @@
             ").",
         );
       }
+      if (DF.sfx) DF.sfx.heal();
       const p = iso(who.q, who.r, grid[who.r][who.q].h);
       floaters.push({
         x: p.x,
@@ -1940,6 +1949,9 @@
       $("bwaveLabel").textContent = params.title || "Skirmish at the Crossing";
       $("bbanner").style.display = "none";
       active = true;
+      // Pass 13/14 (v1.1): battle music — boss fights get the low drone
+      if (DF.music)
+        DF.music.play(enemies.some((e) => e.boss) ? "boss" : "battle");
       // Pass 12 (v1.1): a shrine blessing is SPENT on this fight — +5 aim to
       // the crew, +10 to riders sworn to the blessing god.
       if (DF.state && DF.state.flags && DF.state.flags.blessing) {
