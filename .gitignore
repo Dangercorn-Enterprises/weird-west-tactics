@@ -6,3 +6,4 @@ Thumbs.db
 # build + deps (never commit)
 node_modules/
 dist-electron/
+tools/__pycache__/
