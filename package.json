@@ -9,6 +9,8 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "npx serve src -l 5174 --no-clipboard",
+    "test": "node tools/smoke_test.js",
+    "balance": "node tools/balance_harness.js",
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win nsis",
