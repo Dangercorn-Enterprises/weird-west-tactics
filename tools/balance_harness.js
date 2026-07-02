@@ -943,6 +943,9 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+  setSeed: (s) => {
+    RNG = mulberry32(s);
+  },
   runBattle,
   evalEncounter,
   hitChance,

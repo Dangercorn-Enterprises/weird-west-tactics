@@ -84,29 +84,35 @@ func _story_beat(to: Dictionary) -> Dictionary:
 	var s1 := _step("act1")
 	if to["id"] == "losangeles" and s1 == 0:
 		return {"title": "The Revenant Vanguard", "biome": "boneyard",
+			"intro": "Smoke over the coast road. The Deacon's dead walk in daylight now, and they've taken the highway into Los Angeles. A rider from the pueblo begged anyone with a gun to come. You came.",
 			"enemies": GS.enemies_by_ids(["revenant_gun", "walkin_dead", "dynamite_bandit", "dynamite_bandit"]),
 			"context": {"advance": "act1", "to": 1}}
 	if to["id"] == "deathvalley" and s1 == 1:
 		GS.state["flags"]["boss_deathvalley"] = true
 		return {"title": "The Deacon's Reckoning", "biome": "boneyard",
+			"intro": "Death Valley earns its name tonight. The Deacon stands in a church with no roof, preaching to graves that empty themselves. Baron Samedi's favor hangs on him like a crow on a fence. End the sermon.",
 			"enemies": GS.enemies_by_ids(["the_deacon", "walkin_dead", "walkin_dead", "coyote_beast"]),
 			"context": {"advance": "act1", "to": 2}}
 	if s1 >= 2 and _step("act2") == 0:
 		return {"title": "The Forgeworks Vanguard", "biome": "foundry",
+			"intro": "With the Deacon broken, something older stirs east. Vulcan's Syndicate has bought every claim from here to the mountains — and their brass men don't negotiate. A picket line of them blocks the road.",
 			"enemies": GS.enemies_by_ids(["forge_sentry", "forge_sentry", "ashfall_golem", "dynamite_bandit"]),
 			"context": {"advance": "act2", "to": 1}}
 	if _step("act2") == 1 and to["id"] == "losalamos":
 		GS.state["flags"]["boss_losalamos"] = true
 		return {"title": "The Iron Foreman", "biome": "foundry",
+			"intro": "Los Alamos glows all night. In the foundry's heart the Iron Foreman keeps the quota: ore in, people out — changed. Vulcan's corruption has a shape, and it is nine feet of riveted brass.",
 			"enemies": GS.enemies_by_ids(["iron_foreman", "ashfall_golem", "forge_sentry"]),
 			"context": {"advance": "act2", "to": 2}}
 	if _step("act2") >= 2 and _step("act3") == 0:
 		return {"title": "Heralds of the Hollow Court", "biome": "canyon",
+			"intro": "The gods go quiet. Even Coyote stops laughing. In the canyons, the Weaver strings her threads between the walls and whispers of the Sleeping One below Groom Lake. The Hollow Court has woken. You ride first.",
 			"enemies": GS.enemies_by_ids(["the_weaver", "dust_witch", "revenant_gun"]),
 			"context": {"advance": "act3", "to": 1}}
 	if _step("act3") == 1 and to["id"] == "area51":
 		GS.state["flags"]["boss_area51"] = true
 		return {"title": "The Hollow Man", "biome": "hollow",
+			"intro": "Groom Lake. A dry lakebed the maps refuse to name, and under it, the thing the army dug too deep to find. The Hollow Man waits where the ground goes wrong — the Sleeper's herald, wearing the dark like a coat. This is the end of the trail.",
 			"enemies": GS.enemies_by_ids(["hollow_man", "coyotes_shadow", "dust_devil"]),
 			"context": {"advance": "act3", "to": 2, "finale": true}}
 	return {}

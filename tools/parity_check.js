@@ -49,6 +49,7 @@ if (!jsonLine) {
   process.exit(1);
 }
 const g = JSON.parse(jsonLine);
+H.setSeed(1337); // deterministic node side — parity must not flake
 
 // ---- exact unit derivations ---------------------------------------------------
 const party = H.starterParty();

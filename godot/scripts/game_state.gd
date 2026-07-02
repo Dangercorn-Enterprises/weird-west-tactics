@@ -50,23 +50,32 @@ func _process(delta: float) -> void:
 		_ap_stage += 1
 		match _ap_stage:
 			1:
+				get_tree().change_scene_to_file("res://scenes/creator.tscn")
+			2:
 				new_game()
 				get_tree().change_scene_to_file("res://scenes/worldmap.tscn")
-			2:
-				get_tree().change_scene_to_file("res://scenes/town.tscn")
 			3:
-				go_battle({"title": "Autopilot Skirmish", "biome": "boneyard",
-					"enemies": enemies_by_ids(["the_deacon", "walkin_dead", "coyote_beast", "dust_devil"]),
-					"context": {}})
+				get_tree().change_scene_to_file("res://scenes/town.tscn")
 			4:
+				go_battle({"title": "The Deacon's Reckoning", "biome": "boneyard",
+					"enemies": enemies_by_ids(["the_deacon", "walkin_dead", "coyote_beast", "dust_devil"]),
+					"intro": "Death Valley earns its name tonight. The Deacon stands in a church with no roof, preaching to graves that empty themselves. End the sermon.",
+					"context": {}})
+			5:
 				var sc := get_tree().current_scene
+				if sc != null and "intro_open" in sc and sc.intro_open:
+					var img_i := get_viewport().get_texture().get_image()
+					img_i.save_png("user://shot_battle_intro.png")
+					print("AUTOPILOT shot: BattleIntro")
+					sc.intro_open = false
+					sc.intro_panel.queue_free()
 				if sc != null and "cam_target_azimuth" in sc:
 					sc.cam_target_azimuth += PI # 180° — should show unit BACKS
-			5:
+			6:
 				var img2 := get_viewport().get_texture().get_image()
 				img2.save_png("user://shot_battle_rotated.png")
 				print("AUTOPILOT shot: BattleRotated")
-			6:
+			7:
 				print("AUTOPILOT done")
 				get_tree().quit()
 

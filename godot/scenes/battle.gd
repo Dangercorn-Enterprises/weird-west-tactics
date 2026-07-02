@@ -34,6 +34,9 @@ var log_label: Label
 var ability_bar: HBoxContainer
 var banner: PanelContainer
 var banner_label: Label
+var banner_summary: Label
+var intro_open := false
+var intro_panel: PanelContainer
 
 func _tx(q: int) -> float: return (float(q) - 4.5) * TILE
 func _tz(r: int) -> float: return (float(r) - 4.5) * TILE
@@ -422,17 +425,50 @@ func _build_hud() -> void:
 	cl.add_child(ability_bar)
 	banner = PanelContainer.new()
 	banner.set_anchors_preset(Control.PRESET_CENTER)
+	banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	banner.grow_vertical = Control.GROW_DIRECTION_BOTH
 	banner.visible = false
 	var bb := VBoxContainer.new()
 	banner_label = Label.new()
 	banner_label.add_theme_font_size_override("font_size", 40)
 	bb.add_child(banner_label)
+	banner_summary = Label.new()
+	banner_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	banner_summary.custom_minimum_size = Vector2(420, 0)
+	banner_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bb.add_child(banner_summary)
 	var cont := Button.new()
 	cont.text = "Continue"
 	cont.pressed.connect(_finish_and_return)
 	bb.add_child(cont)
 	banner.add_child(bb)
 	cl.add_child(banner)
+	# story beat intro (narrative overlay shown before the first move)
+	if params.get("intro", "") != "":
+		intro_open = true
+		intro_panel = PanelContainer.new()
+		intro_panel.set_anchors_preset(Control.PRESET_CENTER)
+		intro_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		intro_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+		var iv := VBoxContainer.new()
+		var it := Label.new()
+		it.text = str(params.get("title", ""))
+		GS.headline(it, 30)
+		it.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		iv.add_child(it)
+		var ib := Label.new()
+		ib.text = str(params["intro"])
+		ib.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ib.custom_minimum_size = Vector2(480, 0)
+		iv.add_child(ib)
+		var ride := Button.new()
+		ride.text = "Ride"
+		ride.pressed.connect(func():
+			intro_open = false
+			intro_panel.queue_free())
+		iv.add_child(ride)
+		intro_panel.add_child(iv)
+		cl.add_child(intro_panel)
 
 var _log_lines: Array = []
 func _log(msg: String) -> void:
@@ -655,7 +691,7 @@ func _refresh_highlights() -> void:
 
 # ---- input -----------------------------------------------------------------------
 func _unhandled_input(event: InputEvent) -> void:
-	if ended:
+	if ended or intro_open:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -803,15 +839,23 @@ func _check_end() -> bool:
 		return false
 	ended = true
 	var win := p_alive
-	banner_label.text = "THE DUST SETTLES" if win else "WIPED OUT"
-	banner_label.modulate = Color("#d4a843") if win else Color("#c0392b")
-	banner.visible = true
-	set_meta("win", win)
-	return true
-
-func _finish_and_return() -> void:
-	var win: bool = get_meta("win", false)
 	var summary: Dictionary = GS.apply_battle_result(battle, win, int(battle["kills"]))
 	GS.last_result = {"win": win, "kills": int(battle["kills"]),
 		"xp": summary["xp"], "context": params.get("context", {})}
+	banner_label.text = "THE DUST SETTLES" if win else "WIPED OUT"
+	banner_label.modulate = Color("#d4a843") if win else Color("#c0392b")
+	var lines := "%d kills · +%d XP" % [int(battle["kills"]), int(summary["xp"])]
+	if summary["levelUps"].size() > 0:
+		lines += "\nLEVEL UP — " + ", ".join(summary["levelUps"])
+	var hurt: Array = []
+	for m in GS.state["party"]:
+		if int(m.get("hpDamage", 0)) > 0:
+			hurt.append(str(m["name"]))
+	if hurt.size() > 0:
+		lines += "\nWounded: " + ", ".join(hurt) + " — rest at a saloon or see a Doc."
+	banner_summary.text = lines
+	banner.visible = true
+	return true
+
+func _finish_and_return() -> void:
 	get_tree().change_scene_to_file("res://scenes/worldmap.tscn")

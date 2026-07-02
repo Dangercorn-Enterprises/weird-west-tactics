@@ -10,8 +10,7 @@ func _ready() -> void:
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")
 	$Menu/NewBtn.pressed.connect(func():
-		GS.new_game()
-		get_tree().change_scene_to_file("res://scenes/worldmap.tscn"))
+		get_tree().change_scene_to_file("res://scenes/creator.tscn"))
 	$Menu/ContinueBtn.visible = GS.has_save()
 	$Menu/ContinueBtn.pressed.connect(func():
 		GS.load_game()
