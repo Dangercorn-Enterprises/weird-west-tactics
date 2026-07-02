@@ -287,11 +287,14 @@ func _floater(text: String, pos: Vector3, col: Color) -> void:
 func _sprite_textures(u: Dictionary) -> Dictionary:
 	var id := str(u.get("archetype", ""))
 	var front := _sprite_texture(u)
-	var out := {"front": front, "back": front, "side": front}
-	for k in ["back", "side"]:
+	var out := {"front": front, "back": front, "side": front, "side_r": null}
+	for k in ["back", "side", "side_r"]:
 		var path := "res://assets/sprites/%s_%s.png" % [id, k]
 		if ResourceLoader.exists(path):
 			out[k] = load(path)
+	if out["side_r"] == null:
+		out["side_r"] = out["side"] # fallback: mirror the left view
+		out["side_r_mirrored"] = true
 	return out
 
 func _sprite_texture(u: Dictionary) -> Texture2D:
@@ -693,8 +696,15 @@ func _update_facings() -> void:
 		elif dot < -0.5:
 			view = "front"
 		else:
-			view = "side" # art faces LEFT; mirror when moving screen-right
-			flip = cross < 0.0
+			if cross < 0.0:
+				# right-facing: use the independent view when we have one;
+				# only mirror the left view as a fallback
+				var ts: Dictionary = spr.get_meta("texset")
+				view = "side_r"
+				flip = ts.get("side_r_mirrored", false)
+			else:
+				view = "side"
+				flip = false
 		if str(spr.get_meta("view")) != view or spr.flip_h != flip:
 			var texset: Dictionary = spr.get_meta("texset")
 			spr.texture = texset[view]

@@ -174,6 +174,9 @@ def main():
         side = prompt.replace("facing viewer", "in full side profile view facing left")                      .replace("side profile", "in full side profile view facing left")
         jobs.append(("sprites", name + "_back", back + CHAR_SUFFIX, 768, 1024, sprite_process))
         jobs.append(("sprites", name + "_side", side + CHAR_SUFFIX, 768, 1024, sprite_process))
+        # independent right-side view — no mirror artifacts (gear stays in hand)
+        side_r = prompt.replace("facing viewer", "in full side profile view facing right")                        .replace("side profile", "in full side profile view facing right")
+        jobs.append(("sprites", name + "_side_r", side_r + CHAR_SUFFIX, 768, 1024, sprite_process))
     for name, prompt in PROPS.items():
         jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
                      lambda r, o: sprite_process(r, o, target_h=72)))
