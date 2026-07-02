@@ -1180,30 +1180,36 @@ const CONSUMABLES = [
     turns: 1,
   },
 ];
+// costs added Pass 15 (v1.1) — fitted at Forge towns, one mod per rider.
+// hollow_points simplified to flat +1/+1 (no enemy armor exists to punish it).
 const WEAPON_MODS = [
   {
     id: "ashfall_chamber",
     name: "Ashfall Chamber",
     effect: { wmax: 2 },
+    cost: 120,
     note: "+2 max dmg, glows blue-green",
   },
   {
     id: "hair_trigger",
     name: "Hair Trigger",
     effect: { accuracy: 5, wmin: -1 },
+    cost: 80,
     note: "+5% acc, -1 min dmg",
   },
   {
     id: "extended_barrel",
     name: "Extended Barrel",
     effect: { range: 1, accuracy: -5 },
+    cost: 90,
     note: "+1 range, -5% acc",
   },
   {
     id: "hollow_points",
     name: "Hollow Points",
-    effect: { vsUnarmored: 3, vsArmored: -2 },
-    note: "+3 vs unarmored",
+    effect: { wmin: 1, wmax: 1 },
+    cost: 100,
+    note: "+1 min/max dmg, expanding rounds",
   },
 ];
 

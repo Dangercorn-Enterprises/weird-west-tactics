@@ -131,6 +131,21 @@ check(
   geared.maxAp === 3,
   "got " + geared.maxAp,
 );
+// Forge mod (Pass 15): Ashfall Chamber on the default Peacemaker (4-8 → 4-10)
+const modded = H.partyToUnit(
+  {
+    uid: "m0",
+    archetype: "gunslinger",
+    stats: Object.assign({}, DATA.PREGEN.gunslinger.stats),
+    gear: { weapon: null, armor: null, mod: "ashfall_chamber" },
+  },
+  0,
+);
+check(
+  "Ashfall Chamber +2 wmax applies",
+  modded.wmax === 10 && modded.wmin === 4,
+  modded.wmin + "-" + modded.wmax,
+);
 
 // battles terminate and produce coherent results
 console.log("battle sim:");

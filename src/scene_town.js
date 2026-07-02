@@ -287,6 +287,8 @@
   // ---- Pass 5/6 (v1.1): gear equipping — bought weapons/armor finally matter ----
   function catalogOf(kind) {
     if (kind === "weapon") return typeof WEAPONS !== "undefined" ? WEAPONS : [];
+    if (kind === "mod")
+      return typeof WEAPON_MODS !== "undefined" ? WEAPON_MODS : [];
     return typeof ARMOR !== "undefined" ? ARMOR : [];
   }
   function allowedFor(p, kind, it) {
@@ -297,9 +299,15 @@
   }
   function gearLabel(p, kind) {
     const id = p.gear && p.gear[kind];
-    if (!id) return kind === "weapon" ? "default weapon" : "no armor";
+    if (!id)
+      return kind === "weapon"
+        ? "default weapon"
+        : kind === "mod"
+          ? "no mod"
+          : "no armor";
     const it = catalogOf(kind).find((x) => x.id === id);
     if (!it) return id;
+    if (kind === "mod") return it.name + " (" + it.note + ")";
     return kind === "weapon"
       ? it.name + " (" + it.dmg[0] + "-" + it.dmg[1] + ", rng " + it.range + ")"
       : it.name +
@@ -541,14 +549,59 @@
       }),
     );
   }
+  // Pass 15 (v1.1): the Forge is open — buy mods, fit one per rider.
   function forge(c) {
     c.appendChild(
       el("p", {
         class: "flavor",
-        text: "Hammered brass, Ashfall fire, the smell of hot iron. Weapon mods + prosthetics deepen in a later pass.",
-        style: { color: "#9a8a6a", fontStyle: "italic" },
+        text: "Hammered brass, Ashfall fire, the smell of hot iron. The smith tunes a gun like a fiddle — one mod per rider.",
+        style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "8px" },
       }),
     );
+    (typeof WEAPON_MODS !== "undefined" ? WEAPON_MODS : []).forEach((m) => {
+      const own = DF.state.inventory[m.id] || 0;
+      c.appendChild(
+        row(
+          m.name +
+            " — " +
+            m.note +
+            (own ? "  (owned " + own + ")" : "") +
+            "  [" +
+            m.cost +
+            "g]",
+          "Buy",
+          {
+            disabled: DF.state.gold < m.cost,
+            onclick: () => {
+              DF.state.gold -= m.cost;
+              DF.state.inventory[m.id] = (DF.state.inventory[m.id] || 0) + 1;
+              DF.saveGame();
+              flash("The smith wraps up a " + m.name + ".");
+            },
+          },
+        ),
+      );
+    });
+    c.appendChild(
+      el("p", {
+        text: "— FIT THE IRONS —",
+        style: {
+          color: "#a0522d",
+          letterSpacing: "3px",
+          fontSize: "11px",
+          textAlign: "center",
+          margin: "14px 0 2px",
+        },
+      }),
+    );
+    (DF.state.party || []).forEach((p) => {
+      p.gear = p.gear || { weapon: null, armor: null };
+      c.appendChild(
+        row(p.name + " · " + gearLabel(p, "mod"), "Swap Mod", {
+          onclick: () => cycleGear(p, "mod"),
+        }),
+      );
+    });
   }
   function stable(c) {
     c.appendChild(

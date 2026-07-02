@@ -170,6 +170,18 @@
       u.maxAp = Math.max(2, u.maxAp + ga.speed); // heavy plate slows you down
       u.ap = u.maxAp;
     }
+    // Pass 15 (v1.1): a fitted Forge mod tunes the weapon
+    const gm =
+      p.gear && p.gear.mod && typeof WEAPON_MODS !== "undefined"
+        ? WEAPON_MODS.find((x) => x.id === p.gear.mod)
+        : null;
+    if (gm && gm.effect) {
+      if (gm.effect.accuracy) u.aim += gm.effect.accuracy;
+      if (gm.effect.range) u.rng = Math.max(1, u.rng + gm.effect.range);
+      if (gm.effect.wmin) u.wmin = Math.max(1, u.wmin + gm.effect.wmin);
+      if (gm.effect.wmax) u.wmax = Math.max(u.wmin, u.wmax + gm.effect.wmax);
+      u.modName = gm.name;
+    }
     return u;
   }
   function archColor(id) {
@@ -1038,7 +1050,7 @@
     lastResult = { win, kills, turns: turnsTaken, survivors, xp };
     const b = $("bbanner"),
       bt = $("bbannerTitle");
-    if (DF.sfx) (win ? DF.sfx.win() : DF.sfx.lose());
+    if (DF.sfx) win ? DF.sfx.win() : DF.sfx.lose();
     bt.textContent = win ? "THE DUST SETTLES" : "WIPED OUT";
     bt.style.color = win ? PAL.amber : PAL.blood;
     $("bbannerSub").textContent =

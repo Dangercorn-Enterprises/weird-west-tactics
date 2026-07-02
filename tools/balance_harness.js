@@ -22,9 +22,14 @@
 // =============================================================================
 "use strict";
 const path = require("path");
-const { ARCHETYPES, PREGEN, ENEMY_CATALOG, WEAPONS, ARMOR } = require(
-  path.join(__dirname, "..", "src", "data.js"),
-);
+const {
+  ARCHETYPES,
+  PREGEN,
+  ENEMY_CATALOG,
+  WEAPONS,
+  ARMOR,
+  WEAPON_MODS,
+} = require(path.join(__dirname, "..", "src", "data.js"));
 
 // ---- seedable RNG (mulberry32) so runs are reproducible ---------------------
 function mulberry32(a) {
@@ -168,6 +173,15 @@ function partyToUnit(p, i) {
   if (ga && ga.speed) {
     u.maxAp = Math.max(2, u.maxAp + ga.speed);
     u.ap = u.maxAp;
+  }
+  // Pass 15 mirror: fitted Forge mod tunes the weapon
+  const gm =
+    p.gear && p.gear.mod ? WEAPON_MODS.find((x) => x.id === p.gear.mod) : null;
+  if (gm && gm.effect) {
+    if (gm.effect.accuracy) u.aim += gm.effect.accuracy;
+    if (gm.effect.range) u.rng = Math.max(1, u.rng + gm.effect.range);
+    if (gm.effect.wmin) u.wmin = Math.max(1, u.wmin + gm.effect.wmin);
+    if (gm.effect.wmax) u.wmax = Math.max(u.wmin, u.wmax + gm.effect.wmax);
   }
   return u;
 }
