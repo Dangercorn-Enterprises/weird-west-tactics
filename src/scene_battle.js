@@ -46,6 +46,7 @@
     reachable,
     shake,
     hitPause = 0, // Pass 19: freeze-frames on a crit
+    use3d = false, // v1.2: THREE renderer active (2D canvas becomes an overlay)
     particles,
     floaters,
     abilityMode,
@@ -62,6 +63,12 @@
     C = host.querySelector("#bc");
     X = C.getContext("2d");
     fit = DF.fitCanvas(C, 900, 620);
+    // v1.2 graphics pass: 3D renderer sits UNDER the (now transparent) 2D
+    // overlay. Falls back to the classic 2D path when WebGL/THREE is absent.
+    use3d = !!(
+      DF.battle3d && DF.battle3d.init(host.querySelector("#bwrap"), C)
+    );
+    if (use3d) C.style.background = "transparent";
     C.addEventListener("mousemove", (e) => {
       const p = fit.toLocal(e.clientX, e.clientY);
       C.hoverTile = tileUnderMouse(p.x, p.y);
@@ -521,13 +528,21 @@
     });
   }
 
-  function iso(q, r, h = 0) {
+  function iso2d(q, r, h = 0) {
     return {
       x: ORIGIN.x + ((q - r) * TW) / 2,
       y: ORIGIN.y + ((q + r) * TH) / 2 - h * 18,
     };
   }
+  // v1.2: every screen-space consumer (floaters, particles, previews, bars)
+  // projects through the 3D camera in 3D mode — same call sites, new eyes.
+  function iso(q, r, h = 0) {
+    return use3d && DF.battle3d.ready
+      ? DF.battle3d.project(q, r, h)
+      : iso2d(q, r, h);
+  }
   function tileUnderMouse(mx, my) {
+    if (use3d && DF.battle3d.ready) return DF.battle3d.tileAt(mx, my);
     let best = null,
       bd = 1e9;
     for (let r = 0; r < ROWS; r++)
@@ -1697,8 +1712,96 @@
     );
     if (u.flash > 0) u.flash--;
   }
-  function frame() {
-    if (!active) return;
+  let frameToken = 0; // v1.2: kills stale rAF chains when battle re-enters
+  function frame(token) {
+    if (!active || token !== frameToken) return;
+    const next = () => requestAnimationFrame(() => frame(token));
+    // ---- v1.2: 3D path — THREE draws the world, the 2D canvas becomes a
+    // transparent overlay for text, bars, particles and previews. ----
+    if (use3d && DF.battle3d.ready) {
+      DF.battle3d.sync({
+        units: all(),
+        sel,
+        reachable,
+        hover: C.hoverTile,
+        showReach: turn === "p" && sel && !abilityMode,
+      });
+      if (shake > 0) {
+        DF.battle3d.shake(shake);
+        shake *= 0.85;
+        if (shake < 0.5) shake = 0;
+      }
+      DF.battle3d.render();
+      X.clearRect(0, 0, C.width, C.height);
+      const frozen = hitPause > 0; // crit freeze-frame, same rules as 2D
+      if (frozen) hitPause--;
+      // hover move-cost tag
+      if (turn === "p" && sel && !abilityMode && C.hoverTile) {
+        const hk = C.hoverTile.q + "," + C.hoverTile.r;
+        if (reachable[hk] !== undefined) {
+          const hp = iso(
+            C.hoverTile.q,
+            C.hoverTile.r,
+            grid[C.hoverTile.r][C.hoverTile.q].h,
+          );
+          X.fillStyle = "rgba(212,197,169,.95)";
+          X.font = "10px 'Special Elite'";
+          X.textAlign = "center";
+          X.fillText(reachable[hk] + " AP", hp.x, hp.y + 30);
+        }
+      }
+      // HP bars ride the overlay, projected over each unit's head
+      all().forEach((u) => {
+        const uq = u.px !== undefined ? u.px : u.q,
+          ur = u.py !== undefined ? u.py : u.r;
+        const cell =
+          grid[Math.round(u.r)] && grid[Math.round(u.r)][Math.round(u.q)];
+        const p = iso(uq, ur, cell ? cell.h : 0);
+        const bw = 26;
+        X.fillStyle = "#2a1d0f";
+        X.fillRect(p.x - bw / 2, p.y - 58, bw, 4);
+        X.fillStyle = u.side === "p" ? PAL.teal : PAL.blood;
+        X.fillRect(p.x - bw / 2, p.y - 58, bw * Math.max(0, u.hp / u.maxHp), 4);
+        if (u.flash > 0) u.flash--;
+      });
+      particles = particles.filter((pt) => pt.life > 0);
+      particles.forEach((pt) => {
+        if (!frozen) {
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.vy += 0.15;
+          pt.life--;
+        }
+        X.globalAlpha = pt.life / 18;
+        X.fillStyle = pt.c;
+        X.fillRect(pt.x, pt.y, 3, 3);
+        X.globalAlpha = 1;
+      });
+      floaters = floaters.filter((f) => f.life > 0);
+      floaters.forEach((f) => {
+        if (!frozen) {
+          f.y -= 0.7;
+          f.life--;
+        }
+        X.globalAlpha = Math.min(1, f.life / 20);
+        X.fillStyle = f.c;
+        X.font = "bold 16px 'Special Elite'";
+        X.textAlign = "center";
+        X.fillText(f.t, f.x, f.y);
+        X.globalAlpha = 1;
+      });
+      if (players && players.some((p) => p.alive && p.hp / p.maxHp < 0.3)) {
+        const a = 0.12 + 0.05 * Math.sin(Date.now() / 300);
+        const vg = X.createRadialGradient(450, 310, 240, 450, 310, 560);
+        vg.addColorStop(0, "rgba(192,57,43,0)");
+        vg.addColorStop(1, "rgba(192,57,43," + a + ")");
+        X.fillStyle = vg;
+        X.fillRect(0, 0, 900, 620);
+      }
+      drawPreview();
+      next();
+      return;
+    }
     X.clearRect(0, 0, C.width, C.height);
     X.save();
     if (shake > 0) {
@@ -1758,7 +1861,7 @@
     }
     drawPreview();
     X.restore();
-    requestAnimationFrame(frame);
+    next();
   }
 
   // ---- Pass 8 (v1.1): combat preview — hover an enemy to see the odds ------
@@ -1967,6 +2070,7 @@
         ? DF.scaleEncounter(specs, players.length)
         : specs;
       buildGrid(params.biome); // Pass 9: biome map (defaults to mesa)
+      if (use3d) DF.battle3d.setBoard(grid, biome); // v1.2: rebuild the 3D board
       const free = SPAWNS.slice();
       enemies = scaled.map((spec, i) => {
         const u = enemyToUnit(spec, i);
@@ -2013,7 +2117,9 @@
         );
       }
       refreshSel();
-      requestAnimationFrame(frame);
+      frameToken++;
+      const tk = frameToken;
+      requestAnimationFrame(() => frame(tk));
       log("— Your move —");
     },
     exit() {
@@ -2070,6 +2176,15 @@
       }
       if (k === "h" || k === "H") {
         chooseAbility("Hunker Down");
+        return;
+      }
+      // v1.2: FFT-style quarter-turn camera (3D mode only)
+      if ((k === "q" || k === "Q") && use3d) {
+        DF.battle3d.rotate(-1);
+        return;
+      }
+      if ((k === "e" || k === "E") && use3d) {
+        DF.battle3d.rotate(1);
         return;
       }
     },

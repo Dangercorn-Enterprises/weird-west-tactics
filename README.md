@@ -2,7 +2,7 @@
 
 A turn-based tactical RPG set in a supernatural weird western world — inspired by games like XCOM, Fallout Tactics, and classic tabletop RPG systems.
 
-**Status:** v1.1.0 — full 3-act campaign, shipped installer, active development
+**Status:** v1.2.0 — full 3-act campaign, 3D battle renderer, shipped installer, active development
 
 ## ▶ Play
 
@@ -15,6 +15,14 @@ Open `index.html` (or `src/game.html` directly) in a browser, or run the dev ser
 ## What Is This?
 
 A browser-based tactical combat game where you command a posse of gunslingers, mystics, and mad inventors against supernatural horrors in a post-apocalyptic weird western setting. Think XCOM meets the Wild West with steampunk and the occult.
+
+## New in v1.2 (2026-07-01 — the graphics pass)
+
+- **3D battle renderer** (`src/battle3d.js` + vendored Three.js r147, fully offline) — FFT-style orthographic 3/4 camera over real 3D elevation boxes, warm directional light + soft shadows, crisp billboard pixel sprites, blob shadows, per-biome floors and billboard decos, raycast tile picking
+- **Q/E camera rotation** — smooth FFT-style quarter turns
+- The 2D canvas stays as a transparent overlay (floaters, particles, HP bars, combat previews) — battle logic untouched, balance harness unaffected
+- Clean fallback: no WebGL/THREE → the classic 2D renderer runs unchanged
+- Patterns adapted from the GameBlocks skill (see `gameblocks_usage.md`)
 
 ## New in v1.1 (2026-07-01 — the 20-pass improvement loop)
 
