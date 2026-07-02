@@ -91,10 +91,22 @@
       typeof ARCHETYPES !== "undefined"
         ? ARCHETYPES.find((a) => a.id === p.archetype)
         : null;
-    const w =
-      arch && arch.weapons && arch.weapons[0]
+    // Pass 5 (v1.1): an equipped store weapon overrides the archetype default.
+    // Catalog WEAPONS use {dmg,...}; archetype weapons use {damage,...} — normalize.
+    const gw =
+      p.gear && p.gear.weapon && typeof WEAPONS !== "undefined"
+        ? WEAPONS.find((x) => x.id === p.gear.weapon)
+        : null;
+    const w = gw
+      ? { damage: gw.dmg, range: gw.range, accuracy: gw.accuracy }
+      : arch && arch.weapons && arch.weapons[0]
         ? arch.weapons[0]
         : { damage: [4, 8], range: 5, accuracy: 72 };
+    // Pass 6 (v1.1): armor = flat damage reduction; heavy plate costs speed.
+    const ga =
+      p.gear && p.gear.armor && typeof ARMOR !== "undefined"
+        ? ARMOR.find((x) => x.id === p.gear.armor)
+        : null;
     const s = p.stats || {};
     const vigor = s.vigor || 5,
       quick = s.quickness || 5,
@@ -127,7 +139,7 @@
     const primary = ABIL[p.archetype] || "Aimed Shot";
     const abilities = [primary, ABIL2[p.archetype]].filter(Boolean);
     const divine = DIVINE[p.archetype] || null;
-    return mkUnit({
+    const u = mkUnit({
       id: p.uid || "p" + i,
       name: p.name || (arch ? arch.name : "Rider"),
       role: arch ? arch.name : "Rider",
@@ -147,7 +159,16 @@
       ability: primary,
       abilities,
       divine,
+      wIC: !!(gw && gw.ignoreCover), // Hex Focus etc: basic shots ignore cover
+      armorDef: ga ? ga.def : 0,
+      weaponName: gw ? gw.name : null,
+      armorName: ga ? ga.name : null,
     });
+    if (ga && ga.speed) {
+      u.maxAp = Math.max(2, u.maxAp + ga.speed); // heavy plate slows you down
+      u.ap = u.maxAp;
+    }
+    return u;
   }
   function archColor(id) {
     return (
@@ -456,6 +477,7 @@
       if (hit) {
         let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
         if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
+        if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks (Pass 6)
         def.hp -= dmg;
         def.flash = 10;
         shake = 8;
@@ -531,7 +553,8 @@
         (u) => Math.abs(u.q - def.q) <= 1 && Math.abs(u.r - def.r) <= 1,
       );
       caught.forEach((u) => {
-        const dmg = Math.floor(Math.random() * 4) + 4;
+        let dmg = Math.floor(Math.random() * 4) + 4;
+        if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks (Pass 6)
         u.hp -= dmg;
         u.flash = 10;
         const p = iso(u.q, u.r, grid[u.r][u.q].h);
@@ -796,7 +819,7 @@
       }
       if (dist(sel, occ) <= sel.rng + 1 && sel.ap >= 2) {
         sel.ap -= 2;
-        fire(sel, occ);
+        fire(sel, occ, { ignoreCover: sel.wIC }); // Hex Focus pierces cover
       } else log("Out of range or no AP.");
       return;
     }

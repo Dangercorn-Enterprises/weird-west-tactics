@@ -284,6 +284,52 @@
     );
   }
 
+  // ---- Pass 5/6 (v1.1): gear equipping — bought weapons/armor finally matter ----
+  function catalogOf(kind) {
+    if (kind === "weapon") return typeof WEAPONS !== "undefined" ? WEAPONS : [];
+    return typeof ARMOR !== "undefined" ? ARMOR : [];
+  }
+  function allowedFor(p, kind, it) {
+    if (kind === "weapon" && it.archetype && it.archetype !== p.archetype)
+      return false; // class-locked (Steam Cannon, Hex Focus)
+    if (kind === "armor" && it.faction && p.god !== it.faction) return false; // god-locked (Clockwork Exo)
+    return true;
+  }
+  function gearLabel(p, kind) {
+    const id = p.gear && p.gear[kind];
+    if (!id) return kind === "weapon" ? "default weapon" : "no armor";
+    const it = catalogOf(kind).find((x) => x.id === id);
+    if (!it) return id;
+    return kind === "weapon"
+      ? it.name + " (" + it.dmg[0] + "-" + it.dmg[1] + ", rng " + it.range + ")"
+      : it.name +
+          " (def " +
+          it.def +
+          (it.speed ? ", spd " + it.speed : "") +
+          ")";
+  }
+  function cycleGear(p, kind) {
+    p.gear = p.gear || { weapon: null, armor: null };
+    const inv = DF.state.inventory;
+    const opts = [null].concat(
+      catalogOf(kind)
+        .filter((it) => (inv[it.id] || 0) > 0 && allowedFor(p, kind, it))
+        .map((it) => it.id),
+    );
+    const cur = p.gear[kind];
+    const idx = opts.indexOf(cur);
+    const next = opts[(idx + 1) % opts.length];
+    if (next === cur) {
+      flash("Nothing else " + p.name + " can wear — buy gear above.");
+      return;
+    }
+    if (cur) inv[cur] = (inv[cur] || 0) + 1; // hand the old piece back
+    if (next) inv[next] = Math.max(0, (inv[next] || 0) - 1); // take the new one
+    p.gear[kind] = next;
+    DF.saveGame();
+    render();
+  }
+
   function outfitter(c) {
     c.appendChild(
       el("p", {
@@ -323,6 +369,32 @@
             },
           },
         ),
+      );
+    });
+    // ---- outfit the posse: cycle each rider through owned, allowed gear ----
+    c.appendChild(
+      el("p", {
+        text: "— OUTFIT THE POSSE —",
+        style: {
+          color: "#a0522d",
+          letterSpacing: "3px",
+          fontSize: "11px",
+          textAlign: "center",
+          margin: "14px 0 2px",
+        },
+      }),
+    );
+    (DF.state.party || []).forEach((p) => {
+      p.gear = p.gear || { weapon: null, armor: null };
+      c.appendChild(
+        row(p.name + " · " + gearLabel(p, "weapon"), "Swap Gun", {
+          onclick: () => cycleGear(p, "weapon"),
+        }),
+      );
+      c.appendChild(
+        row(p.name + " · " + gearLabel(p, "armor"), "Swap Armor", {
+          onclick: () => cycleGear(p, "armor"),
+        }),
       );
     });
   }

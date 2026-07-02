@@ -105,6 +105,32 @@ for (let i = 0; i < 500; i++) {
   if (d < lo || d > hi) dmgOk = false;
 }
 check("rollDmg stays in [wmin+str/3, wmax+str/3]", dmgOk);
+// gear application (Pass 5/6): equipped store gear overrides defaults
+const geared = H.partyToUnit(
+  {
+    uid: "g0",
+    archetype: "gunslinger",
+    stats: Object.assign({}, DATA.PREGEN.gunslinger.stats),
+    gear: { weapon: "rifle", armor: "reinforced_vest" },
+  },
+  0,
+);
+check(
+  "equipped Rifle applies (range 7)",
+  geared.rng === 7,
+  "got " + geared.rng,
+);
+check(
+  "equipped Rifle damage 5-10",
+  geared.wmin === 5 && geared.wmax === 10,
+  geared.wmin + "-" + geared.wmax,
+);
+check("Reinforced Vest def 4 applies", geared.armorDef === 4);
+check(
+  "Vest speed -1 costs an AP (4→3)",
+  geared.maxAp === 3,
+  "got " + geared.maxAp,
+);
 
 // battles terminate and produce coherent results
 console.log("battle sim:");

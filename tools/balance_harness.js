@@ -22,7 +22,7 @@
 // =============================================================================
 "use strict";
 const path = require("path");
-const { ARCHETYPES, PREGEN, ENEMY_CATALOG } = require(
+const { ARCHETYPES, PREGEN, ENEMY_CATALOG, WEAPONS, ARMOR } = require(
   path.join(__dirname, "..", "src", "data.js"),
 );
 
@@ -128,8 +128,16 @@ function mkUnit(o) {
 }
 function partyToUnit(p, i) {
   const arch = ARCHETYPES.find((a) => a.id === p.archetype) || null;
-  const w =
-    arch && arch.weapons && arch.weapons[0]
+  // Pass 5/6 mirror: equipped store gear overrides the archetype default
+  const gw =
+    p.gear && p.gear.weapon
+      ? WEAPONS.find((x) => x.id === p.gear.weapon)
+      : null;
+  const ga =
+    p.gear && p.gear.armor ? ARMOR.find((x) => x.id === p.gear.armor) : null;
+  const w = gw
+    ? { damage: gw.dmg, range: gw.range, accuracy: gw.accuracy }
+    : arch && arch.weapons && arch.weapons[0]
       ? arch.weapons[0]
       : { damage: [4, 8], range: 5, accuracy: 72 };
   const s = p.stats || {};
@@ -137,7 +145,7 @@ function partyToUnit(p, i) {
     quick = s.quickness || 5,
     str = s.strength || 4,
     deft = s.deftness || 5;
-  return mkUnit({
+  const u = mkUnit({
     id: p.uid || "p" + i,
     name: p.name || (arch ? arch.name : "Rider"),
     archetype: p.archetype,
@@ -154,7 +162,14 @@ function partyToUnit(p, i) {
     abilities: [ABIL[p.archetype], ABIL2[p.archetype]].filter(Boolean),
     divine: DIVINE[p.archetype] || null,
     divineFavor: FAVOR,
+    wIC: !!(gw && gw.ignoreCover),
+    armorDef: ga ? ga.def : 0,
   });
+  if (ga && ga.speed) {
+    u.maxAp = Math.max(2, u.maxAp + ga.speed);
+    u.ap = u.maxAp;
+  }
+  return u;
 }
 function enemyToUnit(spec, i) {
   const beh = spec.behavior || "";
@@ -248,10 +263,11 @@ function applyDamage(B, def, dmg) {
 }
 function doFire(B, att, def, opts) {
   opts = opts || {};
-  const ch = hitChance(B.grid, att, def, opts.ignoreCover);
+  const ch = hitChance(B.grid, att, def, opts.ignoreCover || att.wIC);
   if (chance(ch)) {
     let dmg = Math.round(rollDmg(att) * (opts.mult || 1));
     if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
+    if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks (Pass 6 mirror)
     applyDamage(B, def, dmg);
     if (opts.status && def.alive)
       def.status[opts.status] = Math.max(
@@ -281,7 +297,11 @@ function doBlast(B, center) {
     (u) =>
       u.alive && Math.abs(u.q - center.q) <= 1 && Math.abs(u.r - center.r) <= 1,
   );
-  caught.forEach((u) => applyDamage(B, u, randint(4, 7)));
+  caught.forEach((u) => {
+    let dmg = randint(4, 7);
+    if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks (Pass 6 mirror)
+    applyDamage(B, u, dmg);
+  });
 }
 function triggerBossPhase(B, b) {
   // mirror of triggerBossPhase(), lines ~483-521
