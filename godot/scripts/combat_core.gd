@@ -255,10 +255,10 @@ func reach(grid: Array, units: Array, u: Dictionary) -> Dictionary:
 	return res
 
 # ---- damage / statuses / boss phase -------------------------------------------
-func apply_damage(b: Dictionary, def: Dictionary, dmg: int) -> void:
+func apply_damage(b: Dictionary, def: Dictionary, dmg: int, crit := false) -> void:
 	def["hp"] -= dmg
 	if on_damage.is_valid():
-		on_damage.call(def, dmg)
+		on_damage.call(def, dmg, crit)
 	if def["hp"] <= 0:
 		def["alive"] = false
 		if def["side"] == "e":
@@ -271,13 +271,17 @@ func apply_damage(b: Dictionary, def: Dictionary, dmg: int) -> void:
 func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> bool:
 	var ch := hit_chance(b["grid"], att, def, opts.get("ignoreCover", false) or att.get("wIC", false))
 	if chance(float(ch)):
-		# flat 10% crit at 1.5x, both sides (Pass 19)
-		var dmg := roundi(float(roll_dmg(att)) * float(opts.get("mult", 1.0)) * (1.5 if chance(10.0) else 1.0))
+		# flat 10% crit at 1.5x, both sides (Pass 19). RNG order preserved
+		# exactly: roll_dmg() first, then the crit chance() — matching the
+		# original inline expression so win-rate parity is untouched.
+		var base_dmg := roll_dmg(att)
+		var is_crit := chance(10.0)
+		var dmg := roundi(float(base_dmg) * float(opts.get("mult", 1.0)) * (1.5 if is_crit else 1.0))
 		if def["status"]["marked"] > 0:
 			dmg = roundi(float(dmg) * 1.3)
 		if int(def.get("armorDef", 0)) > 0:
 			dmg = maxi(1, dmg - int(def["armorDef"]))
-		apply_damage(b, def, dmg)
+		apply_damage(b, def, dmg, is_crit)
 		if opts.get("status") and def["alive"]:
 			var k: String = opts["status"]
 			def["status"][k] = maxi(int(def["status"].get(k, 0)), int(opts.get("statusN", 2)))

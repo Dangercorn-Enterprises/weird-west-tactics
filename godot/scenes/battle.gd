@@ -301,35 +301,50 @@ func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
 	return mi
 
 # ---- damage feedback: floaters + hit flash ------------------------------------
-func _on_unit_damaged(u: Dictionary, dmg: int) -> void:
+func _on_unit_damaged(u: Dictionary, dmg: int, crit := false) -> void:
 	var abus := get_node_or_null("/root/Audio")
 	if abus:
 		abus.sfx("shot")
 		if dmg > 0:
 			abus.sfx("hit")
+			if crit:
+				abus.sfx("blast") # extra punch on a crit
 	var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
-	_floater("-%d" % dmg, Vector3(_tx(u["q"]), y + 1.7, _tz(u["r"])),
-		Color("#c0392b") if u["side"] == "p" else Color("#d4a843"))
+	# Crit: amber "CRIT -N" floater regardless of side; normal hits keep the
+	# red(player)/gold(enemy) convention.
+	var col := Color("#ffcf3f") if crit else (Color("#c0392b") if u["side"] == "p" else Color("#d4a843"))
+	_floater(("CRIT -%d" % dmg) if crit else "-%d" % dmg,
+		Vector3(_tx(u["q"]), y + 1.7, _tz(u["r"])), col, crit)
 	if unit_nodes.has(u["id"]):
 		var spr: Sprite3D = unit_nodes[u["id"]]["sprite"]
-		spr.modulate = Color(3, 3, 3)
+		spr.modulate = Color(5, 4.2, 2) if crit else Color(3, 3, 3) # brighter amber flash on crit
 		var tw := create_tween()
-		tw.tween_property(spr, "modulate", Color.WHITE, 0.28)
+		tw.tween_property(spr, "modulate", Color.WHITE, 0.42 if crit else 0.28)
+		if crit:
+			# localized hitstop feel: a quick scale-punch on the struck sprite
+			# (no global time_scale, so it never fights the tween-based movement)
+			var base_scale: Vector3 = spr.scale if not spr.has_meta("base_scale") else spr.get_meta("base_scale")
+			spr.set_meta("base_scale", base_scale)
+			var pt := create_tween()
+			pt.tween_property(spr, "scale", base_scale * 1.28, 0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			pt.tween_property(spr, "scale", base_scale, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-func _floater(text: String, pos: Vector3, col: Color) -> void:
+func _floater(text: String, pos: Vector3, col: Color, crit := false) -> void:
 	var l := Label3D.new()
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.font_size = 56
-	l.pixel_size = 0.007
-	l.outline_size = 10
+	l.font_size = 72 if crit else 56
+	l.pixel_size = 0.009 if crit else 0.007
+	l.outline_size = 14 if crit else 10
 	l.modulate = col
 	l.position = pos
 	add_child(l)
+	var rise := 1.2 if crit else 0.9
+	var dur := 1.15 if crit else 0.9
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(l, "position:y", pos.y + 0.9, 0.9)
-	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.25)
+	tw.tween_property(l, "position:y", pos.y + rise, dur)
+	tw.tween_property(l, "modulate:a", 0.0, dur).set_delay(0.3 if crit else 0.25)
 	tw.chain().tween_callback(l.queue_free)
 
 # ---- movement / attack animation (v1.3 juice pass) --------------------------------

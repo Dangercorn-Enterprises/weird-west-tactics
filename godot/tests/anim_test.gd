@@ -200,7 +200,44 @@ func _tick() -> void:
 				if absf(spr.position.x - wx) > 0.05 or absf(spr.position.z - wz) > 0.05:
 					_fail("unit %s sprite off its tile after enemy phase" % str(u["id"]))
 			_test_preview()
+			_test_crit()
 			_finish()
+
+# crit must propagate core -> apply_damage -> on_damage(crit) -> CRIT floater
+func _test_crit() -> void:
+	print("== crit feedback ==")
+	var core = battle_scene.core
+	# 1. propagation: apply_damage forwards the crit flag to the on_damage hook
+	var got := {"crit": null, "dmg": 0}
+	core.on_damage = func(u, dmg, crit):
+		got["crit"] = crit
+		got["dmg"] = dmg
+	var tgt: Dictionary = battle_scene.battle["enemies"][0]
+	core.apply_damage(battle_scene.battle, tgt, 7, true)
+	if got["crit"] != true or got["dmg"] != 7:
+		_fail("apply_damage did not forward crit flag: %s" % str(got))
+	# restore the real UI hook
+	core.on_damage = battle_scene._on_unit_damaged
+
+	# 2. visual: a crit spawns an amber "CRIT -N" Label3D floater
+	var before := _count_crit_floaters()
+	battle_scene._on_unit_damaged(tgt, 9, true)
+	var after := _count_crit_floaters()
+	if after <= before:
+		_fail("crit did not spawn a CRIT floater (%d -> %d)" % [before, after])
+	# 3. a normal hit must NOT read as a crit
+	var n0 := _count_crit_floaters()
+	battle_scene._on_unit_damaged(tgt, 4, false)
+	if _count_crit_floaters() != n0:
+		_fail("normal hit spawned a CRIT floater")
+	print("crit propagates core -> UI, floater rendered")
+
+func _count_crit_floaters() -> int:
+	var n := 0
+	for c in battle_scene.get_children():
+		if c is Label3D and "CRIT" in String(c.text):
+			n += 1
+	return n
 
 # combat_preview must equal the parity-tested CombatCore math exactly
 func _test_preview() -> void:
