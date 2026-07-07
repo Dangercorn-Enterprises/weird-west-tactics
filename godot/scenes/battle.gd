@@ -37,6 +37,8 @@ var banner_label: Label
 var banner_summary: Label
 var intro_open := false
 var intro_panel: PanelContainer
+var _animating := {} # unit id -> true while a tween owns the sprite transform
+var _anim_time := 0.0
 
 func _tx(q: int) -> float: return (float(q) - 4.5) * TILE
 func _tz(r: int) -> float: return (float(r) - 4.5) * TILE
@@ -297,6 +299,106 @@ func _floater(text: String, pos: Vector3, col: Color) -> void:
 	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.25)
 	tw.chain().tween_callback(l.queue_free)
 
+# ---- movement / attack animation (v1.3 juice pass) --------------------------------
+# Procedural motion on the existing facing sprites: tiled walk with a hop arc,
+# attack lunge + recoil, enemy-phase slides, idle breathing. Composes with
+# future frame-art (swap textures per segment) without touching CombatCore.
+
+# Reconstruct a tile path from CombatCore.reach()'s BFS cost map by greedy
+# cost descent (every BFS node has a strictly cheaper neighbour toward start).
+static func path_from_reach(reach: Dictionary, from_q: int, from_r: int, to_q: int, to_r: int) -> Array:
+	if (from_q == to_q and from_r == to_r) or not reach.has("%d,%d" % [to_q, to_r]):
+		return []
+	var path: Array = []
+	var q := to_q
+	var r := to_r
+	var guard := 0
+	while (q != from_q or r != from_r) and guard < 128:
+		guard += 1
+		path.push_front([q, r])
+		var best_cost := int(reach["%d,%d" % [q, r]])
+		var best: Variant = null
+		for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+			var k := "%d,%d" % [q + d[0], r + d[1]]
+			if reach.has(k) and int(reach[k]) < best_cost:
+				best_cost = int(reach[k])
+				best = [q + d[0], r + d[1]]
+		if best == null:
+			return path # malformed map — return the partial path
+		q = best[0]
+		r = best[1]
+	return path
+
+# Move sprite+shadow+label along a ground segment with a sine hop.
+func _anim_glide(t: float, id: Variant, a: Vector3, b: Vector3, hop: float) -> void:
+	if not unit_nodes.has(id):
+		return
+	var n: Dictionary = unit_nodes[id]
+	var g := a.lerp(b, t)
+	var half := float(n.get("half", 0.7))
+	n["sprite"].position = Vector3(g.x, g.y + half + sin(t * PI) * hop, g.z)
+	if n.has("shadow"):
+		n["shadow"].position = Vector3(g.x, g.y + 0.012, g.z)
+	n["label"].position = Vector3(g.x, g.y + (2.35 if half > 1.0 else 1.6), g.z)
+
+func _animate_move(u: Dictionary, from_q: int, from_r: int, path: Array) -> void:
+	if path.is_empty() or not unit_nodes.has(u["id"]):
+		return
+	var id: Variant = u["id"]
+	_animating[id] = true
+	unit_nodes[id]["ring"].visible = false
+	var tw := create_tween()
+	var pq := from_q
+	var pr := from_r
+	for step in path:
+		var sq: int = step[0]
+		var sr: int = step[1]
+		var a := Vector3(_tx(pq), _top_y(int(grid[pr][pq]["h"])), _tz(pr))
+		var b := Vector3(_tx(sq), _top_y(int(grid[sr][sq]["h"])), _tz(sr))
+		var fdir := Vector2(sq - pq, sr - pr)
+		tw.tween_callback(func(): u["facing"] = fdir)
+		tw.tween_method(_anim_glide.bind(id, a, b, 0.14), 0.0, 1.0, 0.13)
+		pq = sq
+		pr = sr
+	tw.tween_callback(func():
+		_animating.erase(id)
+		_sync_units())
+
+func _animate_lunge(att: Dictionary, tgt: Dictionary) -> void:
+	if not unit_nodes.has(att["id"]) or _animating.has(att["id"]):
+		return
+	var id: Variant = att["id"]
+	var n: Dictionary = unit_nodes[id]
+	var spr: Sprite3D = n["sprite"]
+	_animating[id] = true
+	var origin: Vector3 = spr.position
+	if n.has("base_y"):
+		origin.y = float(n["base_y"]) # de-bob so the recoil settles at rest height
+	var to := Vector3(_tx(int(tgt["q"])), origin.y, _tz(int(tgt["r"])))
+	var dirv := to - origin
+	dirv.y = 0.0
+	var push := dirv.normalized() * 0.26 if dirv.length() > 0.01 else Vector3.ZERO
+	var tw := create_tween()
+	tw.tween_property(spr, "position", origin + push, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(spr, "position", origin, 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _animating.erase(id))
+
+func _animate_enemy_slide(e: Dictionary, from_q: int, from_r: int, delay: float) -> void:
+	if not unit_nodes.has(e["id"]) or _animating.has(e["id"]):
+		return
+	var id: Variant = e["id"]
+	_animating[id] = true
+	var a := Vector3(_tx(from_q), _top_y(int(grid[from_r][from_q]["h"])), _tz(from_r))
+	var b := Vector3(_tx(int(e["q"])), _top_y(int(grid[int(e["r"])][int(e["q"])]["h"])), _tz(int(e["r"])))
+	var tw := create_tween()
+	if delay > 0.0:
+		tw.tween_interval(delay)
+	var dur := clampf(0.11 * a.distance_to(b), 0.14, 0.5)
+	tw.tween_method(_anim_glide.bind(id, a, b, 0.1), 0.0, 1.0, dur)
+	tw.tween_callback(func():
+		_animating.erase(id)
+		_sync_units())
+
 # ---- unit sprites -----------------------------------------------------------------
 # HD-2D facings: front / back / side (side mirrors for the 4th quadrant).
 # Missing views fall back to front so partial art never breaks a battle.
@@ -369,17 +471,21 @@ func _build_units() -> void:
 		ring.visible = false
 		add_child(ring)
 		var shadow := _add_ground_shadow(Vector3.ZERO, 0.5)
-		unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "shadow": shadow}
+		unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "shadow": shadow,
+			"half": 1.07 if u.get("boss", false) else 0.7}
 	_sync_units()
 
 func _sync_units() -> void:
 	for u in battle["units"]:
 		if not unit_nodes.has(u["id"]):
 			continue # boss-phase summons get nodes on demand below
+		if _animating.has(u["id"]):
+			continue # a tween owns this sprite right now
 		var n: Dictionary = unit_nodes[u["id"]]
 		var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
 		var half := 1.07 if u.get("boss", false) else 0.7
 		n["sprite"].position = Vector3(_tx(u["q"]), y + half, _tz(u["r"]))
+		n["base_y"] = n["sprite"].position.y
 		n["sprite"].visible = u["alive"]
 		if n.has("shadow"):
 			n["shadow"].position = Vector3(_tx(u["q"]), y + 0.012, _tz(u["r"]))
@@ -415,7 +521,7 @@ func _build_unit_node(u: Dictionary) -> void:
 	var ring := MeshInstance3D.new()
 	ring.visible = false
 	add_child(ring)
-	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring}
+	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "half": 0.7}
 
 # ---- HUD ---------------------------------------------------------------------------
 func _build_hud() -> void:
@@ -620,6 +726,7 @@ func _exec_pending_on(target: Dictionary) -> void:
 	var aname := pending_ability
 	pending_ability = ""
 	sel["facing"] = Vector2(int(target["q"]) - int(sel["q"]), int(target["r"]) - int(sel["r"])).normalized()
+	_animate_lunge(sel, target)
 	if aname == sel.get("divine"):
 		_cast_divine(target)
 		return
@@ -724,6 +831,15 @@ func _process(_delta: float) -> void:
 		cam_azimuth += d * 0.14
 		_place_camera()
 	_update_facings()
+	# idle breathing: subtle bob around the synced rest height, phase per unit
+	_anim_time += _delta
+	for u in battle["units"]:
+		if not u["alive"] or _animating.has(u["id"]) or not unit_nodes.has(u["id"]):
+			continue
+		var n: Dictionary = unit_nodes[u["id"]]
+		if n.has("base_y"):
+			n["sprite"].position.y = float(n["base_y"]) \
+				+ sin(_anim_time * 2.3 + float(hash(u["id"]) % 628) / 100.0) * 0.018
 
 # pick front/back/side (+mirror) from the angle between unit facing and camera
 func _update_facings() -> void:
@@ -784,6 +900,7 @@ func _click(screen_pos: Vector2) -> void:
 		if core.dist(sel, occ) <= int(sel["rng"]) + 1 and int(sel["ap"]) >= 2:
 			sel["ap"] = int(sel["ap"]) - 2
 			sel["facing"] = Vector2(int(occ["q"]) - int(sel["q"]), int(occ["r"]) - int(sel["r"])).normalized()
+			_animate_lunge(sel, occ)
 			var hp0: int = occ["hp"]
 			var landed: bool = core.do_fire(battle, sel, occ, {"ignoreCover": sel.get("wIC", false)})
 			_log("%s %s %s%s" % [sel["name"], "hits" if landed else "misses", occ["name"],
@@ -794,14 +911,25 @@ func _click(screen_pos: Vector2) -> void:
 		return
 	var key := "%d,%d" % [q, r]
 	if not sel.is_empty() and pending_ability == "" and reach_map.has(key):
-		sel["ap"] = int(sel["ap"]) - int(reach_map[key])
-		sel["facing"] = Vector2(q - int(sel["q"]), r - int(sel["r"])).normalized()
-		sel["q"] = q
-		sel["r"] = r
-		if int(sel["status"]["bleed"]) > 0:
-			core.apply_damage(battle, sel, 2)
-			sel["status"]["bleed"] = int(sel["status"]["bleed"]) - 1
-		_select(sel)
+		_do_move(q, r)
+
+# Move the selected unit along the BFS path with the walk animation.
+# Split from _click so tests and the autopilot can drive moves directly.
+func _do_move(q: int, r: int) -> void:
+	var key := "%d,%d" % [q, r]
+	var from_q := int(sel["q"])
+	var from_r := int(sel["r"])
+	var path := path_from_reach(reach_map, from_q, from_r, q, r)
+	sel["ap"] = int(sel["ap"]) - int(reach_map[key])
+	sel["q"] = q
+	sel["r"] = r
+	_animate_move(sel, from_q, from_r, path) # sets per-segment facing
+	if path.is_empty():
+		sel["facing"] = Vector2(q - from_q, r - from_r).normalized()
+	if int(sel["status"]["bleed"]) > 0:
+		core.apply_damage(battle, sel, 2)
+		sel["status"]["bleed"] = int(sel["status"]["bleed"]) - 1
+	_select(sel)
 
 func _end_turn() -> void:
 	if ended:
@@ -826,6 +954,15 @@ func _end_turn() -> void:
 					best = pl
 			if not best.is_empty():
 				e["facing"] = Vector2(int(best["q"]) - int(e["q"]), int(best["r"]) - int(e["r"])).normalized()
+	# staggered slide animation for every enemy that moved this phase
+	var slide_delay := 0.0
+	for e in battle["enemies"]:
+		if not e["alive"]:
+			continue
+		var p: Vector2 = pre.get(e["id"], Vector2(e["q"], e["r"]))
+		if Vector2(e["q"], e["r"]) != p:
+			_animate_enemy_slide(e, int(p.x), int(p.y), slide_delay)
+			slide_delay += 0.07
 	for p in battle["players"]:
 		if p["alive"]:
 			p["ap"] = p["maxAp"]

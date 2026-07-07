@@ -203,6 +203,8 @@ func _build_drone(mood_id: String) -> AudioStreamWAV:
 	return wav
 
 func play_music(mood_id: String) -> void:
+	if _music_player == null:
+		return # headless / _ready not yet run — scenes may still request music
 	if _mood == mood_id and _music_player.playing:
 		return
 	_mood = mood_id
