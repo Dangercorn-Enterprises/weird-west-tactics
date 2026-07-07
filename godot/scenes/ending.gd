@@ -4,6 +4,10 @@ extends Control
 func _ready() -> void:
 	var GS = get_node("/root/GameState")
 	GS.apply_theme(self)
+	var _a := get_node_or_null("/root/Audio")
+	if _a:
+		_a.on_scene("ending")
+		_a.sfx("win")
 	GS.headline($Box/Heading, 52)
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")

@@ -64,6 +64,14 @@ func _ready() -> void:
 	_apply_blessing()
 	_select(battle["players"][0])
 	_log("— Your move — (Q/E rotate · Enter end turn)")
+	# boss-aware battle music (mirrors web scene_battle enter(): boss fights get
+	# the tighter, lower "boss" mood; normal skirmishes get "battle").
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		var is_boss := bool(params.get("context", {}).get("boss", false)) \
+			or "boss" in String(params.get("title", "")).to_lower() \
+			or "reckoning" in String(params.get("title", "")).to_lower()
+		abus.play_music("boss" if is_boss else "battle")
 
 # ---- battle state ------------------------------------------------------------
 func _setup_battle() -> void:
@@ -259,6 +267,11 @@ func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
 
 # ---- damage feedback: floaters + hit flash ------------------------------------
 func _on_unit_damaged(u: Dictionary, dmg: int) -> void:
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		abus.sfx("shot")
+		if dmg > 0:
+			abus.sfx("hit")
 	var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
 	_floater("-%d" % dmg, Vector3(_tx(u["q"]), y + 1.7, _tz(u["r"])),
 		Color("#c0392b") if u["side"] == "p" else Color("#d4a843"))

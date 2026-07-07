@@ -6,6 +6,8 @@ var GS
 func _ready() -> void:
 	GS = get_node("/root/GameState")
 	GS.apply_theme(self)
+	var _a := get_node_or_null("/root/Audio")
+	if _a: _a.on_scene("title")
 	GS.headline($Logo, 84)
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")

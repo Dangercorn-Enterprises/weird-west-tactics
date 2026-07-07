@@ -17,6 +17,8 @@ var cards := {}
 func _ready() -> void:
 	GS = get_node("/root/GameState")
 	GS.apply_theme(self)
+	var _a := get_node_or_null("/root/Audio")
+	if _a: _a.on_scene("creator")
 	GS.headline($VBox/Heading, 44)
 	if ResourceLoader.exists("res://assets/scenes/title.png"):
 		$Art.texture = load("res://assets/scenes/title.png")

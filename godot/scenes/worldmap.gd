@@ -39,6 +39,8 @@ const ACT3_OBJ := [
 func _ready() -> void:
 	GS = get_node("/root/GameState")
 	GS.apply_theme(self)
+	var _a := get_node_or_null("/root/Audio")
+	if _a: _a.on_scene("worldmap")
 	GS.headline(info_name, 26)
 	if GS.state.is_empty():
 		if not GS.load_game():
