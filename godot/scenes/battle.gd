@@ -39,6 +39,9 @@ var intro_open := false
 var intro_panel: PanelContainer
 var _animating := {} # unit id -> true while a tween owns the sprite transform
 var _anim_time := 0.0
+var preview_panel: PanelContainer
+var preview_label: Label
+var _hover_id: Variant = null # unit id currently previewed, to skip redundant rebuilds
 
 func _tx(q: int) -> float: return (float(q) - 4.5) * TILE
 func _tz(r: int) -> float: return (float(r) - 4.5) * TILE
@@ -592,6 +595,15 @@ func _build_hud() -> void:
 	bb.add_child(cont)
 	banner.add_child(bb)
 	cl.add_child(banner)
+	# combat preview panel — small odds readout shown while hovering an enemy
+	preview_panel = PanelContainer.new()
+	preview_panel.visible = false
+	preview_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.position = Vector2(16, 96)
+	preview_label = Label.new()
+	preview_label.add_theme_font_size_override("font_size", 16)
+	preview_panel.add_child(preview_label)
+	cl.add_child(preview_panel)
 	# story beat intro (narrative overlay shown before the first move)
 	if params.get("intro", "") != "":
 		intro_open = true
@@ -808,11 +820,87 @@ func _cast_divine(target: Dictionary) -> void:
 	sel["ap"] = 0
 	_after_action()
 
+# ---- combat preview (hover an enemy to see the odds) --------------------------
+# Pure port of the web build's drawPreview math, driven by the parity-tested
+# CombatCore.hit_chance + the shared ABIL_FX table (no PREVIEW_FX duplication).
+# Returns a small dict the HUD renders; null when there's nothing to preview.
+func combat_preview(attacker: Dictionary, target: Dictionary, ability := "") -> Dictionary:
+	var fx: Dictionary = core.ABIL_FX.get(ability, {}) if ability != "" else {"ic": attacker.get("wIC", false)}
+	var kind := str(fx.get("kind", "atk"))
+	if kind in ["heal", "blast"]:
+		# support/AoE abilities: no single-target hit roll to preview honestly
+		return {"ability": ability, "kind": kind, "in_range": true}
+	var ic := bool(fx.get("ic", false))
+	# hit chance: apply aimMod on a copy so we never mutate live unit state mid-frame
+	var att := attacker.duplicate()
+	att["aim"] = int(att["aim"]) + int(fx.get("aimMod", 0))
+	var ch: int = 95 if bool(fx.get("guaranteed", false)) else core.hit_chance(grid, att, target, ic)
+	var mult := float(fx.get("mult", 1.0))
+	var marked_f := 1.3 if int(target.get("status", {}).get("marked", 0)) > 0 else 1.0
+	var base := int(attacker["str"]) / 3 # integer div, mirrors floor(str/3)
+	var lo := int(round(float(int(attacker["wmin"]) + base) * mult * marked_f))
+	var hi := int(round(float(int(attacker["wmax"]) + base) * mult * marked_f))
+	var armor := int(target.get("armorDef", 0))
+	if armor > 0:
+		lo = maxi(1, lo - armor)
+		hi = maxi(1, hi - armor)
+	return {
+		"ability": ability, "kind": kind, "hit": ch, "lo": lo, "hi": hi,
+		"shots": int(fx.get("shots", 1)),
+		"in_range": core.dist(attacker, target) <= int(attacker["rng"]) + 1,
+	}
+
+func _preview_text(p: Dictionary) -> String:
+	if p.get("kind", "atk") in ["heal", "blast"]:
+		var verb := "AoE strike" if p["kind"] == "blast" else "Support"
+		return "%s\n%s" % [p.get("ability", ""), verb]
+	var head := str(p.get("ability", "")).strip_edges()
+	var shots: int = p.get("shots", 1)
+	var line1 := "%d%% to hit%s" % [int(p["hit"]), (" x%d" % shots) if shots > 1 else ""]
+	var line2 := "%d-%d dmg" % [int(p["lo"]), int(p["hi"])]
+	var out := ("%s\n" % head if head != "" else "") + line1 + "\n" + line2
+	if not p.get("in_range", true) and head == "":
+		out += "\nOUT OF RANGE"
+	return out
+
+func _update_preview(screen_pos: Vector2) -> void:
+	if preview_panel == null:
+		return
+	var hide: bool = ended or intro_open or sel.is_empty() or not sel.get("alive", false) or sel.get("side") != "p"
+	var occ := {}
+	if not hide:
+		occ = _unit_at_screen(screen_pos)
+	if occ.is_empty() or occ.get("side") != "e" or not occ.get("alive", false):
+		preview_panel.visible = false
+		_hover_id = null
+		return
+	var p := combat_preview(sel, occ, pending_ability)
+	preview_label.text = _preview_text(p)
+	preview_panel.visible = true
+	_hover_id = occ["id"]
+
+func _unit_at_screen(screen_pos: Vector2) -> Dictionary:
+	var from := cam.project_ray_origin(screen_pos)
+	var dir := cam.project_ray_normal(screen_pos)
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 100.0)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or not hit["collider"].has_meta("q"):
+		return {}
+	var q: int = hit["collider"].get_meta("q")
+	var r: int = hit["collider"].get_meta("r")
+	for u in battle["units"]:
+		if u["alive"] and u["q"] == q and u["r"] == r:
+			return u
+	return {}
+
 # ---- selection / highlights -----------------------------------------------------
 func _select(u: Dictionary) -> void:
 	sel = u
 	pending_ability = ""
 	pending_item = ""
+	if preview_panel:
+		preview_panel.visible = false # avoid stale odds until the next hover
+		_hover_id = null
 	reach_map = core.reach(grid, battle["units"], u) if (not u.is_empty() and u["alive"]) else {}
 	_refresh_highlights()
 	_sync_units()
@@ -854,6 +942,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_log("Cancelled.")
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_click(event.position)
+	if event is InputEventMouseMotion:
+		_update_preview(event.position)
 
 func _process(_delta: float) -> void:
 	var d := cam_target_azimuth - cam_azimuth

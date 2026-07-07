@@ -199,4 +199,56 @@ func _tick() -> void:
 				var wz: float = battle_scene._tz(int(u["r"]))
 				if absf(spr.position.x - wx) > 0.05 or absf(spr.position.z - wz) > 0.05:
 					_fail("unit %s sprite off its tile after enemy phase" % str(u["id"]))
+			_test_preview()
 			_finish()
+
+# combat_preview must equal the parity-tested CombatCore math exactly
+func _test_preview() -> void:
+	print("== combat preview ==")
+	var core = battle_scene.core
+	var grid: Array = battle_scene.grid
+	var players: Array = battle_scene.battle["players"]
+	var enemies: Array = battle_scene.battle["enemies"]
+	if players.is_empty() or enemies.is_empty():
+		_fail("no units to preview")
+		return
+	var att: Dictionary = players[0]
+	var tgt: Dictionary = enemies[0]
+
+	# basic attack: hit% must match hit_chance(); dmg range must match the formula
+	var p: Dictionary = battle_scene.combat_preview(att, tgt, "")
+	var expect_hit: int = core.hit_chance(grid, att, tgt, bool(att.get("wIC", false)))
+	if int(p["hit"]) != expect_hit:
+		_fail("preview hit %d != hit_chance %d" % [int(p["hit"]), expect_hit])
+	var base: int = int(att["str"]) / 3
+	var mf := 1.3 if int(tgt.get("status", {}).get("marked", 0)) > 0 else 1.0
+	var armor: int = int(tgt.get("armorDef", 0))
+	var elo: int = maxi(1, int(round(float(int(att["wmin"]) + base) * mf)) - armor) if armor > 0 else int(round(float(int(att["wmin"]) + base) * mf))
+	var ehi: int = maxi(1, int(round(float(int(att["wmax"]) + base) * mf)) - armor) if armor > 0 else int(round(float(int(att["wmax"]) + base) * mf))
+	if int(p["lo"]) != elo or int(p["hi"]) != ehi:
+		_fail("preview dmg %d-%d != expected %d-%d" % [int(p["lo"]), int(p["hi"]), elo, ehi])
+
+	# ability preview: guaranteed hit reads 95, multiplier scales damage up
+	var g: Dictionary = battle_scene.combat_preview(att, tgt, "Called Shot")
+	if int(g["hit"]) != 95:
+		_fail("Called Shot preview should be 95%% (guaranteed), got %d" % int(g["hit"]))
+	var aimed: Dictionary = battle_scene.combat_preview(att, tgt, "Aimed Shot") # mult 1.5
+	if int(aimed["hi"]) <= int(p["hi"]):
+		_fail("Aimed Shot (x1.5) should exceed basic damage: %d vs %d" % [int(aimed["hi"]), int(p["hi"])])
+
+	# purity: previewing must not mutate the attacker's aim (Fan the Hammer aimMod -10)
+	var aim0: int = int(att["aim"])
+	battle_scene.combat_preview(att, tgt, "Fan the Hammer")
+	if int(att["aim"]) != aim0:
+		_fail("preview mutated attacker aim: %d -> %d" % [aim0, int(att["aim"])])
+
+	# HUD wiring: panel + label exist under a CanvasLayer and render real text
+	if battle_scene.preview_panel == null or battle_scene.preview_label == null:
+		_fail("preview HUD nodes not built")
+	elif not (battle_scene.preview_panel.get_parent() is CanvasLayer):
+		_fail("preview panel not attached to the HUD CanvasLayer")
+	else:
+		var txt: String = battle_scene._preview_text(p)
+		if not ("% to hit" in txt and "dmg" in txt):
+			_fail("preview text missing hit/dmg lines: %s" % txt)
+	print("preview matches CombatCore, no state mutation, HUD wired")
