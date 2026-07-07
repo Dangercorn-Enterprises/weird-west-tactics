@@ -279,13 +279,18 @@ func _test_preview() -> void:
 	if int(att["aim"]) != aim0:
 		_fail("preview mutated attacker aim: %d -> %d" % [aim0, int(att["aim"])])
 
-	# HUD wiring: panel + label exist under a CanvasLayer and render real text
+	# HUD wiring: panel + label live under the THEMED hud Control (which is
+	# under the CanvasLayer), and the panel renders real text.
 	if battle_scene.preview_panel == null or battle_scene.preview_label == null:
 		_fail("preview HUD nodes not built")
-	elif not (battle_scene.preview_panel.get_parent() is CanvasLayer):
-		_fail("preview panel not attached to the HUD CanvasLayer")
 	else:
-		var txt: String = battle_scene._preview_text(p)
-		if not ("% to hit" in txt and "dmg" in txt):
-			_fail("preview text missing hit/dmg lines: %s" % txt)
-	print("preview matches CombatCore, no state mutation, HUD wired")
+		var parent: Node = battle_scene.preview_panel.get_parent()
+		if not (parent is Control) or (parent as Control).theme == null:
+			_fail("preview panel not under a themed HUD Control")
+		elif not (parent.get_parent() is CanvasLayer):
+			_fail("themed HUD Control not under the CanvasLayer")
+		else:
+			var txt: String = battle_scene._preview_text(p)
+			if not ("% to hit" in txt and "dmg" in txt):
+				_fail("preview text missing hit/dmg lines: %s" % txt)
+	print("preview matches CombatCore, no state mutation, HUD themed + wired")

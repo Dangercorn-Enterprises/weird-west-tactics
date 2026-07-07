@@ -575,21 +575,28 @@ func _build_unit_node(u: Dictionary) -> void:
 func _build_hud() -> void:
 	var cl := CanvasLayer.new()
 	add_child(cl)
+	# Themed full-rect root so the battle HUD matches every other scene
+	# (parchment/brass leather look) — theme propagates to all children.
+	var hud := Control.new()
+	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE # don't eat board clicks
+	GS.apply_theme(hud)
+	cl.add_child(hud)
 	var title := Label.new()
 	title.text = str(params.get("title", "Skirmish"))
 	title.position = Vector2(16, 8)
-	title.add_theme_font_size_override("font_size", 24)
-	cl.add_child(title)
+	GS.headline(title, 24) # Rye display face, amber, drop shadow — like town/worldmap
+	hud.add_child(title)
 	log_label = Label.new()
 	log_label.position = Vector2(16, 44)
 	log_label.add_theme_font_size_override("font_size", 15)
-	cl.add_child(log_label)
+	hud.add_child(log_label)
 	ability_bar = HBoxContainer.new()
 	ability_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	ability_bar.position = Vector2(16, -56)
 	ability_bar.offset_top = -56.0
 	ability_bar.offset_left = 16.0
-	cl.add_child(ability_bar)
+	hud.add_child(ability_bar)
 	banner = PanelContainer.new()
 	banner.set_anchors_preset(Control.PRESET_CENTER)
 	banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -609,7 +616,7 @@ func _build_hud() -> void:
 	cont.pressed.connect(_finish_and_return)
 	bb.add_child(cont)
 	banner.add_child(bb)
-	cl.add_child(banner)
+	hud.add_child(banner)
 	# combat preview panel — small odds readout shown while hovering an enemy
 	preview_panel = PanelContainer.new()
 	preview_panel.visible = false
@@ -618,7 +625,7 @@ func _build_hud() -> void:
 	preview_label = Label.new()
 	preview_label.add_theme_font_size_override("font_size", 16)
 	preview_panel.add_child(preview_label)
-	cl.add_child(preview_panel)
+	hud.add_child(preview_panel)
 	# story beat intro (narrative overlay shown before the first move)
 	if params.get("intro", "") != "":
 		intro_open = true
@@ -644,7 +651,7 @@ func _build_hud() -> void:
 			intro_panel.queue_free())
 		iv.add_child(ride)
 		intro_panel.add_child(iv)
-		cl.add_child(intro_panel)
+		hud.add_child(intro_panel)
 
 var _log_lines: Array = []
 func _log(msg: String) -> void:
