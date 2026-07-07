@@ -220,6 +220,31 @@ func _build_board() -> void:
 			if float(cell["cover"]) > 0.0:
 				_add_prop(str(cell.get("deco", "crate")), q, r, h,
 					float(cell["cover"]) > 0.3)
+			elif int(cell["h"]) == 0:
+				# set dressing: small scatter clutter on ~1 in 7 empty flat
+				# tiles, deterministic per board position (no gameplay effect)
+				var sh: int = (q * 31 + r * 17 + q * r * 7) % 29
+				if sh < SCATTER_DECO.size():
+					_add_scatter(SCATTER_DECO[sh], q, r, h)
+
+const SCATTER_DECO := ["scatter_tumbleweed", "scatter_grass", "scatter_pebbles", "scatter_wheel"]
+
+func _add_scatter(name: String, q: int, r: int, h: float) -> void:
+	var path := "res://assets/props/%s.png" % name
+	if not ResourceLoader.exists(path):
+		return
+	var spr := Sprite3D.new()
+	spr.texture = load(path)
+	spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	var world_h := 0.30
+	spr.pixel_size = world_h / float(spr.texture.get_height())
+	spr.shaded = false
+	# hash jitter off tile-center so clutter doesn't sit under unit feet
+	var jx := float((q * 13 + r * 5) % 5 - 2) * 0.09
+	var jz := float((q * 3 + r * 11) % 5 - 2) * 0.09
+	spr.position = Vector3(_tx(q) + jx, h + world_h / 2.0 - 0.02, _tz(r) + jz)
+	add_child(spr)
 
 func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
 	var path := "res://assets/props/%s.png" % deco

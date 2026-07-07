@@ -99,6 +99,12 @@ func _setup_scene() -> void:
 		return
 	gs.new_game()
 	battle_scene = preload("res://scenes/battle.tscn").instantiate()
+	# fail fast if battle.gd didn't compile (bare Node3D has no `sel`) rather
+	# than spinning the frame loop forever on a parse error
+	if not ("sel" in battle_scene):
+		_fail("battle.gd failed to attach — parse error (scene is bare %s)" % battle_scene.get_class())
+		_finish()
+		return
 	root.add_child(battle_scene)
 
 func _elapsed() -> float:

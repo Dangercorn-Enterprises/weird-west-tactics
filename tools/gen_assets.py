@@ -152,6 +152,13 @@ PROPS = {
     "ember": "single glowing forge ember vent grate with orange fire glow, pixel art game object",
     "spire": "single dark alien void stone spire with faint teal glowing veins, pixel art game object",
 }
+# ground scatter deco — non-cover set dressing sprinkled on empty battle tiles
+SCATTER = {
+    "scatter_tumbleweed": "single dry tumbleweed ball of tangled twigs, pixel art game object",
+    "scatter_grass": "small tuft of dry yellow desert bunchgrass, pixel art game object",
+    "scatter_pebbles": "small cluster of sun-bleached desert pebbles on flat ground, pixel art game object",
+    "scatter_wheel": "single broken wooden wagon wheel leaning at an angle, weathered gray wood, pixel art game object",
+}
 SCENES = {
     "town_street": "wide establishing shot of a weird-west frontier town main street at dusk, wooden buildings, saloon lights, distant mesas, hitching posts, " + STYLE_PAINT,
     "saloon": "interior of an old west saloon, piano, poker tables, oil lamps, long bar with bottles, wanted posters, " + STYLE_PAINT,
@@ -183,6 +190,9 @@ def main():
     for name, prompt in PROPS.items():
         jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
                      lambda r, o: sprite_process(r, o, target_h=72)))
+    for name, prompt in SCATTER.items():
+        jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
+                     lambda r, o: sprite_process(r, o, target_h=44)))
     for name, prompt in SCENES.items():
         w, h = (1344, 768)
         jobs.append(("scenes", name, prompt, w, h, scene_process))
