@@ -186,10 +186,12 @@ func _build_board() -> void:
 			mesh.size = Vector3(TILE * 0.98, h, TILE * 0.98)
 			var mi := MeshInstance3D.new()
 			mi.mesh = mesh
-			# top face brightness varies slightly per tile for life
+			# per-tile variation: brightness + a whisper of warm/cool tint so a
+			# single biome texture doesn't read as a wallpaper grid
 			var vary := 0.92 + float((q * 5 + r * 11) % 4) * 0.035
+			var warm := float((q * 3 + r * 7) % 5 - 2) * 0.012
 			var top: StandardMaterial3D = mats[0].duplicate()
-			top.albedo_color = Color(vary, vary, vary) * (Color.WHITE if top.albedo_texture else Color("#4a3820"))
+			top.albedo_color = Color(vary + warm, vary, vary - warm) * (Color.WHITE if top.albedo_texture else Color("#4a3820"))
 			mi.mesh.surface_set_material(0, mats[1])
 			mi.material_override = null
 			mi.set_surface_override_material(0, mats[1])
@@ -202,6 +204,9 @@ func _build_board() -> void:
 			pm.material = top
 			top_plane.mesh = pm
 			top_plane.position = Vector3(_tx(q), h + 0.001, _tz(r))
+			# deterministic quarter-turn per tile — 4 orientations of one
+			# texture kill the repeating-pattern read for free
+			top_plane.rotation_degrees.y = 90.0 * float((q * 7 + r * 13 + (q * r) % 3) % 4)
 			add_child(top_plane)
 			var body := StaticBody3D.new()
 			var shape := CollisionShape3D.new()
