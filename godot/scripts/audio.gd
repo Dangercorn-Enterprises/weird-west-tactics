@@ -19,6 +19,8 @@ const MASTER_SFX := 0.5
 const MASTER_MUSIC := 0.14
 
 var _muted := false
+var music_vol := 1.0                   # 0..1 user volume (persisted in settings)
+var sfx_vol := 1.0
 var _sfx: Dictionary = {}              # name -> AudioStreamWAV
 var _sfx_player: AudioStreamPlayer
 var _music_player: AudioStreamPlayer
@@ -42,15 +44,20 @@ func _gamestate() -> Node:
 	return get_node_or_null("/root/GameState")
 
 func _ready() -> void:
+	# keep audio (and the pause-menu's slider feedback) alive while the tree
+	# is paused — the PauseMenu autoload pauses everything else
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var gs := _gamestate()
 	if gs and gs.has_method("get_setting"):
 		_muted = bool(gs.get_setting("audio_muted", false))
+		music_vol = clampf(float(gs.get_setting("music_vol", 1.0)), 0.0, 1.0)
+		sfx_vol = clampf(float(gs.get_setting("sfx_vol", 1.0)), 0.0, 1.0)
 	_sfx_player = AudioStreamPlayer.new()
 	_sfx_player.bus = "Master"
 	add_child(_sfx_player)
 	_music_player = AudioStreamPlayer.new()
 	_music_player.bus = "Master"
-	_music_player.volume_db = linear_to_db(MASTER_MUSIC)
+	_music_player.volume_db = _db(MASTER_MUSIC * music_vol)
 	add_child(_music_player)
 	_pluck_timer = Timer.new()
 	_pluck_timer.one_shot = true
@@ -176,7 +183,7 @@ func sfx(name: String) -> void:
 	if _muted or not _sfx.has(name):
 		return
 	_sfx_player.stream = _sfx[name]
-	_sfx_player.volume_db = linear_to_db(MASTER_SFX)
+	_sfx_player.volume_db = _db(MASTER_SFX * sfx_vol)
 	_sfx_player.play()
 
 
@@ -212,7 +219,7 @@ func play_music(mood_id: String) -> void:
 		return
 	var m: Dictionary = MOODS.get(mood_id, MOODS["title"])
 	_music_player.stream = _build_drone(mood_id)
-	_music_player.volume_db = linear_to_db(float(m["vol"]))
+	_music_player.volume_db = _db(float(m["vol"]) * music_vol)
 	_music_player.play()
 	_schedule_pluck()
 
@@ -246,7 +253,7 @@ func _on_pluck() -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = _to_wav(buf)
 	p.bus = "Master"
-	p.volume_db = linear_to_db(MASTER_MUSIC)
+	p.volume_db = _db(MASTER_MUSIC * music_vol)
 	add_child(p)
 	p.finished.connect(func(): p.queue_free())
 	p.play()
@@ -262,15 +269,42 @@ func on_scene(name: String) -> void:
 		# battle picks its own mood (boss-aware) in the battle scene
 
 
-# ---- mute ----
+# ---- mute / volumes ----
+
+func _db(v: float) -> float:
+	return linear_to_db(clampf(v, 0.0001, 1.0)) # 0 -> -80dB silence, never -inf
+
+func set_music_volume(v: float) -> void:
+	music_vol = clampf(v, 0.0, 1.0)
+	if _music_player != null and _mood != "":
+		var m: Dictionary = MOODS.get(_mood, MOODS["title"])
+		_music_player.volume_db = _db(float(m["vol"]) * music_vol)
+	_persist("music_vol", music_vol)
+
+func set_sfx_volume(v: float) -> void:
+	sfx_vol = clampf(v, 0.0, 1.0)
+	_persist("sfx_vol", sfx_vol)
+
+func get_music_volume() -> float:
+	return music_vol
+
+func get_sfx_volume() -> float:
+	return sfx_vol
+
+func _persist(key: String, value) -> void:
+	var gs := _gamestate()
+	if gs and gs.has_method("set_setting"):
+		gs.set_setting(key, value)
 
 func toggle_mute() -> bool:
 	_muted = not _muted
-	var gs := _gamestate()
-	if gs and gs.has_method("set_setting"):
-		gs.set_setting("audio_muted", _muted)
+	_persist("audio_muted", _muted)
 	if _muted:
+		var keep := _mood
 		stop_music()
+		_mood = keep   # remember the scene's mood so unmute can resume it
+	elif _mood != "":
+		play_music(_mood)
 	return _muted
 
 func is_muted() -> bool:

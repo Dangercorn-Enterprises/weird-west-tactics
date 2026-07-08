@@ -7,9 +7,11 @@ extends Node
 
 const DT = preload("res://scripts/ui_theme.gd")
 const SAVE_PATH := "user://save.json"
+const SETTINGS_PATH := "user://settings.json"
 
 var design: Dictionary = {}
 var sprites_data: Dictionary = {}
+var settings: Dictionary = {}
 var state: Dictionary = {}
 # handoff: worldmap/town set this before switching to the battle scene
 var pending_battle: Dictionary = {}
@@ -22,10 +24,31 @@ func headline(l: Label, size: int) -> void:
 	DT.headline(l, size)
 
 func _ready() -> void:
+	# autopilot must keep ticking while the PauseMenu holds the tree paused
+	# (_process here is autopilot-only, so ALWAYS changes no gameplay behavior)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_load_settings()
 	var f := FileAccess.open("res://data/design.json", FileAccess.READ)
 	design = JSON.parse_string(f.get_as_text())
 	var sf := FileAccess.open("res://data/sprites.json", FileAccess.READ)
 	sprites_data = JSON.parse_string(sf.get_as_text())
+
+# ---- settings (user://settings.json — audio prefs; audio.gd reads via get_setting)
+func _load_settings() -> void:
+	if not FileAccess.file_exists(SETTINGS_PATH):
+		return
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
+	var s = JSON.parse_string(f.get_as_text())
+	if s is Dictionary:
+		settings = s
+
+func get_setting(key: String, default = null):
+	return settings.get(key, default)
+
+func set_setting(key: String, value) -> void:
+	settings[key] = value
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify(settings))
 
 # ---- dev autopilot (DUSTFALL_AUTOPILOT=1): tour scenes, screenshot each ----------
 var _ap_stage := 0
@@ -76,6 +99,16 @@ func _process(delta: float) -> void:
 				img2.save_png("user://shot_battle_rotated.png")
 				print("AUTOPILOT shot: BattleRotated")
 			7:
+				var pm := get_node_or_null("/root/PauseMenu")
+				if pm:
+					pm.open_menu()
+			8:
+				var img3 := get_viewport().get_texture().get_image()
+				img3.save_png("user://shot_pause.png")
+				print("AUTOPILOT shot: PauseMenu")
+				var pm2 := get_node_or_null("/root/PauseMenu")
+				if pm2:
+					pm2.close()
 				print("AUTOPILOT done")
 				get_tree().quit()
 

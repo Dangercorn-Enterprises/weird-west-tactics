@@ -1009,9 +1009,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E: cam_target_azimuth += PI / 2
 			KEY_ENTER, KEY_KP_ENTER: _end_turn()
 			KEY_ESCAPE:
-				pending_ability = ""
-				pending_item = ""
-				_log("Cancelled.")
+				# swallow Esc only while a targeting flow is pending; a bare Esc
+				# falls through to the PauseMenu autoload
+				if pending_ability != "" or pending_item != "":
+					pending_ability = ""
+					pending_item = ""
+					_log("Cancelled.")
+					get_viewport().set_input_as_handled()
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_click(event.position)
 	if event is InputEventMouseMotion:
