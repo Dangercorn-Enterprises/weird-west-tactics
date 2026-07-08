@@ -1,0 +1,136 @@
+# DUSTFALL: The Ashen Frontier — Steam page draft (v0.1, 2026-07-07)
+
+*Working copy for the store page. Every claim below is grounded in shipped
+design data (godot/data/design.json) or verified build behavior — numbers are
+real, not aspirational. Target: $10 tier, HD-2D demo build by 7/12.
+Tim: mark up freely; SHORT DESC has three options to pick from.*
+
+---
+
+## Basics
+
+| Field | Value |
+|---|---|
+| Title | Dustfall: The Ashen Frontier |
+| Developer / Publisher | Dangercorn Enterprises |
+| Genre | Turn-Based Tactics, Tactical RPG |
+| Price | $9.99 |
+| Platforms | Windows (Godot 4.7, Vulkan) |
+| Players | Single-player |
+| Release shape | Free demo (Quick Skirmish + Act I opening) → full release |
+
+## Short description (choose one, ≤300 chars)
+
+1. *The sun died over the frontier and something older lit the lamps. Lead a
+   posse of gunslingers, hexslingers, and worse across a weird-west wasteland —
+   turn-based tactics where every shot, hex, and bargain with a god leaves a
+   mark.*
+
+2. *HD-2D turn-based tactics in a weird west that buried its dead shallow.
+   Build a posse of six, court six dangerous gods, and shoot your way through
+   the Ashfall — wounds persist, favor is currency, and the train to the Hollow
+   only runs one way.*
+
+3. *A tactics RPG about a frontier that came back wrong. Position, cover, and
+   grit decide gunfights; six gods offer miracles with teeth. Chibi sprites,
+   lit 3D dioramas, consequences.*
+
+## About this game (long description)
+
+**The Ashfall came down like snow that never melted, and the West got weird.**
+
+Dustfall is a turn-based tactics RPG in the HD-2D style — crisp pixel-art
+posse members over lit, rotatable 3D dioramas — set in a weird-west frontier
+of dead mining towns, bone-choked badlands, and one train line that shouldn't
+still be running.
+
+**Build a posse worth burying.** Six archetypes — Gunslinger, Hexslinger,
+Tinkerer, Preacher, Lawdog, Drifter — each with their own abilities, favored
+stats, and bad habits. Recruit up to six; keep them alive if you can. Wounds
+follow your crew out of battle, and the fallen crawl away at death's door
+rather than into it.
+
+**Fight like position matters.** Height, cover, and line of sight decide
+gunfights. Statuses stack ugly — burn, bleed, hex, marked — and a hunkered
+enemy is a wasted bullet. Fifteen enemy breeds with real temperaments: some
+rush you, some hold the high ground, some don't care about you at all until
+you're worth eating.
+
+**Bargain with six gods who are all listening.** Coyote, Baron Samedi, Vulcan,
+Perun, Anansi — and the Sleeper, who you'd best not wake. Favor is a currency:
+earn it in blood, spend it on divine riders that turn a fight sideways.
+Shrines bless; some prices aren't posted.
+
+**Cross a frontier with 26 bad ideas on the map.** A 3-act campaign across
+mesa, canyon, boomtown, boneyard, foundry, and the Hollow — six biomes, each
+with its own board and its own weather of trouble, and five named bosses who
+have been expecting you.
+
+**Outfit for the country you're crossing.** Seven weapons, five armors, four
+weapon mods, three mounts, and a satchel of consumables that all earn their
+slot. A procedurally-synthesized western score — every gunshot, drone, and
+saloon pluck generated, no two ambushes scored quite the same.
+
+## Feature bullets (store sidebar)
+
+- Turn-based tactical combat on lit 3D boards — height, cover, crits, and
+  seven ways to bleed
+- HD-2D: 4-direction pixel-art sprites over rotatable dioramas (Q/E turns the
+  whole world)
+- 6 playable archetypes, posses up to 6, wounds that persist between fights
+- 6 gods, favor economy, divine riders — miracles with fine print
+- 3-act campaign across 26 world nodes, 6 biomes, and 5 named boss showdowns
+- 15 enemy breeds with distinct AI temperaments
+- Gear that matters: 7 weapons, 5 armors, 4 mods, 3 mounts
+- Fully synthesized soundtrack and SFX — the desert never repeats itself
+- Quick Skirmish mode for a straight fight, no questions asked
+
+## Tags (Steam, pick ~15)
+
+Turn-Based Tactics · Tactical RPG · Strategy RPG · Western · Dark Fantasy ·
+Pixel Graphics · Retro · Party-Based RPG · Turn-Based Combat · Singleplayer ·
+Atmospheric · Stylized · Isometric · Difficult · Indie
+
+## System requirements (draft)
+
+- **Minimum:** Windows 10 64-bit · Vulkan 1.0-capable GPU · 4 GB RAM ·
+  300 MB disk
+- *(Godot 4.7 Forward+ renderer; the shipped build is a single ~116 MB exe.
+  Verify minimum GPU claim on one low-end machine before publishing.)*
+
+## AI-content disclosure (REQUIRED by Steam at submission)
+
+Steam requires disclosure of AI-generated content. Honest wording:
+
+> *Character sprites, tile textures, and scene illustrations were generated
+> with an image-generation model (FLUX.1-dev) from hand-written prompts against
+> a fixed style guide, then hand-curated and post-processed (palette snapping,
+> background removal, frame slicing). All game design, code, writing, and audio
+> synthesis are original. No AI-generated content is created at runtime.*
+
+## Store asset checklist (what still needs making)
+
+*(Sizes below are from memory of Steamworks specs — re-verify current specs at
+partner.steamgames.com before upload.)*
+
+- [ ] Main capsule 616×353 (title art exists: assets/scenes/title.png — needs
+      logo lockup + crop)
+- [ ] Small capsule 231×87
+- [ ] Header capsule 460×215
+- [ ] Library capsule 600×900 (vertical — NEW art needed, blocked on NIM)
+- [ ] Library hero 3840×1240 (NEW art needed, blocked on NIM)
+- [ ] 5+ screenshots 1920×1080 — capture from the demo build once the art
+      batch lands (battle w/ preview + crit, worldmap, town, boss intro,
+      pause/loadout)
+- [ ] Trailer (30–60s) — screen-capture the autopilot tour as a placeholder
+      cut; real trailer after walk-cycle art
+- [ ] Demo build depot (dist/dustfall-hd2d.exe pipeline already works)
+
+## Open questions for Tim
+
+1. Short description: pick 1/2/3 (or blend).
+2. "Dangercorn Enterprises" as the publisher name on Steam, or a games label
+   (e.g. the sorceress.games account idea from 07-06)?
+3. Demo scope: Quick Skirmish only, or Skirmish + Act I opening?
+4. Steam Direct $100 fee + tax interview — ready to file when you are (needs
+   the entity decision that also gates SBIR).
