@@ -6,4 +6,7 @@ Thumbs.db
 # build + deps (never commit)
 node_modules/
 dist-electron/
+dist/
 tools/__pycache__/
+godot/.godot/
+assets_raw/
