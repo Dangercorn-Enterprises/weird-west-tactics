@@ -201,7 +201,39 @@ func _tick() -> void:
 					_fail("unit %s sprite off its tile after enemy phase" % str(u["id"]))
 			_test_preview()
 			_test_crit()
+			_test_status()
 			_finish()
+
+# status readout: active statuses render codes above the unit, marked sets
+# the amber priority colour, no statuses => hidden
+func _test_status() -> void:
+	print("== status readout ==")
+	var u: Dictionary = battle_scene.battle["players"][0]
+	# clean slate
+	u["status"] = {"burn": 0, "bleed": 0, "hex": 0, "marked": 0, "hunker": 0, "stun": 0, "conf": 0}
+	var d0: Dictionary = battle_scene._status_display(u)
+	if d0["text"] != "":
+		_fail("no-status unit should show empty readout, got %s" % d0["text"])
+	# marked + burn: marked (higher priority) sets the colour, both codes shown
+	u["status"]["marked"] = 2
+	u["status"]["burn"] = 1
+	var d1: Dictionary = battle_scene._status_display(u)
+	if not ("MRK2" in d1["text"] and "BRN1" in d1["text"]):
+		_fail("status codes missing: %s" % d1["text"])
+	if d1["color"] != Color("#ffcf3f"):
+		_fail("marked should drive the amber priority colour, got %s" % str(d1["color"]))
+	# the live label reflects it after a sync
+	battle_scene._sync_units()
+	var slbl: Label3D = battle_scene.unit_nodes[u["id"]]["status"]
+	if not slbl.visible or "MRK2" not in String(slbl.text):
+		_fail("status label not rendered after sync: vis=%s text=%s" % [slbl.visible, slbl.text])
+	# clearing hides it
+	u["status"]["marked"] = 0
+	u["status"]["burn"] = 0
+	battle_scene._sync_units()
+	if slbl.visible:
+		_fail("status label should hide when no statuses active")
+	print("status readout renders codes + priority colour, hides when clear")
 
 # crit must propagate core -> apply_damage -> on_damage(crit) -> CRIT floater
 func _test_crit() -> void:

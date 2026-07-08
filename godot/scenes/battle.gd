@@ -447,6 +447,35 @@ func _animate_enemy_slide(e: Dictionary, from_q: int, from_r: int, delay: float)
 		_animating.erase(id)
 		_sync_units())
 
+# ---- status effect readout ----------------------------------------------------
+# Neither the web nor the old Godot build showed WHO is burning/bleeding/
+# marked — the player had to infer it from the log. This surfaces active
+# statuses as compact codes above each unit (marked especially: it's a 1.3x
+# damage multiplier the combat preview uses). Font-safe letter codes, not
+# emoji (the bundled typewriter font renders those as tofu). Priority order
+# controls the single label colour when several are active at once.
+const STATUS_INFO := [
+	["marked", "MRK", Color("#ffcf3f")],  # amber — the damage-mult flag, show first
+	["bleed", "BLD", Color("#c0392b")],
+	["burn", "BRN", Color("#e8823a")],
+	["stun", "STN", Color("#d0d0d0")],
+	["conf", "CNF", Color("#b07de0")],
+	["hex", "HEX", Color("#8e5fd0")],
+	["hunker", "HNK", Color("#4ecdc4")],  # teal — the one buff
+]
+
+func _status_display(u: Dictionary) -> Dictionary:
+	var st: Dictionary = u.get("status", {})
+	var parts: Array = []
+	var color := Color.WHITE
+	for entry in STATUS_INFO:
+		var n := int(st.get(entry[0], 0))
+		if n > 0:
+			if parts.is_empty():
+				color = entry[2]  # first (highest-priority) active status sets colour
+			parts.append("%s%d" % [entry[1], n])
+	return {"text": " ".join(parts), "color": color}
+
 # ---- unit sprites -----------------------------------------------------------------
 # HD-2D facings: front / back / side (side mirrors for the 4th quadrant).
 # Missing views fall back to front so partial art never breaks a battle.
@@ -518,10 +547,21 @@ func _build_units() -> void:
 		ring.scale = Vector3(1, 0.08, 1)
 		ring.visible = false
 		add_child(ring)
+		var status := _make_status_label()
+		add_child(status)
 		var shadow := _add_ground_shadow(Vector3.ZERO, 0.5)
 		unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "shadow": shadow,
-			"half": 1.07 if u.get("boss", false) else 0.7}
+			"status": status, "half": 1.07 if u.get("boss", false) else 0.7}
 	_sync_units()
+
+func _make_status_label() -> Label3D:
+	var s := Label3D.new()
+	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	s.font_size = 26
+	s.pixel_size = 0.006
+	s.outline_size = 6
+	s.visible = false
+	return s
 
 func _sync_units() -> void:
 	for u in battle["units"]:
@@ -538,9 +578,17 @@ func _sync_units() -> void:
 		if n.has("shadow"):
 			n["shadow"].position = Vector3(_tx(u["q"]), y + 0.012, _tz(u["r"]))
 			n["shadow"].visible = u["alive"]
-		n["label"].position = Vector3(_tx(u["q"]), y + (2.35 if u.get("boss", false) else 1.6), _tz(u["r"]))
+		var hp_y := y + (2.35 if u.get("boss", false) else 1.6)
+		n["label"].position = Vector3(_tx(u["q"]), hp_y, _tz(u["r"]))
 		n["label"].text = "%d" % maxi(0, int(u["hp"]))
 		n["label"].visible = u["alive"]
+		if n.has("status"):
+			var sd := _status_display(u)
+			var slbl: Label3D = n["status"]
+			slbl.position = Vector3(_tx(u["q"]), hp_y + 0.32, _tz(u["r"])) # just above HP
+			slbl.text = sd["text"]
+			slbl.modulate = sd["color"]
+			slbl.visible = u["alive"] and sd["text"] != ""
 		n["ring"].position = Vector3(_tx(u["q"]), y + 0.03, _tz(u["r"]))
 		n["ring"].visible = u["alive"] and not sel.is_empty() and u["id"] == sel.get("id")
 	# boss-phase summons (Risen Dead) appear mid-fight
@@ -569,7 +617,9 @@ func _build_unit_node(u: Dictionary) -> void:
 	var ring := MeshInstance3D.new()
 	ring.visible = false
 	add_child(ring)
-	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "half": 0.7}
+	var status := _make_status_label()
+	add_child(status)
+	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "status": status, "half": 0.7}
 
 # ---- HUD ---------------------------------------------------------------------------
 func _build_hud() -> void:
