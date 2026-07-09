@@ -67,7 +67,16 @@ func _ready() -> void:
 func _step(act: String) -> int:
 	return int(GS.state.get(act, {}).get("step", 0))
 
+# Demo builds (export preset "Windows Demo", custom feature tag "demo") cap the
+# campaign at the end of Act I: no Act II+ story beats fire and the objective
+# line flips to the demo-complete pitch. The Act I map, town services, and
+# Quick Skirmish stay fully playable.
+func _is_demo() -> bool:
+	return OS.has_feature("demo")
+
 func _objective_text() -> String:
+	if _is_demo() and _step("act1") >= 2:
+		return "DEMO COMPLETE — the Deacon is broken, but something older stirs east. The full game rides on."
 	if _step("act2") >= 2:
 		return ACT3_OBJ[_step("act3")]
 	if _step("act1") >= 2:
@@ -75,6 +84,8 @@ func _objective_text() -> String:
 	return ACT1_OBJ[_step("act1")]
 
 func _objective_node() -> String:
+	if _is_demo() and _step("act1") >= 2:
+		return ""  # demo over — no next objective marker
 	if _step("act2") >= 2:
 		return "" if _step("act3") >= 2 else "area51"
 	if _step("act1") >= 2:
@@ -84,6 +95,8 @@ func _objective_node() -> String:
 # story beats: returns non-empty battle params if a beat fires on arrival at `to`
 func _story_beat(to: Dictionary) -> Dictionary:
 	var s1 := _step("act1")
+	if _is_demo() and s1 >= 2:
+		return {}  # demo cap: Act II+ beats never fire
 	if to["id"] == "losangeles" and s1 == 0:
 		return {"title": "The Revenant Vanguard", "biome": "boneyard",
 			"intro": "Smoke over the coast road. The Deacon's dead walk in daylight now, and they've taken the highway into Los Angeles. A rider from the pueblo begged anyone with a gun to come. You came.",
