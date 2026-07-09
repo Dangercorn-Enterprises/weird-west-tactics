@@ -126,6 +126,14 @@ Steam requires disclosure of AI-generated content. Honest wording:
 FLUX.1-dev assets were non-commercial-licensed and are gone from the tree;
 every shipped image is now commercially clean.)*
 
+## Screenshots — CAPTURED 2026-07-09 (docs/steam_screens/, 1920x1080)
+
+All captured from the shipping build (SDXL art) via the DUSTFALL_AUTOPILOT tour.
+Store picks, in order: `shot_title` (vista + logo), `shot_creator` (Forge Your
+Lead, 6 archetypes), `shot_battle_intro` (HD-2D diorama + story card),
+`shot_worldmap` (parchment campaign map), `shot_town` (saloon services).
+Extras: `shot_battle`, `shot_battle_rotated` (Q/E world turn), `shot_pause`.
+
 ## Store asset checklist (what still needs making)
 
 *(Sizes below are from memory of Steamworks specs — re-verify current specs at
