@@ -143,14 +143,15 @@ partner.steamgames.com before upload.)*
       logo lockup + crop)
 - [ ] Small capsule 231×87
 - [ ] Header capsule 460×215
-- [ ] Library capsule 600×900 (vertical — NEW art needed, blocked on NIM)
-- [ ] Library hero 3840×1240 (NEW art needed, blocked on NIM)
-- [ ] 5+ screenshots 1920×1080 — capture from the demo build once the art
-      batch lands (battle w/ preview + crit, worldmap, town, boss intro,
-      pause/loadout)
+- [ ] Library capsule 600×900 (vertical — generate on forge-imggen, no longer
+      NIM-blocked)
+- [ ] Library hero 3840×1240 (generate on forge-imggen, no longer NIM-blocked)
+- [x] 5+ screenshots 1920×1080 — DONE 2026-07-09, docs/steam_screens/ (8 shots
+      from the shipping SDXL build)
 - [ ] Trailer (30–60s) — screen-capture the autopilot tour as a placeholder
       cut; real trailer after walk-cycle art
-- [ ] Demo build depot (dist/dustfall-hd2d.exe pipeline already works)
+- [x] Demo build depot — DONE 2026-07-09: dist/dustfall-demo.exe (Act-I capped
+      via "demo" feature tag) + dist/dustfall-hd2d.exe (full), both boot-tested
 
 ## Open questions for Tim
 
