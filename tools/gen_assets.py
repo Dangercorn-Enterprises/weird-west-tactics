@@ -22,7 +22,28 @@ STYLE_PIXEL = ("16-bit SNES pixel art, crisp chunky pixels, dark warm ink outlin
 STYLE_PAINT = ("painterly concept art, weird western americana, warm dusk light, "
                "deep umber shadows, brass and teal accents, moody, high detail")
 
-def gen(prompt, w=1024, h=1024, seed=7, retries=4):
+# Local fleet image-gen service (SDXL on Huginn's RTX 2070, forge-imggen).
+# Preferred over NIM: commercial-clean (SDXL Open RAIL++-M vs flux.1-dev
+# non-commercial), no rate limits, no outage dependency. NIM stays as fallback.
+LOCAL_URL = os.environ.get("IMGGEN_URL", "http://10.2.0.11:8710/generate")
+
+
+def _gen_local(prompt, w, h, seed, profile):
+    body = {"prompt": prompt, "profile": profile, "width": w, "height": h,
+            "seed": seed, "style": False}  # prompt is already styled by the caller
+    req = urllib.request.Request(LOCAL_URL, data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=600) as r:
+        j = json.loads(r.read())
+    return base64.b64decode(j["artifacts"][0]["base64"])
+
+
+def gen(prompt, w=1024, h=1024, seed=7, retries=4, profile="concept"):
+    # local fleet GPU first; fall through to NIM on any failure
+    try:
+        return _gen_local(prompt, w, h, seed, profile)
+    except Exception as e:
+        print("  local imggen unavailable (%s) -> NIM" % str(e)[:80])
     body = {"prompt": prompt, "mode": "base", "cfg_scale": 3.5,
             "width": w, "height": h, "seed": seed, "steps": 30}
     for attempt in range(retries):

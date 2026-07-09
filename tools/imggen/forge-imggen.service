@@ -1,0 +1,14 @@
+[Unit]
+Description=forge-imggen local image generation (SDXL base fp16, RTX 2070, worker-per-job)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/forge-imggen
+Environment=HF_HOME=/data/forge-imggen/hf
+ExecStart=/data/forge-imggen/.venv/bin/python /data/forge-imggen/serve.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
