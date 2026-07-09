@@ -1,0 +1,7 @@
+# Trained LoRAs + training images are PRIVATE and live on Huginn (/data/forge-imggen/
+# loras|train|gallery). They must NEVER be committed. This guard covers any accidental
+# local copies under tools/imggen/.
+loras/
+train/
+gallery/
+*.safetensors

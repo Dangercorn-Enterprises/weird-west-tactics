@@ -44,7 +44,8 @@ def run_job(spec):
         out = "%s/%s" % (GALLERY, name)
         job = {"prompt": spec["prompt"], "profile": prof,
                "width": int(spec.get("width", 1024)), "height": int(spec.get("height", 1024)),
-               "seed": int(spec.get("seed", 0)), "style": spec.get("style", True), "out": out}
+               "seed": int(spec.get("seed", 0)), "style": spec.get("style", True),
+               "lora": (spec.get("lora") or None), "out": out}
         jf = "%s/.job_%d.json" % (HERE, ts)
         json.dump(job, open(jf, "w"))
         t0 = time.time()
@@ -109,6 +110,8 @@ h3{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
   <label>Prompt</label><textarea id=prompt placeholder="a weathered sheriff on a saloon porch at dusk"></textarea>
   <label>Style profile</label>
   <select id=profile><option value=concept>Concept — painterly (30-step)</option><option value=pixel>Pixel — fast (Lightning 8-step)</option></select>
+  <label>Subject LoRA <span style=text-transform:none>(trained people/subjects)</span></label>
+  <select id=lora><option value="">none</option></select>
   <div class=row><div><label>Width</label><select id=w><option>768</option><option selected>1024</option><option>512</option></select></div>
   <div><label>Height</label><select id=h><option>768</option><option selected>1024</option><option>512</option></select></div></div>
   <label>Seed</label><div class=row><input id=seed type=number value=0><button class=mini id=rnd>🎲</button></div>
@@ -148,14 +151,17 @@ async function gen(){const p=$('#prompt').value.trim();if(!p)return;
   const go=$('#go');go.disabled=true;go.textContent='Generating…';
   let t=0;stageSpin();const tick=setInterval(()=>{t++;const el=$('#meta');if(el)el.textContent='generating… '+t+'s';},1000);
   try{const r=await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({prompt:p,profile:$('#profile').value,width:+$('#w').value,height:+$('#h').value,seed:+$('#seed').value})});
+    body:JSON.stringify({prompt:p,profile:$('#profile').value,lora:$('#lora').value,width:+$('#w').value,height:+$('#h').value,seed:+$('#seed').value})});
    const d=await r.json();clearInterval(tick);
    if(d.error){stageMsg(d.error,true);}else{show(d.meta);loadGal();}
   }catch(e){clearInterval(tick);stageMsg(''+e,true);}
   go.disabled=false;go.textContent='Generate';}
 $('#go').addEventListener('click',gen);
 $('#rnd').addEventListener('click',()=>{$('#seed').value=Math.floor(Math.random()*1e6);});
-health();loadGal();setInterval(health,5000);
+async function loadLoras(){try{const l=await(await fetch('/loras')).json();
+  const sel=$('#lora');while(sel.options.length>1)sel.remove(1);
+  l.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}catch(e){}}
+health();loadGal();loadLoras();setInterval(health,5000);
 </script></body></html>"""
 
 
@@ -177,6 +183,8 @@ class H(BaseHTTPRequestHandler):
             self._send(200, {"ok": True, "gpu_used_mib": m, "gpu_util": u, "busy": busy})
         elif p == "/gallery":
             self._send(200, gallery_list())
+        elif p == "/loras":
+            self._send(200, imggen.list_loras())
         elif p.startswith("/img/"):
             name = os.path.basename(unquote(p[5:]))
             fp = GALLERY + "/" + name

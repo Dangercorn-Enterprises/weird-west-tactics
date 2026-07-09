@@ -35,3 +35,18 @@ Code + venv live at `/data/forge-imggen/`; runs as `systemctl --user forge-imgge
   prints the view URL.
 - **Follow-up (not built):** an MCP tool so Hermes agents can generate on request
   in chat ("hey Tiki, make me a picture of X") — Hermes supports `mcp`/`tools`.
+
+## LoRA training (private, local) — teach it a person or subject
+- **Train:** put ~15-30 photos of one subject in `/data/forge-imggen/train/<name>/` on
+  Huginn, then `python train_lora.py <dir> <name> --steps 1400`. Produces
+  `/data/forge-imggen/loras/<name>/` (~1h on the 2070, peak <6GB). Verified: SDXL
+  LoRA trains in 8GB via cached latents/embeds (only the UNet resident, 768px,
+  gradient checkpointing).
+- **Use:** the trained subject appears in the portal's **Subject LoRA** dropdown;
+  pick it and generate (trigger token = "<name> person"). `imggen.load(profile, lora=)`.
+- **PRIVACY (enforced):** training images + LoRAs stay on Huginn `/data`, are NOT in
+  this repo, NOT in the shared gallery, NOT pushed anywhere. Family faces never
+  leave the house. `.gitignore` guards against accidental commits.
+- **Next:** a face-clustering ingest so a bulk photo dump (Google Takeout) auto-sorts
+  into per-person training sets (you just name the clusters) — commercial-clean
+  dlib/face_recognition, no Google API (face groups aren't API-exposed).

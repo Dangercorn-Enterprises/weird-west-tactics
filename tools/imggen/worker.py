@@ -11,7 +11,7 @@ import imggen
 
 def main(job_path):
     job = json.load(open(job_path))
-    pipe = imggen.load(job.get("profile", "concept"))
+    pipe = imggen.load(job.get("profile", "concept"), lora=job.get("lora"))
     img = imggen.generate(
         pipe, job["prompt"], profile=job.get("profile", "concept"),
         width=int(job.get("width", 1024)), height=int(job.get("height", 1024)),

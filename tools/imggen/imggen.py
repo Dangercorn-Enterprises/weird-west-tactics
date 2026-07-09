@@ -64,8 +64,20 @@ def wait_for_gpu(max_wait=300, poll=5):
     return False
 
 
+# private trained LoRAs (family / house-model / product subjects) live here;
+# gitignored + never in the shared gallery.
+LORA_ROOT = "/data/forge-imggen/loras"
+
+
+def list_loras():
+    if not os.path.isdir(LORA_ROOT):
+        return []
+    return sorted(d for d in os.listdir(LORA_ROOT)
+                  if os.path.exists(os.path.join(LORA_ROOT, d, "pytorch_lora_weights.safetensors")))
+
+
 # ---- load / generate / teardown -------------------------------------------
-def load(profile="concept"):
+def load(profile="concept", lora=None):
     from diffusers import AutoencoderKL, DiffusionPipeline, EulerDiscreteScheduler
     torch.cuda.set_per_process_memory_fraction(0.90)
     # fp16-fix VAE avoids the known SDXL fp16 black/NaN decode
@@ -74,18 +86,27 @@ def load(profile="concept"):
         BASE, vae=vae, torch_dtype=torch.float16, variant="fp16", use_safetensors=True,
     )
     # Turing path: torch SDPA only. Do NOT enable xformers / flash-attn.
-    pipe.enable_model_cpu_offload()   # text encoders encode then evict; UNet resident
-    pipe.enable_vae_tiling()          # 1024 safety margin
+    # Load adapters BEFORE cpu-offload so their hooks register cleanly.
+    active = []
     if profile == "pixel":
         from huggingface_hub import hf_hub_download
-        pipe.load_lora_weights(hf_hub_download(LIGHTNING_REPO, LIGHTNING_CKPT))
-        pipe.fuse_lora()
+        pipe.load_lora_weights(hf_hub_download(LIGHTNING_REPO, LIGHTNING_CKPT), adapter_name="lightning")
+        active.append("lightning")
         pipe.scheduler = EulerDiscreteScheduler.from_config(
             pipe.scheduler.config, timestep_spacing="trailing")
+    if lora:
+        d = os.path.join(LORA_ROOT, os.path.basename(lora))
+        if os.path.isdir(d):
+            pipe.load_lora_weights(d, adapter_name="subject")
+            active.append("subject")
+    if active:
+        pipe.set_adapters(active, adapter_weights=[1.0] * len(active))
+    pipe.enable_model_cpu_offload()   # text encoders encode then evict; UNet resident
+    pipe.enable_vae_tiling()          # 1024 safety margin
     return pipe
 
 
-def generate(pipe, prompt, profile="concept", width=1024, height=1024, seed=0, style=True):
+def generate(pipe, prompt, profile="concept", width=1024, height=1024, seed=0, style=True, lora=None):
     styled = f"{prompt}, {STYLE_PIXEL if profile == 'pixel' else STYLE_PAINT}" if style else prompt
     steps, gs = (8, 0.0) if profile == "pixel" else (30, 6.0)
     g = torch.Generator(device="cuda").manual_seed(int(seed))
