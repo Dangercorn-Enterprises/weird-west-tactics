@@ -116,10 +116,15 @@ Atmospheric · Stylized · Isometric · Difficult · Indie
 Steam requires disclosure of AI-generated content. Honest wording:
 
 > *Character sprites, tile textures, and scene illustrations were generated
-> with an image-generation model (FLUX.1-dev) from hand-written prompts against
-> a fixed style guide, then hand-curated and post-processed (palette snapping,
-> background removal, frame slicing). All game design, code, writing, and audio
-> synthesis are original. No AI-generated content is created at runtime.*
+> with Stable Diffusion XL 1.0 (self-hosted, Open RAIL++-M license) from
+> hand-written prompts against a fixed style guide, then hand-curated and
+> post-processed (AI background matting, palette snapping, pixel-resolution
+> downscale). All game design, code, writing, and audio synthesis are
+> original. No AI-generated content is created at runtime.*
+
+*(2026-07-09: full asset set regenerated on self-hosted SDXL — the earlier
+FLUX.1-dev assets were non-commercial-licensed and are gone from the tree;
+every shipped image is now commercially clean.)*
 
 ## Store asset checklist (what still needs making)
 

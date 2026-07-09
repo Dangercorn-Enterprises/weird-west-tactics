@@ -126,9 +126,25 @@ def crop_content(img, pad=6):
     return img.crop((max(0, l - pad), max(0, t - pad),
                      min(img.width, r + pad), min(img.height, b + pad)))
 
+# AI matting (rembg/u2net) cuts the scene backgrounds SDXL's concept profile
+# paints behind characters — the corner flood-fill only handles flat backdrops.
+# Session is lazy + cached (model load is ~2s, reused across all sprites).
+_REMBG_SESSION = None
+def _rembg_cut(img):
+    global _REMBG_SESSION
+    from rembg import remove, new_session
+    if _REMBG_SESSION is None:
+        _REMBG_SESSION = new_session("u2net")
+    return remove(img.convert("RGBA"), session=_REMBG_SESSION,
+                  alpha_matting=False, post_process_mask=True)
+
 def sprite_process(raw_path, out_path, target_h=96):
     img = Image.open(raw_path)
-    img = remove_bg(img)
+    try:
+        img = _rembg_cut(img)
+    except Exception as e:
+        print("  [rembg unavailable (%s) -> corner flood-fill]" % str(e)[:60])
+        img = remove_bg(img)
     img = crop_content(img)
     scale = target_h / img.height
     img = img.resize((max(8, int(img.width * scale)), target_h), Image.BOX)
@@ -210,11 +226,14 @@ SEED_OVERRIDE = {
     "dynamite_bandit": 51087, "the_weaver": 51099,
 }
 def _seed_for(name):
+    # SEED_BUMP: reroll knob for targeted regeneration — delete the bad sprite
+    # files, re-run with SEED_BUMP=N, and only they regenerate on fresh seeds.
+    bump = int(os.environ.get("SEED_BUMP", "0"))
     for suf, off in (("_side_r", 3), ("_back", 1), ("_side", 2)):
         if name.endswith(suf):
             base = name[:-len(suf)]
-            return (SEED_OVERRIDE.get(base, hash(name)) + off * 7919) % 100000
-    return SEED_OVERRIDE.get(name, hash(name)) % 100000
+            return (SEED_OVERRIDE.get(base, hash(name)) + off * 7919 + bump) % 100000
+    return (SEED_OVERRIDE.get(name, hash(name)) + bump) % 100000
 
 # SDXL-Lightning (the fast "pixel" profile) has weak prompt adherence and draws
 # "character model sheet" / totem-pole collages for some subjects no matter the
@@ -271,7 +290,11 @@ def main():
         # 832x1216 (portrait SDXL bucket) + _solo_wrap; the facing phrase in the
         # base desc is rewritten first, then wrapped.
         jobs.append(("sprites", name, _solo_wrap(prompt), 832, 1216, sprite_process))
-        back = prompt.replace("facing viewer", "seen directly from behind, back view").replace("side profile", "seen directly from behind, back view")
+        # Strong back phrase: plain "back view" still drew faces on ~30% of
+        # backs; "face completely hidden" is what actually flips SDXL around.
+        back_phrase = ("viewed from directly behind, showing the back of the head "
+                       "and shoulders, face completely hidden, back view")
+        back = prompt.replace("facing viewer", back_phrase).replace("side profile", back_phrase)
         side = prompt.replace("facing viewer", "in full side profile view facing left").replace("side profile", "in full side profile view facing left")
         side_r = prompt.replace("facing viewer", "in full side profile view facing right").replace("side profile", "in full side profile view facing right")
         jobs.append(("sprites", name + "_back", _solo_wrap(back), 832, 1216, sprite_process))
