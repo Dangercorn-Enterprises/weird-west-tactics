@@ -35,6 +35,19 @@ Tim: mark up freely; SHORT DESC has three options to pick from.*
    grit decide gunfights; six gods offer miracles with teeth. Chibi sprites,
    lit 3D dioramas, consequences.*
 
+4. *(fleet draft — J5, 2026-07-09, corrected: no permadeath claim; the real
+   mechanic is persistent wounds per game_state.gd:187)* — *Assemble a posse.
+   Fight hexes, revenants, and iron golems on a cursed frontier. Carry every
+   wound home. DUSTFALL is a turn-based tactical RPG of grid combat, scars
+   that stick, and a branching campaign through a haunted Old West.*
+
+> Fleet-draft lines worth stealing for marketing copy (J5, grounded-checked):
+> "revenants wearing faces you buried" · "Each one is flesh and will, not a
+> unit" · "watch the curse take root when the plan goes wrong". REJECTED from
+> the same draft: all permadeath/"lose them forever"/"no reload" claims —
+> factually wrong (wounds persist, fallen survive at 1 HP), would be
+> refund-bait on a store page.
+
 ## About this game (long description)
 
 **The Ashfall came down like snow that never melted, and the West got weird.**
