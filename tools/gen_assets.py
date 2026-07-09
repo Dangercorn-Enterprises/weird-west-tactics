@@ -226,13 +226,17 @@ def main():
         if os.path.exists(out):
             skipped += 1
             continue
-        print("[%s/%s] generating..." % (kind, name))
-        data = gen(prompt, w, h, seed=hash(name) % 100000)
+        # sprites/props -> SDXL-Lightning "pixel" profile (flat, sprite-friendly);
+        # tiles/scenes -> "concept" (30-step painterly). Without this everything
+        # silently defaulted to concept and sprites never got the pixel path.
+        profile = "pixel" if kind in ("sprites", "props") else "concept"
+        print("[%s/%s] generating (%s)..." % (kind, name, profile))
+        data = gen(prompt, w, h, seed=hash(name) % 100000, profile=profile)
         save_raw(data, raw)
         os.makedirs(os.path.dirname(out), exist_ok=True)
         post(raw, out)
         done += 1
-        time.sleep(2)  # be polite to the free tier
+        time.sleep(1)  # local GPU, no rate limit
     print("done: %d generated, %d skipped (existing)" % (done, skipped))
 
 if __name__ == "__main__":
