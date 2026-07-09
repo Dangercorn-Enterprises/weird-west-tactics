@@ -24,3 +24,14 @@ Code + venv live at `/data/forge-imggen/`; runs as `systemctl --user forge-imgge
 
 ## Consumers
 `tools/gen_assets.py::gen()` calls this first (env `IMGGEN_URL`), NIM as fallback.
+
+## Web portal + fleet command (no code needed)
+- **Portal:** open **http://10.2.0.11:8710/** in any browser on the LAN — type a
+  prompt, pick profile/size, Generate; image shows inline with a Download button
+  and a persistent gallery of past runs. (Served by serve.py; images in
+  `/data/forge-imggen/gallery/`.)
+- **Fleet command:** `imagegen "prompt" [concept|pixel] [w] [h]` on any node
+  (`~/.local/bin/imagegen`, deployed fleet-wide) — generates on Huginn's GPU,
+  prints the view URL.
+- **Follow-up (not built):** an MCP tool so Hermes agents can generate on request
+  in chat ("hey Tiki, make me a picture of X") — Hermes supports `mcp`/`tools`.
