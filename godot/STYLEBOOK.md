@@ -106,3 +106,30 @@ phrasings and the workarounds that shipped (now baked into gen_assets.py):
 ## Rules (carried from sprites.js, still binding)
 - Every sprite must be **screenshot-verified in-engine** before it's "done".
 - One mod per rider; teal = supernatural only; when in doubt, darker + warmer.
+
+## 2026-07-09 — SDXL migration (commercial-clean) + the anti-"character sheet" recipe
+Flux is NON-COMMERCIAL (flux.1-dev license); the whole asset set was regenerated
+on **local SDXL 1.0** (forge-imggen, Huginn RTX 2070, Open RAIL++-M — sellable).
+Pipeline: `tools/gen_assets.py` → forge-imggen `:8710` (local-first, NIM fallback).
+
+**The sprite-sheet trap (cost 3 regen rounds):** SDXL draws a *character design
+sheet / turnaround / totem-pole collage* instead of one sprite for many subjects.
+Root causes, in order of impact:
+1. The literal word **"sprite"** ("full body pixel art game **sprite** of a…")
+   pulls hard toward *sprite sheets*. `_solo_wrap()` strips it and leads with
+   **"solo, a single full-body character, one figure only"**.
+2. **No negative prompt.** Added `SPRITE_NEG` (character sheet, turnaround,
+   multiple views, poster, background scenery, text…). CRITICAL: negatives only
+   bite with classifier-free guidance — the **Lightning "pixel" profile runs at
+   gs=0.0 and IGNORES them**. Sprites therefore render on the **concept profile**
+   (30-step, gs=6.0); props stay on pixel (single objects, no sheet risk).
+3. Seed/profile alone can't fix it — reseeding and switching profile both failed;
+   only the prompt-restructure + negative combo works. (Consistent with the flux
+   lesson: composition duds are PROMPT-triggered, rephrase don't re-seed.)
+4. Concept SDXL loves to add scene backgrounds (breaks corner-flood bg removal) —
+   push "isolated on a flat plain solid white background, no scenery" + negatives.
+
+**Residual variance:** even with the recipe, ~10-20% of rolls still sheet/poster.
+Production flow = generate-all → **visually judge every sprite (Calder, not
+subagents — RULE-013) → auto-reroll only the failures** until the set is clean.
+forge-imggen now accepts `negative_prompt` end-to-end (imggen/worker/serve).

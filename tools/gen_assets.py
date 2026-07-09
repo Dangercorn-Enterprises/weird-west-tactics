@@ -28,9 +28,26 @@ STYLE_PAINT = ("painterly concept art, weird western americana, warm dusk light,
 LOCAL_URL = os.environ.get("IMGGEN_URL", "http://10.2.0.11:8710/generate")
 
 
-def _gen_local(prompt, w, h, seed, profile):
+# Suppresses SDXL's strong pull toward "character design sheet" layouts for
+# single-character sprites. Only effective on the concept profile (gs=6.0); the
+# Lightning "pixel" profile runs at gs=0 and ignores negatives (server-gated).
+SPRITE_NEG = ("character sheet, reference sheet, model sheet, character turnaround, "
+              "sprite sheet, spritesheet, animation frames, game asset sheet, "
+              "multiple views, multiple poses, multiple angles, side by side, "
+              "two characters, multiple characters, duplicate character, "
+              "item icons, equipment icons, inventory, weapon rack, "
+              "grid, contact sheet, collage, storyboard, split panel, panels, "
+              "poster, movie poster, propaganda poster, album cover, banner, "
+              "background scenery, landscape, sky, clouds, sunset, environment, "
+              "ground, floor, terrain, room, wall, "
+              "border, frame, totem pole, stacked figures, "
+              "text, labels, caption, watermark, signature")
+
+
+def _gen_local(prompt, w, h, seed, profile, negative=None):
     body = {"prompt": prompt, "profile": profile, "width": w, "height": h,
-            "seed": seed, "style": False}  # prompt is already styled by the caller
+            "seed": seed, "style": False,  # prompt is already styled by the caller
+            "negative_prompt": negative}
     req = urllib.request.Request(LOCAL_URL, data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=600) as r:
@@ -38,14 +55,16 @@ def _gen_local(prompt, w, h, seed, profile):
     return base64.b64decode(j["artifacts"][0]["base64"])
 
 
-def gen(prompt, w=1024, h=1024, seed=7, retries=4, profile="concept"):
+def gen(prompt, w=1024, h=1024, seed=7, retries=4, profile="concept", negative=None):
     # local fleet GPU first; fall through to NIM on any failure
     try:
-        return _gen_local(prompt, w, h, seed, profile)
+        return _gen_local(prompt, w, h, seed, profile, negative=negative)
     except Exception as e:
         print("  local imggen unavailable (%s) -> NIM" % str(e)[:80])
     body = {"prompt": prompt, "mode": "base", "cfg_scale": 3.5,
             "width": w, "height": h, "seed": seed, "steps": 30}
+    if negative:
+        body["negative_prompt"] = negative
     for attempt in range(retries):
         req = urllib.request.Request(URL, data=json.dumps(body).encode(),
             headers={"Authorization": "Bearer " + KEY, "Accept": "application/json",
@@ -141,7 +160,7 @@ CHARACTERS = {
     # return all-black duds on every seed (see STYLEBOOK). Don't revert them.
     "preacher": "full body pixel art game sprite of a quiet traveling chaplain, long dark wool coat, round flat hat, kind weathered face, standing idle facing viewer",
     "lawdog": "full body pixel art game sprite of a frontier marshal with a brass star badge, long tan coat and wide hat, hands resting on his belt, standing idle facing viewer",
-    "drifter": "full body pixel art game sprite of a lone wanderer wrapped in a striped serape blanket poncho, wide hat shading his face, standing idle facing viewer",
+    "drifter": "full body pixel art game sprite of a lone desert wanderer in a plain weathered poncho and wide hat shading his face, dusty trousers and boots, standing idle facing viewer",
     # enemies
     "walkin_dead": "full body pixel art game sprite of a spooky green-skinned ghoul cowboy, tattered old coat and hat, glowing eyes, standing idle facing viewer",
     "rattlesnake": "full body pixel art game sprite of a desperado in a red bandana and brown hat, holding a rifle at his side, standing idle facing viewer",
@@ -157,10 +176,60 @@ CHARACTERS = {
     "the_deacon": "full body pixel art game sprite of an undead preacher boss, tall black coat, purple vodou glow, skull face paint, raised bone staff",
     "iron_foreman": "full body pixel art game sprite of a massive brass industrial golem boss, furnace chest, crane arm, smokestacks on shoulders",
     "hollow_man": "full body pixel art game sprite of an eldritch hollow man boss, void-black body with glowing teal eye in chest, long limbs",
-    "coyotes_shadow": "full body pixel art game sprite of a shadow trickster coyote spirit boss, semi-transparent black fur, orange glowing markings, bipedal",
-    "the_weaver": "full body pixel art game sprite of a spider spirit boss woman, six arms weaving glowing green threads, elegant and sinister",
+    "coyotes_shadow": "full body pixel art game sprite of a single upright bipedal coyote-headed trickster spirit boss, dark smoky fur, a few orange glowing runes on its arms, clawed hands, standing idle facing viewer",
+    "the_weaver": "full body pixel art game sprite of a single spider-spirit boss woman with six arms, faint glowing green threads at her fingertips, elegant and sinister, standing idle facing viewer",
 }
-CHAR_SUFFIX = ", plain solid white background, single character centered, no text, " + STYLE_PIXEL
+CHAR_SUFFIX = (", isolated on a plain pure white background, one single full-body character, "
+               "centered, full body from head to feet, no border, no frame, "
+               "not a character reference sheet, no split panels, no text, " + STYLE_PIXEL)
+
+# Proven anti-sheet recipe (see STYLEBOOK): SDXL draws "character design sheets"
+# for the literal word "sprite", so we drop it and lead with "solo, one figure
+# only". Combined with SPRITE_NEG on the concept profile (gs=6, which honors
+# negatives — Lightning's gs=0 does not) this yields a single centered figure on
+# a removable plain background. The facing phrase already lives in `desc`.
+_SPRITE_PREFIXES = ("full body pixel art game sprite of a ",
+                    "full body pixel art game sprite of an ",
+                    "full body pixel art game sprite of ")
+def _solo_wrap(desc):
+    for p in _SPRITE_PREFIXES:
+        if desc.startswith(p):
+            desc = desc[len(p):]
+            break
+    return ("solo, a single full-body character, one figure only, centered, "
+            "full body from head to toe, " + desc +
+            ", isolated on a flat plain solid white background, white backdrop, "
+            "no scenery, no landscape, " + STYLE_PIXEL)
+# Seeds where the default hash(name) drew a broken composition (totem filmstrip,
+# reference sheet, two figures, or an opaque scene background that bg-removal
+# can't cut). Overridden so a targeted re-gen draws a clean single figure.
+# Facings get a deterministic offset so back/side don't collide with the base.
+SEED_OVERRIDE = {
+    "coyotes_shadow": 51011, "drifter": 51023, "preacher": 51037,
+    "revenant_gun": 51049, "gunslinger": 51061, "lawdog": 51073,
+    "dynamite_bandit": 51087, "the_weaver": 51099,
+}
+def _seed_for(name):
+    for suf, off in (("_side_r", 3), ("_back", 1), ("_side", 2)):
+        if name.endswith(suf):
+            base = name[:-len(suf)]
+            return (SEED_OVERRIDE.get(base, hash(name)) + off * 7919) % 100000
+    return SEED_OVERRIDE.get(name, hash(name)) % 100000
+
+# SDXL-Lightning (the fast "pixel" profile) has weak prompt adherence and draws
+# "character model sheet" / totem-pole collages for some subjects no matter the
+# seed. The 30-step "concept" profile follows "one single figure" reliably (all
+# scenes used it, zero collage artifacts). Route the stubborn characters there;
+# sprite_process pixelizes the result so it still matches the sheet.
+PROFILE_OVERRIDE = {
+    "coyotes_shadow", "drifter", "preacher", "revenant_gun",
+    "gunslinger", "lawdog", "dynamite_bandit", "the_weaver",
+}
+def _base_name(name):
+    for suf in ("_side_r", "_back", "_side"):
+        if name.endswith(suf):
+            return name[:-len(suf)]
+    return name
 # battle cover props (billboarded in the 3D battle scene) — same recipe as characters
 PROPS = {
     "crate": "single wooden supply crate with rope, pixel art game object",
@@ -199,15 +268,15 @@ def main():
     for name, prompt in TILES.items():
         jobs.append(("tiles", name, prompt, 1024, 1024, tile_process))
     for name, prompt in CHARACTERS.items():
-        jobs.append(("sprites", name, prompt + CHAR_SUFFIX, 768, 1024, sprite_process))
-        # HD-2D facings: back + side views (side mirrors for the 4th facing)
-        back = prompt.replace("facing viewer", "seen directly from behind, back view")                      .replace("side profile", "seen directly from behind, back view")
-        side = prompt.replace("facing viewer", "in full side profile view facing left")                      .replace("side profile", "in full side profile view facing left")
-        jobs.append(("sprites", name + "_back", back + CHAR_SUFFIX, 768, 1024, sprite_process))
-        jobs.append(("sprites", name + "_side", side + CHAR_SUFFIX, 768, 1024, sprite_process))
-        # independent right-side view — no mirror artifacts (gear stays in hand)
-        side_r = prompt.replace("facing viewer", "in full side profile view facing right")                        .replace("side profile", "in full side profile view facing right")
-        jobs.append(("sprites", name + "_side_r", side_r + CHAR_SUFFIX, 768, 1024, sprite_process))
+        # 832x1216 (portrait SDXL bucket) + _solo_wrap; the facing phrase in the
+        # base desc is rewritten first, then wrapped.
+        jobs.append(("sprites", name, _solo_wrap(prompt), 832, 1216, sprite_process))
+        back = prompt.replace("facing viewer", "seen directly from behind, back view").replace("side profile", "seen directly from behind, back view")
+        side = prompt.replace("facing viewer", "in full side profile view facing left").replace("side profile", "in full side profile view facing left")
+        side_r = prompt.replace("facing viewer", "in full side profile view facing right").replace("side profile", "in full side profile view facing right")
+        jobs.append(("sprites", name + "_back", _solo_wrap(back), 832, 1216, sprite_process))
+        jobs.append(("sprites", name + "_side", _solo_wrap(side), 832, 1216, sprite_process))
+        jobs.append(("sprites", name + "_side_r", _solo_wrap(side_r), 832, 1216, sprite_process))
     for name, prompt in PROPS.items():
         jobs.append(("props", name, prompt + CHAR_SUFFIX, 768, 768,
                      lambda r, o: sprite_process(r, o, target_h=72)))
@@ -229,9 +298,13 @@ def main():
         # sprites/props -> SDXL-Lightning "pixel" profile (flat, sprite-friendly);
         # tiles/scenes -> "concept" (30-step painterly). Without this everything
         # silently defaulted to concept and sprites never got the pixel path.
-        profile = "pixel" if kind in ("sprites", "props") else "concept"
+        # sprites -> concept profile (30-step, gs=6.0 so SPRITE_NEG's anti-sheet
+        # terms actually bite); props -> fast pixel profile (single objects, no
+        # sheet risk); tiles/scenes -> concept.
+        profile = "pixel" if kind == "props" else "concept"
+        neg = SPRITE_NEG if kind == "sprites" else None
         print("[%s/%s] generating (%s)..." % (kind, name, profile))
-        data = gen(prompt, w, h, seed=hash(name) % 100000, profile=profile)
+        data = gen(prompt, w, h, seed=_seed_for(name), profile=profile, negative=neg)
         save_raw(data, raw)
         os.makedirs(os.path.dirname(out), exist_ok=True)
         post(raw, out)

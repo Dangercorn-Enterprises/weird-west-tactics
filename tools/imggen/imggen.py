@@ -106,11 +106,17 @@ def load(profile="concept", lora=None):
     return pipe
 
 
-def generate(pipe, prompt, profile="concept", width=1024, height=1024, seed=0, style=True, lora=None):
+def generate(pipe, prompt, profile="concept", width=1024, height=1024, seed=0,
+             style=True, lora=None, negative_prompt=None):
     styled = f"{prompt}, {STYLE_PIXEL if profile == 'pixel' else STYLE_PAINT}" if style else prompt
     steps, gs = (8, 0.0) if profile == "pixel" else (30, 6.0)
     g = torch.Generator(device="cuda").manual_seed(int(seed))
     kw = dict(prompt=styled, num_inference_steps=steps, guidance_scale=gs, generator=g)
+    # negative_prompt only takes effect with classifier-free guidance (gs > 1);
+    # the SDXL-Lightning "pixel" profile runs at gs=0.0 and ignores it (and some
+    # diffusers builds error if it's passed there), so gate on gs.
+    if negative_prompt and gs > 1:
+        kw["negative_prompt"] = negative_prompt
     try:
         return pipe(width=width, height=height, **kw).images[0]
     except torch.cuda.OutOfMemoryError:

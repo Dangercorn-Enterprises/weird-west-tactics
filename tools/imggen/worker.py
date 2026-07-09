@@ -16,6 +16,7 @@ def main(job_path):
         pipe, job["prompt"], profile=job.get("profile", "concept"),
         width=int(job.get("width", 1024)), height=int(job.get("height", 1024)),
         seed=int(job.get("seed", 0)), style=job.get("style", True),
+        negative_prompt=job.get("negative_prompt"),
     )
     img.save(job["out"])
     # process exit (below) frees the CUDA context -> VRAM back to ~1 MiB

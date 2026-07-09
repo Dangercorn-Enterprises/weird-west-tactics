@@ -45,7 +45,8 @@ def run_job(spec):
         job = {"prompt": spec["prompt"], "profile": prof,
                "width": int(spec.get("width", 1024)), "height": int(spec.get("height", 1024)),
                "seed": int(spec.get("seed", 0)), "style": spec.get("style", True),
-               "lora": (spec.get("lora") or None), "out": out}
+               "lora": (spec.get("lora") or None),
+               "negative_prompt": (spec.get("negative_prompt") or None), "out": out}
         jf = "%s/.job_%d.json" % (HERE, ts)
         json.dump(job, open(jf, "w"))
         t0 = time.time()
