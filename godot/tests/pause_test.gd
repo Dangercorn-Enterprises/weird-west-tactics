@@ -57,6 +57,7 @@ func _tick() -> void:
 			_test_volumes()
 			_test_mute()
 			_test_menu()
+			_test_posse()
 			# quit-to-title from a paused menu, then let change_scene settle
 			pm.open_menu()
 			pm._quit_to_title()
@@ -123,6 +124,34 @@ func _test_mute() -> void:
 		_fail("mood lost across mute/unmute: %s" % audio._mood)
 	if not audio._music_player.playing:
 		_fail("music did not resume on unmute")
+
+# Posse sheet (2i): injected IN-MEMORY roster only — state is swapped back and
+# never saved (_swap is deliberately untested here; it writes user://save.json).
+func _test_posse() -> void:
+	print("== posse sheet ==")
+	var saved_state = gs.state
+	gs.state = {"party": [
+		{"uid": "t0", "name": "Test Rider", "archetype": "gunslinger", "level": 2,
+			"xp": 40, "hpDamage": 4, "gear": {"weapon": "rifle"}, "god": "vulcan",
+			"stats": {"vigor": 6, "quickness": 7, "strength": 4, "deftness": 8,
+				"nimbleness": 5, "cognition": 4, "knowledge": 3, "mien": 4, "spirit": 5}},
+		{"uid": "t1", "name": "Bench Hand", "archetype": "preacher", "level": 1,
+			"xp": 0, "hpDamage": 0, "gear": {},
+			"stats": {"vigor": 5, "quickness": 4, "strength": 5, "deftness": 4}},
+	]}
+	pm.open_menu()
+	if pm.posse_btn.disabled:
+		_fail("posse button disabled with a live party")
+	pm._open_posse()
+	if not pm.posse_box.visible or pm.main_box.visible:
+		_fail("posse view did not swap in")
+	if pm.posse_box.get_child_count() != 5: # head + hint + 2 rider rows + back
+		_fail("posse row count wrong: %d" % pm.posse_box.get_child_count())
+	pm._back_to_main()
+	if pm.posse_box.visible or not pm.main_box.visible:
+		_fail("back did not restore the main menu")
+	pm.close()
+	gs.state = saved_state
 
 func _test_menu() -> void:
 	print("== pause menu ==")
