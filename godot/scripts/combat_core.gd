@@ -51,6 +51,7 @@ var design: Dictionary = {} # design.json (enemies/weapons/armor/mods/pregen...)
 var favor := 1 # divine favor snapshot per unit (New Game seeds 1)
 var scale_enabled := true
 var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
+var on_cover_hit: Callable = Callable() # UI hook (q, r, chp_left) — cover chip/shatter
 
 # ---- seeded RNG: exact mulberry32 port so runs are reproducible -------------
 var _rng_state: int = 0
@@ -87,17 +88,78 @@ func build_grid() -> Array:
 	for r in ROWS:
 		var row: Array = []
 		for q in COLS:
-			row.append({"h": 0, "cover": 0.0})
+			# cover: current bonus (0..0.4). cover0: original (for FX/repair ref).
+			# chp: cover durability. -1 = heavy/indestructible-by-bullets; >0 =
+			# light, decays toward 0. heavy: material flag for explosive rules.
+			row.append({"h": 0, "cover": 0.0, "cover0": 0.0, "chp": 0, "heavy": false})
 		grid.append(row)
 	for p in [[3, 2], [6, 7], [2, 6], [7, 3]]:
 		grid[p[1]][p[0]]["h"] = 1
 	for p in [[4, 4], [5, 5]]:
 		grid[p[1]][p[0]]["h"] = 2
+	# heavy cover (rock/wall): 0.4 bonus, bullet-immune (chp -1)
 	for p in [[2, 3], [7, 6], [4, 7], [5, 2], [1, 5], [8, 4]]:
-		grid[p[1]][p[0]]["cover"] = 0.4
+		var c: Dictionary = grid[p[1]][p[0]]
+		c["cover"] = 0.4; c["cover0"] = 0.4; c["chp"] = -1; c["heavy"] = true
+	# light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits
 	for p in [[3, 5], [6, 4], [2, 8], [7, 8], [4, 1], [5, 8]]:
-		grid[p[1]][p[0]]["cover"] = 0.2
+		var c: Dictionary = grid[p[1]][p[0]]
+		c["cover"] = 0.2; c["cover0"] = 0.2; c["chp"] = LIGHT_COVER_HP; c["heavy"] = false
 	return grid
+
+const LIGHT_COVER_HP := 3  # absorbed would-be-hits before light cover is gone
+const HUNKER_BONUS := 0.20  # hunker adds to cover bonus (was a flat -20 to-hit)
+
+# Bresenham supercover line between two tiles (exclusive of endpoints).
+func _line_tiles(aq: int, ar: int, bq: int, br: int) -> Array:
+	var tiles: Array = []
+	var dq: int = absi(bq - aq)
+	var dr: int = absi(br - ar)
+	var sq: int = 1 if aq < bq else -1
+	var sr: int = 1 if ar < br else -1
+	var err: int = dq - dr
+	var q: int = aq
+	var r: int = ar
+	while q != bq or r != br:
+		var e2: int = 2 * err
+		if e2 > -dr:
+			err -= dr; q += sq
+		if e2 < dq:
+			err += dq; r += sr
+		if q == bq and r == br:
+			break
+		tiles.append([q, r])
+	return tiles
+
+# Direct-fire line of sight: a full-height (h>=2) tile between shooter and target
+# blocks the shot. High ground shooting DOWN sees over one intervening wall
+# (skylined target below the muzzle line) — the "I have the high ground" rule.
+func has_los(grid: Array, att: Dictionary, def: Dictionary) -> bool:
+	var att_h: int = int(grid[att["r"]][att["q"]]["h"])
+	var def_h: int = int(grid[def["r"]][def["q"]]["h"])
+	for t in _line_tiles(int(att["q"]), int(att["r"]), int(def["q"]), int(def["r"])):
+		if int(grid[t[1]][t[0]]["h"]) >= 2:
+			# elevation advantage lets you see over a wall lower than your perch
+			if att_h > def_h and int(grid[t[1]][t[0]]["h"]) <= att_h:
+				continue
+			return false
+	return true
+
+# Effective cover bonus (0..~0.6) the defender enjoys vs THIS attacker.
+# High ground on the shooter halves it (sees over); a defender on high ground
+# gets NONE (beacon — skylined); hunker adds to it. Directional flanking:
+# point-blank (adjacent) attacks bypass cover in v1 (full edge-facing = v2).
+func cover_bonus(grid: Array, att: Dictionary, def: Dictionary) -> float:
+	if int(grid[def["r"]][def["q"]]["h"]) >= 1:
+		return HUNKER_BONUS if def["status"]["hunker"] > 0 else 0.0  # beacon
+	var cb: float = float(grid[def["r"]][def["q"]]["cover"])
+	if dist(att, def) <= 1:
+		cb = 0.0  # point-blank flank negates cover (v1 directional proxy)
+	elif int(grid[att["r"]][att["q"]]["h"]) > int(grid[def["r"]][def["q"]]["h"]):
+		cb *= 0.5  # shooting down over low cover — half, not erased (Njord fix)
+	if def["status"]["hunker"] > 0:
+		cb += HUNKER_BONUS
+	return minf(cb, 0.60)  # cap so hunker can't fully erase the hit band
 
 # ---- unit construction --------------------------------------------------------
 func mk_unit(o: Dictionary) -> Dictionary:
@@ -202,19 +264,25 @@ func enemy_to_unit(spec: Dictionary, i: int) -> Dictionary:
 static func dist(a: Dictionary, b: Dictionary) -> int:
 	return absi(a["q"] - b["q"]) + absi(a["r"] - b["r"])
 
-func hit_chance(grid: Array, att: Dictionary, def: Dictionary, ignore_cover := false) -> int:
+# Bare-target hit % — everything EXCEPT cover/hunker (those live in cover_bonus).
+# Unclamped so the banded roll can compute the "would-hit-bare" ceiling.
+func base_hit(grid: Array, att: Dictionary, def: Dictionary) -> float:
 	var c: float = float(att["aim"])
-	var cover: float = 0.0 if ignore_cover else float(grid[def["r"]][def["q"]]["cover"])
-	c -= cover * 100.0
 	c += float(grid[att["r"]][att["q"]]["h"] - grid[def["r"]][def["q"]]["h"]) * 10.0
 	c -= float(maxi(0, dist(att, def) - att["rng"])) * 15.0
 	if att.get("jinx", 0):
 		c -= 15.0
 	if att["status"]["hex"] > 0:
 		c -= 15.0
-	if def["status"]["hunker"] > 0:
-		c -= 20.0
-	return clampi(roundi(c), 5, 95)
+	return c
+
+# Effective chance to hit the UNIT (through cover). Used by AI EV + hover preview.
+# = base_hit - cover_bonus, clamped. Identical value to the pre-banded formula
+# for the plain cover+hunker case, so unit win-rate parity is preserved.
+func hit_chance(grid: Array, att: Dictionary, def: Dictionary, ignore_cover := false) -> int:
+	var base: float = base_hit(grid, att, def)
+	var cb: float = 0.0 if ignore_cover else cover_bonus(grid, att, def)
+	return clampi(roundi(base - cb * 100.0), 5, 95)
 
 func roll_dmg(att: Dictionary) -> int:
 	return randint(att["wmin"], att["wmax"]) + int(float(att["str"]) / 3.0)
@@ -269,11 +337,20 @@ func apply_damage(b: Dictionary, def: Dictionary, dmg: int, crit := false) -> vo
 		check_boss_phase(b, def)
 
 func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> bool:
-	var ch := hit_chance(b["grid"], att, def, opts.get("ignoreCover", false) or att.get("wIC", false))
-	if chance(float(ch)):
-		# flat 10% crit at 1.5x, both sides (Pass 19). RNG order preserved
-		# exactly: roll_dmg() first, then the crit chance() — matching the
-		# original inline expression so win-rate parity is untouched.
+	var ic: bool = opts.get("ignoreCover", false) or att.get("wIC", false)
+	# Direct fire needs line of sight (h>=2 terrain blocks the shot). Abilities
+	# can waive it via opts.no_los (e.g. supernatural / thrown effects).
+	if not opts.get("no_los", false) and not has_los(b["grid"], att, def):
+		return false
+	# Banded single roll (BT cover model): one draw split into hit / strikes-cover
+	# / miss. The HIT threshold == the old effective hit_chance and consumes the
+	# same single rnd() as the former chance(), so unit-hit parity is exact; the
+	# strikes-cover band is carved out of the former miss space.
+	var hit_thru: int = hit_chance(b["grid"], att, def, ic)
+	var bare: int = clampi(roundi(base_hit(b["grid"], att, def)), 5, 95)
+	var r: float = rnd() * 100.0
+	if r < float(hit_thru):
+		# HIT UNIT — RNG order preserved: roll_dmg() then crit chance().
 		var base_dmg := roll_dmg(att)
 		var is_crit := chance(10.0)
 		var dmg := roundi(float(base_dmg) * float(opts.get("mult", 1.0)) * (1.5 if is_crit else 1.0))
@@ -288,7 +365,25 @@ func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> boo
 		if att.get("hexer", false) and def["alive"]:
 			def["status"]["hex"] = maxi(int(def["status"]["hex"]), 2)
 		return true
+	elif not ic and r < float(bare):
+		# STRIKES COVER — the would-have-hit-bare band. Cover eats the shot and
+		# degrades (light only); the unit is untouched. Misses (r>=bare) touch
+		# nothing, so accuracy-spam can never strip cover.
+		strike_cover(b, def["q"], def["r"])
 	return false
+
+# Degrade cover on an absorbed hit. Heavy (chp<0) shrugs off small arms; light
+# decays its bonus as its durability drops, so coverage weakens as it breaks.
+func strike_cover(b: Dictionary, q: int, r: int) -> void:
+	var cell: Dictionary = b["grid"][r][q]
+	if int(cell["chp"]) <= 0:
+		return  # heavy/indestructible or already gone
+	cell["chp"] = int(cell["chp"]) - 1
+	cell["cover"] = float(cell["cover0"]) * (float(cell["chp"]) / float(LIGHT_COVER_HP))
+	if int(cell["chp"]) <= 0:
+		cell["cover"] = 0.0
+	if on_cover_hit.is_valid():
+		on_cover_hit.call(q, r, int(cell["chp"]))
 
 const STATUS_DOT := {"burn": 3, "bleed": 2}
 
@@ -309,6 +404,27 @@ func do_blast(b: Dictionary, center: Dictionary) -> void:
 			if int(u.get("armorDef", 0)) > 0:
 				dmg = maxi(1, dmg - int(u["armorDef"]))
 			apply_damage(b, u, dmg)
+	# Explosives are the answer to cover: delete light in the radius, crack heavy.
+	# This is the whole reason to lob (and why hunkering behind a wagon is finite).
+	for dr in range(-1, 2):
+		for dq in range(-1, 2):
+			var q: int = int(center["q"]) + dq
+			var r: int = int(center["r"]) + dr
+			if q < 0 or r < 0 or q >= COLS or r >= ROWS:
+				continue
+			var cell: Dictionary = b["grid"][r][q]
+			if float(cell["cover"]) <= 0.0:
+				continue
+			if bool(cell["heavy"]):
+				# crack heavy down a tier rather than vaporize it
+				cell["cover"] = maxf(0.0, float(cell["cover"]) - 0.2)
+				if cell["cover"] <= 0.0:
+					cell["heavy"] = false
+			else:
+				cell["cover"] = 0.0
+				cell["chp"] = 0
+			if on_cover_hit.is_valid():
+				on_cover_hit.call(q, r, -1)  # -1 flags a blast (shatter FX)
 
 func trigger_boss_phase(b: Dictionary, boss: Dictionary) -> void:
 	boss["enraged"] = true
@@ -431,23 +547,27 @@ func enemy_phase(b: Dictionary) -> void:
 			if e.get("sentry", false) and dist(e, tgt) > int(e["rng"]) + 1:
 				break # emplacements never chase
 			if dist(e, tgt) <= int(e["rng"]) + 1 and int(e["ap"]) >= 2:
-				e["ap"] -= 2
 				var cluster := 0
 				for p in alive:
 					if absi(p["q"] - tgt["q"]) <= 1 and absi(p["r"] - tgt["r"]) <= 1:
 						cluster += 1
-				if e.get("bomber", false) or (e.get("slammer", false) and cluster >= 2):
-					do_blast(b, tgt)
-				else:
-					do_fire(b, e, tgt)
-				var any_alive := false
-				for p in b["players"]:
-					if p["alive"]:
-						any_alive = true
-						break
-				if not any_alive:
-					return
-				continue
+				var is_blast: bool = e.get("bomber", false) or (e.get("slammer", false) and cluster >= 2)
+				# Direct fire needs LOS; blasts lob over terrain. No clear shot ->
+				# fall through to reposition instead of wasting the turn on a wall.
+				if is_blast or has_los(b["grid"], e, tgt):
+					e["ap"] -= 2
+					if is_blast:
+						do_blast(b, tgt)
+					else:
+						do_fire(b, e, tgt)
+					var any_alive := false
+					for p in b["players"]:
+						if p["alive"]:
+							any_alive = true
+							break
+					if not any_alive:
+						return
+					continue
 			if e.get("blinker", false) and int(e["ap"]) >= 1 and dist(e, tgt) > int(e["rng"]):
 				var spots: Array = []
 				for r in ROWS:
@@ -479,6 +599,12 @@ func _avg_roll(u: Dictionary, mult: float) -> float:
 	return (float(u["wmin"] + u["wmax"]) / 2.0 + float(int(float(u["str"]) / 3.0))) * mult
 
 func _exp_atk_dmg(grid: Array, att: Dictionary, def: Dictionary, fx: Dictionary) -> float:
+	# No line of sight -> no shot: EV 0 so the policy never fires through a wall.
+	# Only thrown/blast effects (no_los) are exempt — even a guaranteed Called
+	# Shot needs to see the target.
+	if not fx.get("no_los", false):
+		if not has_los(grid, att, def):
+			return 0.0
 	var saved: int = att["aim"]
 	if fx.has("aimMod"):
 		att["aim"] += int(fx["aimMod"])
