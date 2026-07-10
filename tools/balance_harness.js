@@ -1045,6 +1045,7 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
     playerDeaths: B.playerDeaths,
     survivors: B.players.filter((p) => p.alive).length,
     enemyDeathRound,
+    kills: B.kills, // incl. raised adds — lets tooling see XP inflow, not just WR
   };
 }
 
@@ -1271,4 +1272,5 @@ module.exports = {
   fullParty,
   partyToUnit,
   enemyToUnit,
+  scaleEncounter,
 };
