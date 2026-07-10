@@ -971,7 +971,8 @@ func run_battle(party_specs: Array, enemy_specs: Array, max_rounds: int) -> Dict
 		not b["players"].filter(func(p): return p["alive"]).is_empty()
 		and b["enemies"].filter(func(e): return e["alive"]).is_empty()
 	)
-	return {"win": win, "rounds": round_n, "timedOut": timed_out}
+	# kills incl. raised adds — WR alone can't see farms/stalls (Njord RT#2)
+	return {"win": win, "rounds": round_n, "timedOut": timed_out, "kills": b["kills"]}
 
 func eval_encounter(party: Array, enemy_ids: Array, runs: int) -> Dictionary:
 	var raw: Array = []
@@ -981,10 +982,16 @@ func eval_encounter(party: Array, enemy_ids: Array, runs: int) -> Dictionary:
 			raw.append(spec)
 	var specs := scale_encounter(raw, party.size()) if scale_enabled else raw
 	var wins := 0
+	var rounds := 0
+	var kills := 0
 	for i in runs:
-		if run_battle(party, specs, 60)["win"]:
+		var r := run_battle(party, specs, 60)
+		if r["win"]:
 			wins += 1
-	return {"winRate": float(wins) / float(runs), "n": runs}
+		rounds += int(r["rounds"])
+		kills += int(r["kills"])
+	return {"winRate": float(wins) / float(runs), "n": runs,
+		"avgRounds": float(rounds) / float(runs), "avgKills": float(kills) / float(runs)}
 
 func mk_party(ids: Array) -> Array:
 	var out: Array = []

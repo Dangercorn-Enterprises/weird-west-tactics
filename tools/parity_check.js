@@ -119,18 +119,30 @@ console.log(
   "encounter win rates (±" + TOLERANCE * 100 + " pts, " + RUNS + " runs/side):",
 );
 for (const [key, [pk, ids]] of Object.entries(ENC)) {
-  const node = H.evalEncounter(key, parties[pk], ids, RUNS).winRate;
+  const node = H.evalEncounter(key, parties[pk], ids, RUNS);
   const gd = g.encounters[key];
-  const diff = Math.abs(node - gd);
+  const diff = Math.abs(node.winRate - gd.wr);
+  // rounds/kills ride along (XP-inflow + stall visibility — WR can't see
+  // farms). Same seed + same draws -> effectively exact; 0.05 = float dust.
+  const dR = Math.abs(node.avgRounds - gd.rounds);
+  const dK = Math.abs(node.avgKills - gd.kills);
   check(
     key.padEnd(9) +
       " node " +
-      (node * 100).toFixed(1) +
+      (node.winRate * 100).toFixed(1) +
       "% / godot " +
-      (gd * 100).toFixed(1) +
-      "%",
-    diff <= TOLERANCE,
-    "Δ " + (diff * 100).toFixed(1) + " pts",
+      (gd.wr * 100).toFixed(1) +
+      "%  r" +
+      gd.rounds.toFixed(1) +
+      " k" +
+      gd.kills.toFixed(2),
+    diff <= TOLERANCE && dR <= 0.05 && dK <= 0.05,
+    "Δwr " +
+      (diff * 100).toFixed(1) +
+      "pts Δr " +
+      dR.toFixed(3) +
+      " Δk " +
+      dK.toFixed(3),
   );
 }
 

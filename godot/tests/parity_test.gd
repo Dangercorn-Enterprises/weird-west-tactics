@@ -59,7 +59,11 @@ func _init() -> void:
 	}
 	var results := {}
 	for k in encounters:
-		results[k] = snappedf(encounters[k]["winRate"], 0.0001)
+		results[k] = {
+			"wr": snappedf(encounters[k]["winRate"], 0.0001),
+			"rounds": snappedf(encounters[k]["avgRounds"], 0.0001),
+			"kills": snappedf(encounters[k]["avgKills"], 0.0001),
+		}
 
 	print(JSON.stringify({"unit": unit_report, "encounters": results}))
 	quit(0)

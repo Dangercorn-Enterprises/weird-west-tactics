@@ -1078,6 +1078,7 @@ function evalEncounter(name, party, enemyIds, runs) {
     totSurv = 0,
     totTTK = 0,
     ttkN = 0,
+    totKills = 0,
     timeouts = 0;
   for (let i = 0; i < runs; i++) {
     const res = runBattle(party, enemySpecs, 60);
@@ -1092,6 +1093,7 @@ function evalEncounter(name, party, enemyIds, runs) {
     totRounds += res.rounds;
     totDeaths += res.playerDeaths;
     totSurv += res.survivors;
+    totKills += res.kills;
   }
   return {
     name,
@@ -1102,6 +1104,7 @@ function evalEncounter(name, party, enemyIds, runs) {
     avgDeaths: totDeaths / runs,
     avgSurvivors: totSurv / runs,
     avgTTK: ttkN ? totTTK / ttkN : null,
+    avgKills: totKills / runs, // incl. raised adds — XP inflow visibility
     timeoutRate: timeouts / runs,
   };
 }
