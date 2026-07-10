@@ -906,6 +906,12 @@ function playerPhaseAbilities(B) {
       p.ap -= choice.fx.cost;
       if (!B.enemies.some((e) => e.alive)) return;
     }
+    // 2b (hunker ends turn): a competent player banks leftover AP as a brace —
+    // the activation was over anyway; prices hunker into the baselines.
+    if (p.alive && p.ap >= 1) {
+      p.status.hunker = Math.max(p.status.hunker, 2);
+      p.ap = 0;
+    }
   }
   B.players.forEach((p) => (p.jinx = 0)); // jinx clears at end of player phase (~691)
 }

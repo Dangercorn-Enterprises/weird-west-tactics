@@ -828,6 +828,12 @@ func player_phase(b: Dictionary) -> void:
 					break
 			if not any_e:
 				return
+		# 2b (hunker ends turn): a competent player banks leftover AP as a brace —
+		# the activation was over anyway, so this is strictly-correct defense and
+		# finally prices hunker into the baselines.
+		if p["alive"] and int(p["ap"]) >= 1:
+			p["status"]["hunker"] = maxi(int(p["status"]["hunker"]), 2)
+			p["ap"] = 0
 	for p in b["players"]:
 		p["jinx"] = 0
 

@@ -787,12 +787,14 @@ func _rebuild_ability_bar() -> void:
 		db.pressed.connect(_choose_ability.bind(str(sel["divine"])))
 		ability_bar.add_child(db)
 	var hb := Button.new()
-	hb.text = "Hunker (1)"
+	# Session #2 decision 2b (Tim): hunkering ends the unit's turn — kills the
+	# shoot-then-hunker dominant line (Njord's turtle exploit).
+	hb.text = "Hunker (ends turn)"
 	hb.disabled = int(sel["ap"]) < 1
 	hb.pressed.connect(func():
-		sel["ap"] = int(sel["ap"]) - 1
+		sel["ap"] = 0
 		sel["status"]["hunker"] = maxi(int(sel["status"]["hunker"]), 2)
-		_log("%s hunkers down — harder to hit." % sel["name"])
+		_log("%s hunkers down for the rest of the turn." % sel["name"])
 		_select(sel))
 	ability_bar.add_child(hb)
 	for item in [["bandages", "Bandage"], ["ashfall_charge", "Charge"], ["smelling_salts", "Salts"]]:
