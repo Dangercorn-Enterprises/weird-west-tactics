@@ -199,6 +199,8 @@ func party_to_unit(p: Dictionary, i: int) -> Dictionary:
 		"id": p.get("uid", "p%d" % i),
 		"name": p.get("name", "Rider"),
 		"archetype": aid,
+		# sworn shrine god fuels this unit's divine (JS parity: god: p.god || null)
+		"god": p.get("god") if p.get("god") else null,
 		"side": "p",
 		"q": 1,
 		"r": [1, 4, 7, 2][i] if i < 4 else 1,
