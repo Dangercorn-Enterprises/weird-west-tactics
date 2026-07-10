@@ -103,3 +103,28 @@ economy: the safe path is the slow path.
 - **Doctrine layer:** lobbed dynamite (scatter/spotter) + AI expected-value lob.
 - Re-run the parity/balance harness after each (combat-math changes void the
   green guarantee otherwise — audit cluster 6).
+
+---
+## Positioning v1 — BUILT (2026-07-09, commits 71385a9 + 2f8401e)
+Shipped: LOS raycast (h>=2 blocks direct fire; high ground sees over), banded
+single-roll cover (hit/strikes-cover/miss), high-ground halves target cover +
+beacon (no cover on high tiles), hunker +0.20 capped at 0.60, point-blank
+negates cover (v1 flank proxy), destructible LIGHT cover decaying its bonus,
+heavy bullet-immune, explosives crack/delete cover; AI + player policy LOS-aware;
+battle-scene FX (cover topples + dust puff on break). tests/positioning_test.gd
+17/17. Battle boots clean.
+
+**Balance shift (2000-run bot-vs-bot):** skirmish .99->.67, finale .84->.53,
+foreman .62->.47 DOWN; vanguard .74->.81, deacon .52->.62, weaver .65->.70,
+hollow .64->.67 UP. Unit derivations unchanged.
+⚠️ **CAVEAT — do not retune off these:** the sim's scripted player bot cannot
+USE the new tools (never seeks high ground, never flanks, never repositions for
+LOS), so it eats the downsides without the upsides — win rates understate human
+play. Tuning against a positionally-blind bot tunes the game for a bad player.
+Real balance = a HUMAN playtest (Tim) + a positional bot policy. This is a
+PLAYTEST gate.
+
+**Deferred to v2 (Njord red-team priorities):** OVERWATCH/reaction fire (#1 —
+makes flanking risky, load-bearing), full edge-directional cover, difficult
+terrain (double MP), hunker-turtle economy (ends-turn/no-move), the dynamite
+LOB doctrine (scatter/spotter). Njord's full report: docs/COVER_REDTEAM_2026-07-09.md.
