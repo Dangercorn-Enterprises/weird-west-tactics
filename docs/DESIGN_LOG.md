@@ -466,3 +466,54 @@ the default Quick Skirmish has no teeth for a competent player.
 Also shipped this run: deployed-only XP + per-rider battle-end breakdown
 (2i first cut), FAVORED re-route + LIVE_STATS convention (2f stopgap —
 casters finally level).
+
+---
+## OVERNIGHT ANNEX — Njord red-team #2 (the SHIPPED rules) + code-verified
+## answers (2026-07-10 overnight; full verdict docs/REDTEAM_RULES_NJORD_2026-07-10.md)
+
+Njord exploit-hunted the four shipped rules + deployed-only XP. I verified
+every §11 blocker against the actual code. Verdicts with receipts:
+
+1. **Kit-raised dead PAY full kill XP — CONFIRMED (CRITICAL).**
+   apply_damage increments kills for any side-e death (combat_core.gd:344,
+   no raisedBy exclusion); apply_battle_result pays kills×10. Every Risen
+   Dead the Deacon raises is a 10-XP piñata.
+2. **Enrage is HP-gated ONLY — CONFIRMED.** check_boss_phase:492 fires
+   solely at hp ≤ 50%. A player who never damages the Deacon stays
+   pre-enrage forever → **the XP farm is UNBOUNDED as shipped**
+   (~5 XP/round gross at the raise cadence, deployed-only XP removes the
+   dilution brake, and the new battle-end XP breakdown TEACHES the farm).
+   Njord's P0 stands: ship-block class for a demo containing the Deacon.
+   Closure options (TIM PICKS, none implemented): kit adds worth 0 XP ·
+   per-fight kit-XP budget · enrage turn-timer or anti-ignore (enrage if
+   unhurt K turns) · adds excluded from kill count.
+3. **Shoot-then-hunker is STILL LEGAL — CONFIRMED.** The 2b intent was
+   "kill the dominant line," but ends-turn ≠ mutex: hunker only needs ≥1 AP
+   (battle.gd), and maxAp is 3+ for everyone — shoot (2 AP) then hunker
+   (ends turn) fits every turn. The dominant line survived the nerf.
+   Options (TIM PICKS): hunker requires full AP (no actions spent) · hunker
+   forbidden after attacking · accept shoot-then-brace as intended texture.
+4. **Thrower death does NOT defuse — CONFIRMED.** tick_charges never
+   references the thrower; the stick booms regardless. No kill-to-defuse
+   counterplay. (Flag, arguably fine — dead man's dynamite is very western.)
+5. **Rough scar after cover break — INTENTIONAL, Calder interpretation,
+   vetoable.** Njord notes the inverted incentive: breaking brush can
+   worsen YOUR approach. Alternative: rough only while the cover object
+   stands.
+6. **Bot brace ⊆ player rules — ALIGNED.** The bot's end-of-activation
+   brace is the same action a player may take with spare AP; the bot uses
+   a strict subset of legal options, so post-hunker baselines don't
+   overstate player defense. (Njord's Hole C doesn't bite — but his larger
+   point stands: WR alone can't see farms, stalls, or duration; the
+   instrument needs XP/duration columns, queued for the dial-map tool.)
+
+Also confirmed from code while verifying: sticks DO crack/delete cover on
+detonation (delayed cover-deletion, Njord §3C-4) and charges stack per tile
+(damage and −5.5 bot-avoid both stack). His −5.5-is-a-policy-hammer and
+rough×fuse (flee across brush can be impossible) findings look right by
+inspection and are queued as instrument/AI follow-ups after Tim's picks.
+
+**Morning decision list distilled: (a) close the Deacon farm (pick a
+closure), (b) hunker mutex or accept the texture, (c) rough-scar keep or
+revert, (d) later: fuse-avoid EV model, spawn-slot variety, XP/duration
+instrument columns.**
