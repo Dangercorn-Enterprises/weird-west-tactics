@@ -54,6 +54,7 @@ func _ready() -> void:
 	core.seed_rng(int(Time.get_ticks_usec()) & 0x7FFFFFFF)
 	core.on_damage = _on_unit_damaged
 	core.on_cover_hit = _on_cover_hit
+	core.on_charge = _on_charge
 	params = GS.pending_battle if not GS.pending_battle.is_empty() else {
 		"title": "Skirmish at the Crossing", "biome": "mesa",
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
@@ -101,7 +102,8 @@ func _setup_battle() -> void:
 		u["r"] = sp[1]
 		enemies.append(u)
 	battle = {"grid": grid, "players": players, "enemies": enemies,
-		"units": players + enemies, "kills": 0, "playerDeaths": 0}
+		"units": players + enemies, "kills": 0, "playerDeaths": 0,
+		"charges": []}
 
 func _build_biome_grid(biome: Dictionary) -> Array:
 	var g: Array = []
@@ -339,6 +341,40 @@ func _blob_texture() -> ImageTexture:
 			img.set_pixel(x, y, Color(0, 0, 0, clampf(0.55 * (1.0 - d), 0.0, 0.55)))
 	_blob_tex = ImageTexture.create_from_image(img)
 	return _blob_tex
+
+# CombatCore.on_charge(q, r, lit): a fuse-delay stick (2c) lands lit or goes
+# off. The pulsing marker IS the trope — the cowboy sees it and moves.
+var _charge_props := {}
+
+func _on_charge(q: int, r: int, lit: bool) -> void:
+	var key := "%d,%d" % [q, r]
+	if lit:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.18, 0.18, 0.18)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color("#c0392b")
+		mat.emission_enabled = true
+		mat.emission = Color("#ff6b4a")
+		mat.emission_energy_multiplier = 1.2
+		bm.material = mat
+		mi.mesh = bm
+		mi.position = Vector3(_tx(q), _top_y(int(grid[r][q]["h"])) + 0.12, _tz(r))
+		add_child(mi)
+		var tw := create_tween().set_loops()
+		tw.tween_property(mi, "scale", Vector3(1.35, 1.35, 1.35), 0.35)
+		tw.tween_property(mi, "scale", Vector3.ONE, 0.35)
+		_charge_props[key] = mi
+		_log("A lit stick of dynamite lands — MOVE!")
+	else:
+		var node: Node3D = _charge_props.get(key)
+		if node != null and is_instance_valid(node):
+			var tw := create_tween()
+			tw.tween_property(node, "scale", Vector3(2.2, 2.2, 2.2), 0.12)
+			tw.tween_property(node, "scale", Vector3.ZERO, 0.15)
+			tw.tween_callback(node.queue_free)
+		_charge_props.erase(key)
+		_log("The dynamite goes off!")
 
 func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()

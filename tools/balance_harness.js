@@ -468,6 +468,28 @@ function doBlast(B, center) {
       }
     }
 }
+// ---- fuse-delay charges (Session #2 decision 2c: stick dynamite) --------------
+// Mirror of combat_core.gd plant_charge/tick_charges: a lit stick lands and
+// detonates at the START of the thrower's side's NEXT phase — the other side
+// gets exactly one panicked move. Slammer/ashfall/divine blasts stay instant.
+function plantCharge(B, side, center) {
+  B.charges.push({ q: center.q, r: center.r, side, fuse: 1 });
+}
+function tickCharges(B, side) {
+  const still = [];
+  for (const c of B.charges) {
+    if (c.side === side) {
+      c.fuse -= 1;
+      if (c.fuse <= 0) {
+        doBlast(B, c);
+        continue;
+      }
+    }
+    still.push(c);
+  }
+  B.charges = still;
+}
+
 function triggerBossPhase(B, b) {
   // mirror of triggerBossPhase(), lines ~483-521
   b.enraged = true;
@@ -534,6 +556,9 @@ function moveToward(B, u, tgt) {
 
 // ---- ENEMY phase AI (mirror of enemyTurn(), lines ~527-611) -----------------
 function enemyPhase(B) {
+  // lit enemy sticks go off first — the player phase between was the panic window
+  tickCharges(B, "e");
+  if (!B.players.some((p) => p.alive)) return;
   const queue = B.enemies
     .filter((e) => e.alive)
     .sort((a, b) => (b.quick || 0) - (a.quick || 0));
@@ -594,7 +619,10 @@ function enemyPhase(B) {
         // fall through to reposition instead of wasting the turn on a wall.
         if (isBlast || hasLos(B.grid, e, tgt)) {
           e.ap -= 2;
-          if (isBlast) doBlast(B, tgt);
+          if (e.bomber)
+            plantCharge(B, "e", tgt); // 2c: lit stick, fuse-delay
+          else if (isBlast)
+            doBlast(B, tgt); // slammer shockwave stays instant
           else doFire(B, e, tgt);
           if (!B.players.some((p) => p.alive)) return;
           continue;
@@ -697,13 +725,23 @@ function bestShotEvFrom(B, p, q, r) {
 }
 // tile cover for the defensive tiebreak — beacon-aware: high tiles protect nothing
 const tileCov = (grid, q, r) => (grid[r][q].h >= 1 ? 0 : grid[r][q].cover || 0);
+// expected blast damage standing on (q,r) from live fuse charges (2c) —
+// ~5.5 = avg 4-7 stick, per overlapping charge. The bot's panic instinct.
+function chargeDanger(B, q, r) {
+  let d = 0;
+  for (const c of B.charges)
+    if (Math.abs(q - c.q) <= 1 && Math.abs(r - c.r) <= 1) d += 5.5;
+  return d;
+}
 // Move to the best SHOT tile (EV>0 required) reachable while keeping >=2 AP to
 // fire. Score = shot EV + 2.0*cover. Baseline = current tile's score when it
 // has a shot, else 0. minGain gates Rule B (no shuffling for crumbs).
 function positionalMove(B, p, minGain) {
   const rc = reach(B.grid, B.units, p);
   const curEv = bestShotEvFrom(B, p, p.q, p.r);
-  const curScore = curEv > 0 ? curEv + 2.0 * tileCov(B.grid, p.q, p.r) : 0;
+  const curScore =
+    (curEv > 0 ? curEv + 2.0 * tileCov(B.grid, p.q, p.r) : 0) -
+    chargeDanger(B, p.q, p.r);
   let bestQ = -1,
     bestR = -1,
     bestCost = 0,
@@ -714,7 +752,7 @@ function positionalMove(B, p, minGain) {
     const [q, r] = key.split(",").map(Number);
     const ev = bestShotEvFrom(B, p, q, r);
     if (ev <= 0) continue;
-    const s = ev + 2.0 * tileCov(B.grid, q, r);
+    const s = ev + 2.0 * tileCov(B.grid, q, r) - chargeDanger(B, q, r);
     if (s > bestScore) {
       bestScore = s;
       bestQ = q;
@@ -769,6 +807,8 @@ function execAtk(B, p, def, fx) {
 // the real hitChance), and repositions instead of burning AP on walls — so
 // Positioning v1 win rates measure the rules, not bot blindness.
 function playerPhaseBasic(B) {
+  tickCharges(B, "p"); // fuse rule is engine truth, not policy choice
+  if (!B.enemies.some((e) => e.alive)) return;
   const order = B.players
     .filter((p) => p.alive)
     .sort((a, b) => (b.quick || 0) - (a.quick || 0));
@@ -802,6 +842,9 @@ function playerPhaseBasic(B) {
   B.players.forEach((p) => (p.jinx = 0));
 }
 function playerPhaseAbilities(B) {
+  // symmetric fuse tick (no player sticks exist yet; ready for the item)
+  tickCharges(B, "p");
+  if (!B.enemies.some((e) => e.alive)) return;
   const order = B.players
     .filter((p) => p.alive)
     .sort((a, b) => (b.quick || 0) - (a.quick || 0));
@@ -950,6 +993,7 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
     units: [...players, ...enemies],
     kills: 0,
     playerDeaths: 0,
+    charges: [],
   };
   let round = 0;
   let enemyDeathRound = null;

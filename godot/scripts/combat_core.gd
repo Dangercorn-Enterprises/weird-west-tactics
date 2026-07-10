@@ -52,6 +52,7 @@ var favor := 1 # divine favor snapshot per unit (New Game seeds 1)
 var scale_enabled := true
 var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
 var on_cover_hit: Callable = Callable() # UI hook (q, r, chp_left) — cover chip/shatter
+var on_charge: Callable = Callable() # UI hook (q, r, lit) — lit=true plant, false boom
 
 # ---- seeded RNG: exact mulberry32 port so runs are reproducible -------------
 var _rng_state: int = 0
@@ -434,6 +435,28 @@ func do_blast(b: Dictionary, center: Dictionary) -> void:
 			if on_cover_hit.is_valid():
 				on_cover_hit.call(q, r, -1)  # -1 flags a blast (shatter FX)
 
+# ---- fuse-delay charges (Session #2 decision 2c: stick dynamite) ---------------
+# A lit stick lands on the target tile and detonates at the START of the
+# thrower's side's NEXT phase — the other side gets exactly one panicked move.
+# (Ashfall charge, divine blasts, and slammer shockwaves stay instant.)
+func plant_charge(b: Dictionary, side: String, center: Dictionary) -> void:
+	b["charges"].append({"q": int(center["q"]), "r": int(center["r"]), "side": side, "fuse": 1})
+	if on_charge.is_valid():
+		on_charge.call(int(center["q"]), int(center["r"]), true)
+
+func tick_charges(b: Dictionary, side: String) -> void:
+	var still: Array = []
+	for c in b.get("charges", []):
+		if c["side"] == side:
+			c["fuse"] = int(c["fuse"]) - 1
+			if int(c["fuse"]) <= 0:
+				if on_charge.is_valid():
+					on_charge.call(int(c["q"]), int(c["r"]), false)
+				do_blast(b, c)
+				continue
+		still.append(c)
+	b["charges"] = still
+
 func trigger_boss_phase(b: Dictionary, boss: Dictionary) -> void:
 	boss["enraged"] = true
 	boss["str"] += 3
@@ -499,6 +522,10 @@ func move_unit_toward(b: Dictionary, u: Dictionary, tgt: Dictionary) -> bool:
 
 # ---- ENEMY phase (mirror of enemyPhase) ----------------------------------------
 func enemy_phase(b: Dictionary) -> void:
+	# lit enemy sticks go off first — the player phase between was the panic window
+	tick_charges(b, "e")
+	if b["players"].filter(func(p): return p["alive"]).is_empty():
+		return
 	var queue: Array = b["enemies"].filter(func(e): return e["alive"])
 	queue.sort_custom(func(a, c): return int(a["quick"]) > int(c["quick"]))
 	for e in queue:
@@ -564,8 +591,10 @@ func enemy_phase(b: Dictionary) -> void:
 				# fall through to reposition instead of wasting the turn on a wall.
 				if is_blast or has_los(b["grid"], e, tgt):
 					e["ap"] -= 2
-					if is_blast:
-						do_blast(b, tgt)
+					if e.get("bomber", false):
+						plant_charge(b, "e", tgt)  # 2c: lit stick, fuse-delay
+					elif is_blast:
+						do_blast(b, tgt)  # slammer shockwave stays instant
 					else:
 						do_fire(b, e, tgt)
 					var any_alive := false
@@ -662,6 +691,15 @@ func _best_shot_ev_from(b: Dictionary, p: Dictionary, q: int, r: int) -> float:
 func _tile_cov(grid: Array, q: int, r: int) -> float:
 	return 0.0 if int(grid[r][q]["h"]) >= 1 else float(grid[r][q]["cover"])
 
+# Expected blast damage standing on (q,r) from live fuse charges (2c) —
+# ~5.5 = avg 4-7 stick, per overlapping charge. The bot's panic instinct.
+func _charge_danger(b: Dictionary, q: int, r: int) -> float:
+	var d := 0.0
+	for c in b.get("charges", []):
+		if absi(q - int(c["q"])) <= 1 and absi(r - int(c["r"])) <= 1:
+			d += 5.5
+	return d
+
 # Move to the best SHOT tile (EV>0 required) reachable while keeping >=2 AP to
 # fire. Score = shot EV + 2.0*cover (cover ~tiebreak: 0.4 heavy ≈ a 10%-hit
 # swing on a typical gun). Baseline = current tile's score when it has a shot,
@@ -671,7 +709,8 @@ func _tile_cov(grid: Array, q: int, r: int) -> float:
 func positional_move(b: Dictionary, p: Dictionary, min_gain: float) -> bool:
 	var rc := reach(b["grid"], b["units"], p)
 	var cur_ev := _best_shot_ev_from(b, p, int(p["q"]), int(p["r"]))
-	var cur_score: float = cur_ev + 2.0 * _tile_cov(b["grid"], int(p["q"]), int(p["r"])) if cur_ev > 0.0 else 0.0
+	var cur_score: float = (cur_ev + 2.0 * _tile_cov(b["grid"], int(p["q"]), int(p["r"])) if cur_ev > 0.0 else 0.0) \
+		- _charge_danger(b, int(p["q"]), int(p["r"]))
 	var best_q := -1
 	var best_r := -1
 	var best_cost := 0
@@ -686,7 +725,7 @@ func positional_move(b: Dictionary, p: Dictionary, min_gain: float) -> bool:
 		var ev := _best_shot_ev_from(b, p, q, r)
 		if ev <= 0.0:
 			continue
-		var s: float = ev + 2.0 * _tile_cov(b["grid"], q, r)
+		var s: float = ev + 2.0 * _tile_cov(b["grid"], q, r) - _charge_danger(b, q, r)
 		if s > best_score:
 			best_score = s
 			best_q = q
@@ -726,6 +765,12 @@ func _exec_atk(b: Dictionary, p: Dictionary, def: Dictionary, fx: Dictionary) ->
 		})
 
 func player_phase(b: Dictionary) -> void:
+	# symmetric fuse tick (no player sticks exist yet; ready for the item).
+	# NOTE: the interactive battle drives the player phase itself — when a
+	# player stick item ships, battle.gd needs this tick at turn start too.
+	tick_charges(b, "p")
+	if b["enemies"].filter(func(e): return e["alive"]).is_empty():
+		return
 	var order: Array = b["players"].filter(func(p): return p["alive"])
 	order.sort_custom(func(a, c): return int(a["quick"]) > int(c["quick"]))
 	for p in order:
@@ -874,6 +919,7 @@ func run_battle(party_specs: Array, enemy_specs: Array, max_rounds: int) -> Dict
 	var b := {
 		"grid": grid, "players": players, "enemies": enemies,
 		"units": players + enemies, "kills": 0, "playerDeaths": 0,
+		"charges": [],
 	}
 	var round_n := 0
 	var timed_out := false
