@@ -30,15 +30,52 @@ inert. See SYSTEMS_AUDIT_2026-07-09.md cluster 6.
 fire-support brain) without turning a western into an artillery game. The
 dynamite-over-the-ridge is the hero beat.
 
-**OPEN sub-decisions (Tim's calls — feel-changing):**
-1. **Spotter or blind toss?** Does lobbing over a hill require a friendly unit
-   with LOS to the target (BattleTech indirect doctrine — rewards fire-support
-   positioning), or can anyone blind-toss with a scatter/drift penalty?
-2. **High ground sees over?** Should standing on high terrain (h2) extend sight
-   OVER lower cover (h1) — making the ridge the king position? (Calder rec: yes.)
-3. **Does the AI lob too?** Enemy dynamite-throwers arcing over cover at the
-   player — symmetric and cool, but needs AI no-LOS targeting. In or out for v1?
+**Sub-decisions — RESOLVED (Tim):**
+1. **Lob = scatter without spotter, precise with.** BattleTech rules: a blind
+   toss deviates (scatter roll → blast center drifts). A friendly unit with LOS
+   to the target = spotter → the throw lands exactly where you want, no scatter.
+   Fire-support positioning becomes teamwork.
+2. **High ground is KING but a BEACON** — double-edged, not a free bonus:
+   - Offense: +hit shooting down, and you see OVER lower cover ("I have the high
+     ground"). Worth the climb.
+   - Cost: you're skylined — high ground grants NO cover to the unit on it
+     (exposed), so the ridge is a glass cannon. Take it for the shot, pay in risk.
+3. **AI plays like a player — expected-value targeting.** It weighs a scattered
+   low-% lob as usually bad, BUT raises its willingness when it sees GROUPED
+   targets (AoE value climbs with clustering). "You miss 100% of the shots you
+   don't take." Not "can I hit one guy" — it's EV incl. variance and AoE.
 
-**Next:** on sub-decisions → Calder prototypes the C milestone (raycast LOS on
-the height grid) for playtest, then layers the lob. Balance re-run via the
-parity harness after.
+## Session #1b — Cover & terrain (spawned from #1; Pillar 2)
+**Status:** DESIGNED, one keystone to confirm
+
+**Cover model (XCOM×BattleTech, per Tim):** cover is a **chance to block, not
+flat damage reduction**. Half cover = ~50% of the body shielded = ~50% chance
+an incoming shot **hits the cover object instead of you**. This is directional
+(protects from the covered side → flanking is real).
+
+⚠️ **KEYSTONE (confirm):** the elegant reading of Tim's spec is a **block roll**:
+if a shot would hit, roll cover% → on block, the damage lands on the COVER, not
+the unit. This makes destructible cover fall out for free — cover degrades by
+eating the hits it blocks. (Alt: cover as a pure to-hit penalty like today, with
+a separate HP track — messier.) Calder rec: block-roll.
+
+**Cover is DYNAMIC + material-typed:**
+- **Heavy** (boulders, solid walls): effectively indestructible vs in-game
+  munitions — you're "largely good."
+- **Light** (trees, cactus, thin half-wall, upturned table): has cover-HP;
+  degrades as it absorbs blocked hits; eventually breaks and stops being cover.
+  Coverage is a live, destructible battlefield state.
+
+**Difficult terrain:** terrain affects MOVEMENT — rough/rubble/brush tiles cost
+double movement points (tabletop/XCOM staple). Positioning now has a real
+economy: the safe path is the slow path.
+
+**Build slicing (one system in hand before the next):**
+- **Positioning v1 (prototype next):** raycast LOS (terrain blocks direct fire)
+  + high-ground sees-over + high-ground-is-a-beacon (no cover up top) +
+  directional cover-as-block-roll. Playtest in a skirmish.
+- **Positioning v2:** material/destructible cover (cover-HP, light degrades) +
+  difficult-terrain movement cost.
+- **Doctrine layer:** lobbed dynamite (scatter/spotter) + AI expected-value lob.
+- Re-run the parity/balance harness after each (combat-math changes void the
+  green guarantee otherwise — audit cluster 6).
