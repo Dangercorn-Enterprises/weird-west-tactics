@@ -395,3 +395,74 @@ see buffs there. The positional bot prices offense only (no hunker, no
 overwatch, no baiting), so today's numbers are a pre-defense snapshot that
 2a/2b/2c will invalidate. Human playtest sets band centers; the sim detects
 regressions and soft content.
+
+---
+# Session #2 DECISIONS — Tim's picks (2026-07-10, ~00:30 PT, live)
+*Tim read the memos + Njord's annex and picked. Recorded with the why.*
+
+- **2b HUNKER → ends the turn** (XCOM-style). One rule kills the
+  shoot-then-hunker dominant line. Njord's brace-texture concern noted;
+  revisit alongside overwatch.
+- **2c DYNAMITE → split by item.** Stick dynamite (bandits now, player item
+  later) = FUSE-DELAY: lands lit with a telegraph, detonates at the start of
+  the thrower's side's next phase, the other side gets one panicked move —
+  area denial/herding. Ashfall charge stays INSTANT (alchemical). The trope
+  lives where the flavor is.
+- **2f DEAD STATS → re-route + gray out** (stopgap; full wiring is a future
+  design session). FAVORED pairs re-point to live stats so every archetype
+  levels something real; dead stats stop being displayed as live. OWNED
+  CAVEAT (Njord): this buffs casters — baselines re-run after.
+  Re-route mapping (Calder interpretation, Tim may veto): hexslinger
+  cognition/spirit→deftness/vigor · tinkerer knowledge/cognition→deftness/
+  quickness · preacher spirit/vigor→vigor/strength · lawdog vigor/mien→
+  vigor/quickness · drifter nimbleness/quickness→quickness/deftness ·
+  gunslinger deftness/quickness unchanged.
+- **2h BOSS KITS → Deacon first, alone.** boss-summon: raises walkin_dead
+  mid-fight pre-enrage (cadence capped), own balance re-run, then reassess.
+  Five-kit program explicitly NOT committed (Njord's cost catch stands).
+- **2e DIFFICULT TERRAIN → double-MP now, data-only.** Njord's flip
+  endorsed by Tim. Implementation interpretation (vetoable): the boards
+  have no "rough" class, so SOFT-COVER tiles (brush/cactus/wreckage) cost
+  double to ENTER — cover routes become the slow routes, open ground stays
+  fast but exposed. Both engines + parity + baselines re-run.
+- **2i PARTY UI → XP visibility + bench rule first.** Post-battle XP/level
+  breakdown surfaced at battle end; ONLY DEPLOYED riders earn XP (bench
+  becomes free storage, no more dilution). Pause-menu sheet + reorder is
+  the follow-up build. (Balance note: removes the hidden recruit tax.)
+- **2a OVERWATCH → HELD for a dedicated design session.** Load-bearing;
+  Calder (universal-capped-symmetric) vs Njord (kit-first) gets argued
+  live. Until then the point-blank rule remains the only flank tax.
+- **2g LOOT/ECONOMY → HELD for a dedicated session** with the real gold
+  curves. Njord's faucet≠sink catch accepted; no catalog opening blind.
+
+---
+## Session #2 BUILD RUN — all six picks landed (2026-07-10 night,
+## commits d2f2a0f · 02aedd6 · 7887e75 · b26c801 · db9d8bd · 3dff43b)
+Every item: parity Δ 0.0 (bit-exact both engines), positioning 17/17,
+god_swear 5/5, battle parses + boots clean. Baselines re-run per combat
+change (numbers below are sequential — the shared RNG stream ripples ±0.2
+between steps; that ripple is mirrored identically in both engines).
+
+| change | deacon | foreman | weaver | hollow | finale4 | vanguard | notes |
+|---|---|---|---|---|---|---|---|
+| post-red-team base | .714 | .888 | .925 | .920 | .908 | .962 | positional bot |
+| + hunker ends turn | .744 | .900 | .933 | .920 | .918 | .965 | bot banks AP as brace |
+| + rough terrain | .772 | .964 | .940 | .949 | .911 | .974 | slows the closers |
+| + fuse dynamite | .771 | .964 | .938 | .950 | .910 | .988 | bandits dodgeable |
+| + Deacon kit (FREE raise) | **.774** | .968 | .935 | .950 | .913 | .988 | identity, ~neutral |
+
+**The instrument earned its keep live:** the Deacon kit as first specced
+(raise REPLACES his shot) measured **+7pts EASIER** (.843) — a boss-grade
+attack traded for a slow corner-spawn zombie is a self-nerf. Tim picked the
+FREE raise on the spot → .774, balance-neutral with the summoner identity
+intact. This is the design loop working: spec → measure → fork → pick →
+re-measure, inside an hour.
+
+**Standing read for the tuning session (unchanged):** deltas are the
+signal; skirmish/T1 rows are saturated alarms; everything sits above band
+for a positional player and the gap is GENERAL enemy tuning — one session
+with these dials, not per-system nerfs. Skirmish 1.00 in particular means
+the default Quick Skirmish has no teeth for a competent player.
+Also shipped this run: deployed-only XP + per-rider battle-end breakdown
+(2i first cut), FAVORED re-route + LIVE_STATS convention (2f stopgap —
+casters finally level).
