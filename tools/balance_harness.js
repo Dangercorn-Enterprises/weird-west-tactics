@@ -2,18 +2,21 @@
 // =============================================================================
 // DUSTFALL — BALANCE HARNESS  (DEV-ONLY; lives OUTSIDE src/, never shipped)
 //
-// A headless, deterministic simulator that mirrors the EXACT combat math from
-// src/scene_battle.js and the unit derivations from src/data.js, so we can
-// measure encounter difficulty *quantitatively* (win-rate / turns / TTK /
-// player deaths) without driving the animated, rAF-throttled live game.
+// A headless, deterministic simulator that mirrors the EXACT combat math of
+// the CANONICAL engine — godot/scripts/combat_core.gd (the Godot 4.7 HD-2D
+// port, incl. Positioning v1 2026-07-09: LOS, banded-roll cover, high ground,
+// destructible cover) — so we can measure encounter difficulty quantitatively
+// (win-rate / turns / TTK / player deaths) headlessly.
 //
 // Fidelity strategy:
 //   - Unit DATA (archetypes/weapons/pregens/enemy catalog) is required straight
 //     from the real src/data.js — single source of truth, no copy.
-//   - Combat MATH (hitChance/rollDmg/reach/grid/AI/boss-phase) is mirrored here
-//     from scene_battle.js with line citations, and VALIDATED against the live
-//     game's exposed DF.battle.hitChance / rollDmg (see the morning summary).
-//     Keep this file in sync when the core combat math changes.
+//   - Combat MATH is a line-mirror of combat_core.gd; tools/parity_check.js
+//     proves both engines produce the same win rates (±4 pts / 2000 runs).
+//     Keep this file in sync when combat_core.gd changes, and re-run parity.
+//   - HISTORY: this harness originally mirrored the web build
+//     (src/scene_battle.js). Since the Godot port became the product, the web
+//     build is the legacy PRE-Positioning-v1 reference and no longer matches.
 //
 // Usage:
 //   node tools/balance_harness.js [runsPerEncounter]   (default 2000)
@@ -60,11 +63,16 @@ const SPAWNS = [
   [9, 8],
   [8, 5],
 ];
+const LIGHT_COVER_HP = 3; // absorbed would-be-hits before light cover is gone
+const HUNKER_BONUS = 0.2; // hunker adds to cover bonus (was a flat -20 to-hit)
 function buildGrid() {
   const grid = [];
   for (let r = 0; r < ROWS; r++) {
     grid.push([]);
-    for (let q = 0; q < COLS; q++) grid[r].push({ h: 0, cover: 0 });
+    // cover: current bonus (0..0.4). cover0: original. chp: durability
+    // (-1 = heavy/bullet-immune; >0 = light, decays). heavy: material flag.
+    for (let q = 0; q < COLS; q++)
+      grid[r].push({ h: 0, cover: 0, cover0: 0, chp: 0, heavy: false });
   }
   const set = (q, r, o) => Object.assign(grid[r][q], o);
   [
@@ -77,6 +85,7 @@ function buildGrid() {
     [4, 4],
     [5, 5],
   ].forEach(([q, r]) => set(q, r, { h: 2 }));
+  // heavy cover (rock/wall): 0.4 bonus, bullet-immune (chp -1)
   [
     [2, 3],
     [7, 6],
@@ -84,7 +93,10 @@ function buildGrid() {
     [5, 2],
     [1, 5],
     [8, 4],
-  ].forEach(([q, r]) => set(q, r, { cover: 0.4 }));
+  ].forEach(([q, r]) =>
+    set(q, r, { cover: 0.4, cover0: 0.4, chp: -1, heavy: true }),
+  );
+  // light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits
   [
     [3, 5],
     [6, 4],
@@ -92,8 +104,67 @@ function buildGrid() {
     [7, 8],
     [4, 1],
     [5, 8],
-  ].forEach(([q, r]) => set(q, r, { cover: 0.2 }));
+  ].forEach(([q, r]) =>
+    set(q, r, { cover: 0.2, cover0: 0.2, chp: LIGHT_COVER_HP, heavy: false }),
+  );
   return grid;
+}
+
+// Bresenham supercover line between two tiles (exclusive of endpoints).
+// Mirror of combat_core.gd _line_tiles.
+function lineTiles(aq, ar, bq, br) {
+  const tiles = [];
+  const dq = Math.abs(bq - aq),
+    dr = Math.abs(br - ar);
+  const sq = aq < bq ? 1 : -1,
+    sr = ar < br ? 1 : -1;
+  let err = dq - dr,
+    q = aq,
+    r = ar;
+  while (q !== bq || r !== br) {
+    const e2 = 2 * err;
+    if (e2 > -dr) {
+      err -= dr;
+      q += sq;
+    }
+    if (e2 < dq) {
+      err += dq;
+      r += sr;
+    }
+    if (q === bq && r === br) break;
+    tiles.push([q, r]);
+  }
+  return tiles;
+}
+
+// Direct-fire line of sight: a full-height (h>=2) tile between shooter and
+// target blocks the shot. High ground shooting DOWN sees over one intervening
+// wall lower than the perch. Mirror of combat_core.gd has_los.
+function hasLos(grid, att, def) {
+  const attH = grid[att.r][att.q].h,
+    defH = grid[def.r][def.q].h;
+  for (const [q, r] of lineTiles(att.q, att.r, def.q, def.r)) {
+    if (grid[r][q].h >= 2) {
+      if (attH > defH && grid[r][q].h <= attH) continue;
+      return false;
+    }
+  }
+  return true;
+}
+
+// Effective cover bonus (0..0.6) the defender enjoys vs THIS attacker.
+// High ground on the shooter halves it; a defender on high ground gets NONE
+// (beacon — skylined); hunker adds; point-blank bypasses (v1 flank proxy).
+// Mirror of combat_core.gd cover_bonus.
+function coverBonus(grid, att, def) {
+  if (grid[def.r][def.q].h >= 1)
+    return def.status.hunker > 0 ? HUNKER_BONUS : 0; // beacon
+  let cb = grid[def.r][def.q].cover || 0;
+  if (dist(att, def) <= 1)
+    cb = 0; // point-blank flank negates cover
+  else if (grid[att.r][att.q].h > grid[def.r][def.q].h) cb *= 0.5; // shooting down over low cover — half, not erased (Njord fix)
+  if (def.status.hunker > 0) cb += HUNKER_BONUS;
+  return Math.min(cb, 0.6); // cap so hunker can't fully erase the hit band
 }
 
 // ---- ability name maps (mirror of partyToUnit) ------------------------------
@@ -128,7 +199,15 @@ function mkUnit(o) {
   o.maxAp = 3 + Math.floor(o.quick / 4);
   o.ap = o.maxAp;
   o.jinx = 0;
-  o.status = { burn: 0, bleed: 0, hex: 0, marked: 0, hunker: 0 };
+  o.status = {
+    burn: 0,
+    bleed: 0,
+    hex: 0,
+    marked: 0,
+    hunker: 0,
+    stun: 0,
+    conf: 0,
+  };
   return o;
 }
 function partyToUnit(p, i) {
@@ -154,6 +233,7 @@ function partyToUnit(p, i) {
     id: p.uid || "p" + i,
     name: p.name || (arch ? arch.name : "Rider"),
     archetype: p.archetype,
+    god: p.god || null, // sworn shrine god fuels this unit's divine
     side: "p",
     q: 1,
     r: [1, 4, 7, 2][i] || 1,
@@ -218,18 +298,23 @@ function enemyToUnit(spec, i) {
   return u;
 }
 
-// ---- combat math (verbatim mirror of scene_battle.js) -----------------------
+// ---- combat math (verbatim mirror of combat_core.gd) ------------------------
 const dist = (a, b) => Math.abs(a.q - b.q) + Math.abs(a.r - b.r);
-function hitChance(grid, att, def, ignoreCover) {
+// Bare-target hit % — everything EXCEPT cover/hunker (those live in coverBonus).
+// Unclamped so the banded roll can compute the "would-hit-bare" ceiling.
+function baseHit(grid, att, def) {
   let c = att.aim;
-  const cover = ignoreCover ? 0 : grid[def.r][def.q].cover || 0;
-  c -= cover * 100;
   c += (grid[att.r][att.q].h - grid[def.r][def.q].h) * 10;
   c -= Math.max(0, dist(att, def) - att.rng) * 15;
   if (att.jinx) c -= 15;
   if (att.status && att.status.hex > 0) c -= 15; // hexed: attacker less accurate
-  if (def.status && def.status.hunker > 0) c -= 20; // hunkered: harder to hit
-  return Math.max(5, Math.min(95, Math.round(c)));
+  return c;
+}
+// Effective chance to hit the UNIT (through cover). Used by AI EV + previews.
+function hitChance(grid, att, def, ignoreCover) {
+  const base = baseHit(grid, att, def);
+  const cb = ignoreCover ? 0 : coverBonus(grid, att, def);
+  return Math.max(5, Math.min(95, Math.round(base - cb * 100)));
 }
 function rollDmg(att) {
   return randint(att.wmin, att.wmax) + Math.floor(att.str / 3);
@@ -285,14 +370,23 @@ function applyDamage(B, def, dmg) {
 }
 function doFire(B, att, def, opts) {
   opts = opts || {};
-  const ch = hitChance(B.grid, att, def, opts.ignoreCover || att.wIC);
-  if (chance(ch)) {
-    // Pass 19 mirror: flat 10% crit at 1.5x, both sides
-    let dmg = Math.round(
-      rollDmg(att) * (opts.mult || 1) * (chance(10) ? 1.5 : 1),
-    );
+  const ic = opts.ignoreCover || att.wIC;
+  // Direct fire needs line of sight (h>=2 terrain blocks the shot). Abilities
+  // can waive it via opts.no_los (e.g. supernatural / thrown effects).
+  if (!opts.no_los && !hasLos(B.grid, att, def)) return false;
+  // Banded single roll (BT cover model): one draw split into hit /
+  // strikes-cover / miss. Mirror of combat_core.gd do_fire — RNG order is
+  // 1 draw on miss/strike, 3 on hit (band roll, dmg, crit).
+  const hitThru = hitChance(B.grid, att, def, ic);
+  const bare = Math.max(5, Math.min(95, Math.round(baseHit(B.grid, att, def))));
+  const r = rnd() * 100;
+  if (r < hitThru) {
+    // HIT UNIT — RNG order preserved: rollDmg() then crit chance().
+    const baseDmg = rollDmg(att);
+    const isCrit = chance(10); // flat 10% crit at 1.5x, both sides
+    let dmg = Math.round(baseDmg * (opts.mult || 1) * (isCrit ? 1.5 : 1));
     if (def.status && def.status.marked > 0) dmg = Math.round(dmg * 1.3); // marked
-    if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks (Pass 6 mirror)
+    if (def.armorDef) dmg = Math.max(1, dmg - def.armorDef); // armor soaks
     applyDamage(B, def, dmg);
     if (opts.status && def.alive)
       def.status[opts.status] = Math.max(
@@ -301,8 +395,22 @@ function doFire(B, att, def, opts) {
       );
     if (att.hexer && def.alive) def.status.hex = Math.max(def.status.hex, 2);
     return true;
+  } else if (!ic && r < bare) {
+    // STRIKES COVER — the would-have-hit-bare band. Cover eats the shot and
+    // degrades (light only); pure misses never strip cover.
+    strikeCover(B, def.q, def.r);
   }
   return false;
+}
+
+// Degrade cover on an absorbed hit. Heavy (chp<0) shrugs off small arms;
+// light decays its bonus as durability drops. Mirror of strike_cover.
+function strikeCover(B, q, r) {
+  const cell = B.grid[r][q];
+  if (cell.chp <= 0) return; // heavy/indestructible or already gone
+  cell.chp -= 1;
+  cell.cover = cell.cover0 * (cell.chp / LIGHT_COVER_HP);
+  if (cell.chp <= 0) cell.cover = 0;
 }
 // ---- status ticking (mirror of tickStatus() in scene_battle.js) -------------
 const STATUS_DOT = { burn: 3, bleed: 2 };
@@ -317,16 +425,33 @@ function tickStatus(B, u) {
   });
 }
 function doBlast(B, center) {
-  // dynamite/AoE: chebyshev<=1, 4-7 dmg (mirror of blast(), lines ~429-480)
+  // dynamite/AoE: chebyshev<=1, 4-7 dmg (mirror of do_blast)
   const caught = B.units.filter(
     (u) =>
       u.alive && Math.abs(u.q - center.q) <= 1 && Math.abs(u.r - center.r) <= 1,
   );
   caught.forEach((u) => {
     let dmg = randint(4, 7);
-    if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks (Pass 6 mirror)
+    if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks
     applyDamage(B, u, dmg);
   });
+  // Explosives are the answer to cover: delete light in the radius, crack heavy.
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dq = -1; dq <= 1; dq++) {
+      const q = center.q + dq,
+        r = center.r + dr;
+      if (q < 0 || r < 0 || q >= COLS || r >= ROWS) continue;
+      const cell = B.grid[r][q];
+      if (!(cell.cover > 0)) continue;
+      if (cell.heavy) {
+        // crack heavy down a tier rather than vaporize it
+        cell.cover = Math.max(0, cell.cover - 0.2);
+        if (cell.cover <= 0) cell.heavy = false;
+      } else {
+        cell.cover = 0;
+        cell.chp = 0;
+      }
+    }
 }
 function triggerBossPhase(B, b) {
   // mirror of triggerBossPhase(), lines ~483-521
@@ -446,14 +571,19 @@ function enemyPhase(B) {
       // Pass 10 mirror: sentries never chase
       if (e.sentry && dist(e, tgt) > e.rng + 1) break;
       if (dist(e, tgt) <= e.rng + 1 && e.ap >= 2) {
-        e.ap -= 2;
         const cluster = alive.filter(
           (p) => Math.abs(p.q - tgt.q) <= 1 && Math.abs(p.r - tgt.r) <= 1,
         ).length;
-        if (e.bomber || (e.slammer && cluster >= 2)) doBlast(B, tgt);
-        else doFire(B, e, tgt);
-        if (!B.players.some((p) => p.alive)) return;
-        continue;
+        const isBlast = e.bomber || (e.slammer && cluster >= 2);
+        // Direct fire needs LOS; blasts lob over terrain. No clear shot ->
+        // fall through to reposition instead of wasting the turn on a wall.
+        if (isBlast || hasLos(B.grid, e, tgt)) {
+          e.ap -= 2;
+          if (isBlast) doBlast(B, tgt);
+          else doFire(B, e, tgt);
+          if (!B.players.some((p) => p.alive)) return;
+          continue;
+        }
       }
       if (e.blinker && e.ap >= 1 && dist(e, tgt) > e.rng) {
         const spots = [];
@@ -513,6 +643,9 @@ const DIVINE_BLAST = new Set(["Vulcan's Forgefire", "Perun's Thunder"]);
 const avgRoll = (u, mult) =>
   ((u.wmin + u.wmax) / 2 + Math.floor(u.str / 3)) * (mult || 1);
 function expAtkDmg(grid, att, def, fx) {
+  // No line of sight -> no shot: EV 0 so the policy never fires through a
+  // wall. Only no_los effects are exempt (mirror of _exp_atk_dmg).
+  if (!fx.no_los && !hasLos(grid, att, def)) return 0;
   const saved = att.aim;
   if (fx.aimMod) att.aim += fx.aimMod;
   const ch = fx.guaranteed ? 95 : hitChance(grid, att, def, fx.ic);
