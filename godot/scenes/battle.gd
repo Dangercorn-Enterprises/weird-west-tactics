@@ -893,12 +893,22 @@ func _exec_pending_on(target: Dictionary) -> void:
 		return
 	var aname := pending_ability
 	pending_ability = ""
+	# Positioning v1: direct-fire abilities and single-target divines respect LOS —
+	# refuse (no cost, no lunge) rather than waste the AP/favor/once-per-fight ult
+	# on do_fire's silent LOS gate. Blast divines and support/AoE lob over terrain.
+	var fx: Dictionary = core.ABIL_FX.get(aname, {})
+	var is_divine: bool = aname == sel.get("divine")
+	var needs_los: bool = (is_divine and not core.DIVINE_BLAST.has(aname)) \
+		or (not is_divine and not fx.is_empty()
+			and not (str(fx.get("kind", "atk")) in ["heal", "blast"]))
+	if needs_los and not core.has_los(grid, sel, target):
+		_log("No line of sight.")
+		return
 	sel["facing"] = Vector2(int(target["q"]) - int(sel["q"]), int(target["r"]) - int(sel["r"])).normalized()
 	_animate_lunge(sel, target)
-	if aname == sel.get("divine"):
+	if is_divine:
 		_cast_divine(target)
 		return
-	var fx: Dictionary = core.ABIL_FX.get(aname, {})
 	if fx.is_empty():
 		return
 	sel["ap"] = int(sel["ap"]) - int(fx.get("cost", 2))
@@ -974,6 +984,7 @@ func combat_preview(attacker: Dictionary, target: Dictionary, ability := "") -> 
 		"ability": ability, "kind": kind, "hit": ch, "lo": lo, "hi": hi,
 		"shots": int(fx.get("shots", 1)),
 		"in_range": core.dist(attacker, target) <= int(attacker["rng"]) + 1,
+		"los": core.has_los(grid, attacker, target),
 	}
 
 func _preview_text(p: Dictionary) -> String:
@@ -981,6 +992,9 @@ func _preview_text(p: Dictionary) -> String:
 		var verb := "AoE strike" if p["kind"] == "blast" else "Support"
 		return "%s\n%s" % [p.get("ability", ""), verb]
 	var head := str(p.get("ability", "")).strip_edges()
+	# a blocked shot has no honest odds to show — say why instead of a fake %
+	if not p.get("los", true):
+		return ("%s\n" % head if head != "" else "") + "NO LINE OF SIGHT"
 	var shots: int = p.get("shots", 1)
 	var line1 := "%d%% to hit%s" % [int(p["hit"]), (" x%d" % shots) if shots > 1 else ""]
 	var line2 := "%d-%d dmg" % [int(p["lo"]), int(p["hi"])]
@@ -1148,6 +1162,11 @@ func _click(screen_pos: Vector2) -> void:
 			_exec_pending_on(occ)
 			return
 		if core.dist(sel, occ) <= int(sel["rng"]) + 1 and int(sel["ap"]) >= 2:
+			# Positioning v1: refuse the impossible shot (no AP) instead of letting
+			# do_fire's LOS gate silently whiff a paid action.
+			if not core.has_los(grid, sel, occ):
+				_log("No line of sight.")
+				return
 			sel["ap"] = int(sel["ap"]) - 2
 			sel["facing"] = Vector2(int(occ["q"]) - int(sel["q"]), int(occ["r"]) - int(sel["r"])).normalized()
 			_animate_lunge(sel, occ)
