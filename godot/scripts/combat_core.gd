@@ -620,6 +620,82 @@ func _is_healer(p: Dictionary) -> bool:
 			return true
 	return false
 
+# ---- positional bot (sim measuring instrument, 2026-07-09) ----------------------
+# The pre-v1 bot was positionally blind: it never sought LOS, high ground, or
+# flanks, so Positioning v1 win rates understated human play (DESIGN_LOG caveat).
+# These helpers price tiles with the REAL hit_chance, so height bonus, cover
+# halving, beacon, and point-blank flanking are all valued without hand-tuned
+# weights. Linear scans only (no sorts): sort stability differs between GDScript
+# and JS, and the harness must stay draw-for-draw identical.
+
+# Best basic-attack EV from tile (q,r): lowest-HP enemy visible and in range
+# from there, priced by hit_chance. 0.0 when no shot exists from that tile.
+func _best_shot_ev_from(b: Dictionary, p: Dictionary, q: int, r: int) -> float:
+	var sq: int = p["q"]
+	var sr: int = p["r"]
+	p["q"] = q
+	p["r"] = r
+	var focus: Dictionary = {}
+	for e in b["enemies"]:
+		if not e["alive"]:
+			continue
+		if dist(p, e) > int(p["rng"]) + 1:
+			continue
+		if not has_los(b["grid"], p, e):
+			continue
+		if focus.is_empty() or int(e["hp"]) < int(focus["hp"]):
+			focus = e
+	var ev := 0.0
+	if not focus.is_empty():
+		ev = float(hit_chance(b["grid"], p, focus, p.get("wIC", false))) / 100.0 * _avg_roll(p, 1.0)
+	p["q"] = sq
+	p["r"] = sr
+	return ev
+
+# Tile cover for the defensive tiebreak — beacon-aware: high tiles protect nothing.
+func _tile_cov(grid: Array, q: int, r: int) -> float:
+	return 0.0 if int(grid[r][q]["h"]) >= 1 else float(grid[r][q]["cover"])
+
+# Move to the best SHOT tile (EV>0 required) reachable while keeping >=2 AP to
+# fire. Score = shot EV + 2.0*cover (cover ~tiebreak: 0.4 heavy ≈ a 10%-hit
+# swing on a typical gun). Baseline = current tile's score when it has a shot,
+# else 0 — any reachable shot beats standing blind, and the bot never cover-
+# shuffles without gaining a shot. min_gain gates Rule B so it won't move for
+# crumbs. Returns true if it moved (consumes move AP, ticks bleed).
+func positional_move(b: Dictionary, p: Dictionary, min_gain: float) -> bool:
+	var rc := reach(b["grid"], b["units"], p)
+	var cur_ev := _best_shot_ev_from(b, p, int(p["q"]), int(p["r"]))
+	var cur_score: float = cur_ev + 2.0 * _tile_cov(b["grid"], int(p["q"]), int(p["r"])) if cur_ev > 0.0 else 0.0
+	var best_q := -1
+	var best_r := -1
+	var best_cost := 0
+	var best_score := cur_score
+	for key in rc.keys():
+		var cost: int = int(rc[key])
+		if int(p["ap"]) - cost < 2:
+			continue
+		var parts: PackedStringArray = key.split(",")
+		var q := int(parts[0])
+		var r := int(parts[1])
+		var ev := _best_shot_ev_from(b, p, q, r)
+		if ev <= 0.0:
+			continue
+		var s: float = ev + 2.0 * _tile_cov(b["grid"], q, r)
+		if s > best_score:
+			best_score = s
+			best_q = q
+			best_r = r
+			best_cost = cost
+	if best_q >= 0 and best_score > cur_score + min_gain:
+		p["ap"] -= best_cost
+		p["q"] = best_q
+		p["r"] = best_r
+		if int(p["status"]["bleed"]) > 0:
+			apply_damage(b, p, STATUS_DOT["bleed"])
+			p["status"]["bleed"] -= 1
+		return true
+	return false
+
 func _exec_atk(b: Dictionary, p: Dictionary, def: Dictionary, fx: Dictionary) -> void:
 	var st := {"status": fx.get("status"), "statusN": fx.get("statusN")}
 	if fx.get("kind") == "multi":
@@ -669,20 +745,29 @@ func player_phase(b: Dictionary) -> void:
 					hurt[0]["hp"] = mini(int(hurt[0]["maxHp"]), int(hurt[0]["hp"]) + randint(6, 10))
 					p["ap"] -= 2
 					continue
-			# 2) move into range if nothing is in range
+			# 2) find a firing position (positional bot): a target only counts when
+			# it's VISIBLE. No visible target -> hunt a reachable shot tile (Rule A);
+			# none reachable -> close distance the old way.
 			var in_range: Array = live_enemies.filter(func(e): return dist(p, e) <= int(p["rng"]) + 1)
-			if in_range.is_empty():
+			var visible: Array = in_range.filter(func(e): return has_los(b["grid"], p, e))
+			if visible.is_empty():
+				if positional_move(b, p, 0.0):
+					continue
 				var nearest := live_enemies.duplicate()
 				nearest.sort_custom(func(a, c): return dist(p, a) < dist(p, c))
 				if int(p["ap"]) > 0 and move_unit_toward(b, p, nearest[0]):
 					continue
 				break
-			# 3) divine: once per fight on the biggest in-range threat
+			# 3) divine: once per fight on the biggest eligible threat. Blast divines
+			# lob (any in-range threat); single-target divines need LOS or the once-
+			# per-fight ult whiffs on do_fire's gate. Linear scan, no sorts.
 			if p.get("divine") and not p.get("divineUsed", false) and int(p.get("divineFavor", 0)) >= 1:
-				var threats := in_range.duplicate()
-				threats.sort_custom(func(a, c): return int(a["hp"]) > int(c["hp"]))
-				var threat: Dictionary = threats[0]
-				if threat.get("boss", false) or int(threat["hp"]) >= 18:
+				var pool: Array = in_range if DIVINE_BLAST.has(p["divine"]) else visible
+				var threat: Dictionary = {}
+				for e in pool:
+					if threat.is_empty() or int(e["hp"]) > int(threat["hp"]):
+						threat = e
+				if not threat.is_empty() and (threat.get("boss", false) or int(threat["hp"]) >= 18):
 					var emp: bool = int(p["divineFavor"]) >= 3
 					p["divineFavor"] = maxi(0, int(p["divineFavor"]) - 1)
 					p["divineUsed"] = true
@@ -714,10 +799,17 @@ func player_phase(b: Dictionary) -> void:
 							threat["status"]["conf"] = maxi(int(threat["status"].get("conf", 0)), 1)
 					p["ap"] = 0
 					continue
-			# 4) best damage-per-AP action on the lowest-HP focus target
-			var focus_list := in_range.duplicate()
-			focus_list.sort_custom(func(a, c): return int(a["hp"]) < int(c["hp"]))
-			var focus: Dictionary = focus_list[0]
+			# 4) focus the lowest-HP VISIBLE target (linear scan). Rule B: when the
+			# shot is poor (<50%) and AP allows move+shoot, take a better perch
+			# first — high ground / flank / decayed-cover angles all price in via
+			# hit_chance inside positional_move.
+			var focus: Dictionary = {}
+			for e in visible:
+				if focus.is_empty() or int(e["hp"]) < int(focus["hp"]):
+					focus = e
+			if int(p["ap"]) >= 3 and hit_chance(b["grid"], p, focus, p.get("wIC", false)) < 50:
+				if positional_move(b, p, 0.15 * _avg_roll(p, 1.0)):
+					continue
 			var opts: Array = [{"cost": 2, "kind": "atk", "mult": 1.0}]
 			for aname in p.get("abilities", []):
 				var fx: Dictionary = ABIL_FX.get(aname, {})

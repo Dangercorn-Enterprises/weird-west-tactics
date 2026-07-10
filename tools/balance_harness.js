@@ -654,6 +654,71 @@ function expAtkDmg(grid, att, def, fx) {
 }
 const isHealer = (p) =>
   (p.abilities || []).some((a) => a === "Lay on Hands" || a === "Soul Drain");
+
+// ---- positional bot (sim measuring instrument, 2026-07-09) -------------------
+// Mirror of combat_core.gd _best_shot_ev_from / _tile_cov / positional_move.
+// Prices tiles with the REAL hitChance so height, cover-halving, beacon, and
+// point-blank flanking are valued without hand-tuned weights. Linear scans
+// only (no sorts): sort stability differs between engines and parity must
+// stay draw-for-draw exact.
+function bestShotEvFrom(B, p, q, r) {
+  const sq = p.q,
+    sr = p.r;
+  p.q = q;
+  p.r = r;
+  let focus = null;
+  for (const e of B.enemies) {
+    if (!e.alive) continue;
+    if (dist(p, e) > p.rng + 1) continue;
+    if (!hasLos(B.grid, p, e)) continue;
+    if (!focus || e.hp < focus.hp) focus = e;
+  }
+  let ev = 0;
+  if (focus)
+    ev = (hitChance(B.grid, p, focus, p.wIC || false) / 100) * avgRoll(p, 1);
+  p.q = sq;
+  p.r = sr;
+  return ev;
+}
+// tile cover for the defensive tiebreak — beacon-aware: high tiles protect nothing
+const tileCov = (grid, q, r) => (grid[r][q].h >= 1 ? 0 : grid[r][q].cover || 0);
+// Move to the best SHOT tile (EV>0 required) reachable while keeping >=2 AP to
+// fire. Score = shot EV + 2.0*cover. Baseline = current tile's score when it
+// has a shot, else 0. minGain gates Rule B (no shuffling for crumbs).
+function positionalMove(B, p, minGain) {
+  const rc = reach(B.grid, B.units, p);
+  const curEv = bestShotEvFrom(B, p, p.q, p.r);
+  const curScore = curEv > 0 ? curEv + 2.0 * tileCov(B.grid, p.q, p.r) : 0;
+  let bestQ = -1,
+    bestR = -1,
+    bestCost = 0,
+    bestScore = curScore;
+  for (const key of Object.keys(rc)) {
+    const cost = rc[key];
+    if (p.ap - cost < 2) continue;
+    const [q, r] = key.split(",").map(Number);
+    const ev = bestShotEvFrom(B, p, q, r);
+    if (ev <= 0) continue;
+    const s = ev + 2.0 * tileCov(B.grid, q, r);
+    if (s > bestScore) {
+      bestScore = s;
+      bestQ = q;
+      bestR = r;
+      bestCost = cost;
+    }
+  }
+  if (bestQ >= 0 && bestScore > curScore + minGain) {
+    p.ap -= bestCost;
+    p.q = bestQ;
+    p.r = bestR;
+    if (p.status && p.status.bleed > 0) {
+      applyDamage(B, p, STATUS_DOT.bleed);
+      p.status.bleed--;
+    }
+    return true;
+  }
+  return false;
+}
 function execAtk(B, p, def, fx) {
   const st = { status: fx.status, statusN: fx.statusN };
   if (fx.kind === "multi") {
@@ -684,6 +749,10 @@ function execAtk(B, p, def, fx) {
 // divine on the biggest threat, otherwise spend AP on the best damage-per-AP
 // action available (Gut Shot / Fan the Hammer / Called Shot / basic). Real play
 // sits between the two. Both validated against the live combat math.
+// POSITIONAL (2026-07-09, folded into both): only visible targets count, the
+// bot hunts firing perches (LOS / high ground / point-blank flanks priced by
+// the real hitChance), and repositions instead of burning AP on walls — so
+// Positioning v1 win rates measure the rules, not bot blindness.
 function playerPhaseBasic(B) {
   const order = B.players
     .filter((p) => p.alive)
@@ -695,15 +764,19 @@ function playerPhaseBasic(B) {
     if (!p.alive) continue;
     let guard = 0;
     while (guard++ < 12) {
-      const inRange = B.enemies
-        .filter((e) => e.alive && dist(p, e) <= p.rng + 1)
+      // v1: only VISIBLE targets count; reposition for a shot before approaching
+      const visible = B.enemies
+        .filter(
+          (e) => e.alive && dist(p, e) <= p.rng + 1 && hasLos(B.grid, p, e),
+        )
         .sort((a, b) => a.hp - b.hp);
-      if (inRange.length && p.ap >= 2) {
+      if (visible.length && p.ap >= 2) {
         p.ap -= 2;
-        doFire(B, p, inRange[0]);
+        doFire(B, p, visible[0]);
         if (!B.enemies.some((e) => e.alive)) return;
         continue;
       }
+      if (positionalMove(B, p, 0)) continue;
       const nearest = B.enemies
         .filter((e) => e.alive)
         .sort((a, b) => dist(p, a) - dist(p, b))[0];
@@ -738,22 +811,29 @@ function playerPhaseAbilities(B) {
           continue;
         }
       }
-      // 2) move into range if nothing is in range
+      // 2) find a firing position (positional bot): a target only counts when
+      // it's VISIBLE. No visible target -> hunt a reachable shot tile (Rule A);
+      // none reachable -> close distance the old way.
       const inRange = B.enemies.filter(
         (e) => e.alive && dist(p, e) <= p.rng + 1,
       );
-      if (!inRange.length) {
+      const visible = inRange.filter((e) => hasLos(B.grid, p, e));
+      if (!visible.length) {
+        if (positionalMove(B, p, 0)) continue;
         const nearest = B.enemies
           .filter((e) => e.alive)
           .sort((a, b) => dist(p, a) - dist(p, b))[0];
         if (p.ap > 0 && moveToward(B, p, nearest)) continue;
         break;
       }
-      // 3) divine: pop once per fight on the biggest in-range threat.
-      // Phase 1b: gated by favor — needs >=1 (consumes 1), empowered at >=3.
+      // 3) divine: once per fight on the biggest eligible threat. Blast divines
+      // lob (any in-range threat); single-target divines need LOS or the once-
+      // per-fight ult whiffs on doFire's gate. Linear scan, no sorts.
       if (p.divine && !p.divineUsed && (p.divineFavor || 0) >= 1) {
-        const threat = inRange.slice().sort((a, b) => b.hp - a.hp)[0];
-        if (threat.boss || threat.hp >= 18) {
+        const pool = DIVINE_BLAST.has(p.divine) ? inRange : visible;
+        let threat = null;
+        for (const e of pool) if (!threat || e.hp > threat.hp) threat = e;
+        if (threat && (threat.boss || threat.hp >= 18)) {
           // save the ult for real threats, not trash
           const emp = (p.divineFavor || 0) >= 3;
           p.divineFavor = Math.max(0, (p.divineFavor || 0) - 1);
@@ -801,8 +881,15 @@ function playerPhaseAbilities(B) {
           continue;
         }
       }
-      // 4) best damage-per-AP action on the lowest-HP focus target
-      const focus = inRange.slice().sort((a, b) => a.hp - b.hp)[0];
+      // 4) focus the lowest-HP VISIBLE target (linear scan). Rule B: when the
+      // shot is poor (<50%) and AP allows move+shoot, take a better perch
+      // first — high ground / flank / decayed-cover angles all price in via
+      // hitChance inside positionalMove.
+      let focus = null;
+      for (const e of visible) if (!focus || e.hp < focus.hp) focus = e;
+      if (p.ap >= 3 && hitChance(B.grid, p, focus, p.wIC || false) < 50) {
+        if (positionalMove(B, p, 0.15 * avgRoll(p, 1))) continue;
+      }
       const opts = [{ fx: { cost: 2, kind: "atk", mult: 1 } }];
       (p.abilities || []).forEach((name) => {
         const fx = ABIL_FX[name];
