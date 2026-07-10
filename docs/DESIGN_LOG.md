@@ -517,3 +517,50 @@ inspection and are queued as instrument/AI follow-ups after Tim's picks.
 closure), (b) hunker mutex or accept the texture, (c) rough-scar keep or
 revert, (d) later: fuse-avoid EV model, spawn-slot variety, XP/duration
 instrument columns.**
+
+---
+# ☀ MORNING DIGEST — 2026-07-10 (overnight lane, 07:00 PT)
+
+## The night in one paragraph
+Everything you picked at 1 AM shipped and held green, then the lane built
+the rest of the decided queue: the **posse sheet + ride-order reorder** is
+in the pause menu (98023ce — Esc → Posse anywhere: XP bars, wounds, live
+stats bright / dormant dimmed, gear, sworn god; top 4 ride), the new rules
+got **26 deterministic tests** (643cf73 — fuse, Deacon cadence/cap, rough
+MP, brace, level-up re-route proof for all six archetypes), your three
+session packs are on disk, Njord red-teamed the shipped rules overnight,
+and every finding was **verified against code** before it reached you.
+Parity stayed **bit-exact (Δ 0.0)** through all of it — now with rounds +
+kills columns in the standard check (9314550) so farms and stalls show up,
+not just win rates. 9 commits, all pushed.
+
+## YOUR PICKS, priority order (nothing was implemented — all yours)
+1. **P0 — close the Deacon XP farm.** CONFIRMED unbounded: raised adds pay
+   full kill XP (combat_core.gd:344) and enrage triggers ONLY at ≤50% HP
+   (check_boss_phase:492) — never poke the boss, farm ~5 XP/round forever;
+   deployed-only XP removed the dilution brake and the new XP breakdown
+   TEACHES it. Options: **kit adds worth 0 XP** · **per-fight kit-XP
+   budget** · **enrage turn-timer** · **anti-ignore enrage** (enrage if
+   unhurt K turns). Ship-block class for any demo containing the Deacon.
+2. **Hunker mutex.** Shoot-then-hunker SURVIVED the ends-turn nerf (hunker
+   needs 1 AP; everyone has 3+): the 2b dominant line still runs. Options:
+   **hunker requires full AP** · **no hunker after attacking** · **accept
+   it as intended texture**.
+3. **Rough-scar veto.** My interpretation: brush stays slow after its cover
+   breaks. Njord notes it inverts an incentive (breaking cover can worsen
+   YOUR approach). Options: **keep the scar** · **rough only while the
+   cover object stands**.
+4. **Sessions ready when you are:** overwatch (docs/OVERWATCH_SESSION_
+   BRIEF.md — the one real fight, me vs Njord, matrix + parameter sheet) ·
+   loot/economy (docs/ECONOMY_DATASHEET.md — 2010g catalog vs one
+   repeatable 100-180g faucet; sinks die mid-Act-II, now with numbers) ·
+   boss-band tuning (docs/TUNING_DIALS_2026-07-10.md — 162-cell sweep;
+   headline: aim is a weak dial vs positional play, and no boss row lands
+   in band before ×1.4 on any single global dial — comps and rules are the
+   real levers).
+
+## Board state (forge)
+calder-032 (P0 farm) · calder-033 (hunker mutex) — TIM-GATED picks filed;
+calder-034 (overwatch build, unblocks the hour you pick); calder-035
+(instrument columns) filed AND LANDED overnight (9314550). calder-027
+verify-blocker flagged to the SiteLens lane, untouched from here.
