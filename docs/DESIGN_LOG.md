@@ -53,14 +53,35 @@ flat damage reduction**. Half cover = ~50% of the body shielded = ~50% chance
 an incoming shot **hits the cover object instead of you**. This is directional
 (protects from the covered side → flanking is real).
 
-**KEYSTONE — CONFIRMED (Tim, 2026-07-09):** BT over XCOM — cover is a **block
-roll**, not a to-hit penalty. Shots that would hit are absorbed by cover at the
-cover's %; absorbed damage lands on the cover object.
-⚠️ **Anti-exploit rule (Tim's explicit catch):** cover durability degrades ONLY
-on successful absorbs of would-be HITS — never on outright missed shots.
-Otherwise players strip cover for free by spamming low-accuracy shots at it.
-Sequence per shot: roll to-hit FIRST → on hit, roll cover block → on block,
-cover takes the damage. Misses touch nothing.
+**KEYSTONE — FINAL (Tim's spec, 2026-07-09): the BANDED SINGLE ROLL.**
+Tim's design: cover gives a visible "cover bonus" (to-hit reduction), plus a
+second resolution — if the shot WOULD have hit the bare target but was denied
+by the cover bonus, the shot STRUCK THE COVER → cover is damaged.
+One d100 roll, three outcome bands (example: aim 75, cover bonus 40):
+  roll 1-35   → HIT UNIT        (hit chance with cover)
+  roll 36-75  → STRIKES COVER   (the denied band — cover takes the damage)
+  roll 76-100 → CLEAN MISS      (nothing is touched)
+Properties: anti-exploit is inherent (pure misses never damage cover — only
+shots that would have connected); mathematically equivalent to a to-hit-then-
+block-roll but resolved in ONE roll; composes with the existing engine (cover
+already subtracts from hit chance — we add the second threshold + cover damage
+in the band). Directional: the bonus only applies vs shots crossing the
+covered face.
+
+**Degradation model (damage-class split, Calder rec pending Tim's pick):**
+Small arms NEVER degrade heavy cover (no invisible 60-hit rock counters — a
+6-8 turn fight never pays that off); explosives crack heavy (1-2 blasts) and
+delete light. Light cover degrades from small-arms strikes-cover results
+(~2-3) AND is destroyed outright by blasts. Legible 2x2: {light,heavy} x
+{bullets,explosives}. Realism ("dozens of rounds could split rock") is served
+by the explosive path instead of bookkeeping.
+
+**OPEN (Tim): dynamite fuse.** His own trope — "the cowboy sees the lit stick
+and moves" — implies FUSE-DELAY dynamite: lands on your turn, detonates at the
+start of your next, enemies get one panicked move → dynamite becomes AREA
+DENIAL / herding (flush them from cover into the gun line), not just damage.
+Alt: instant boom (simpler, classic). Fuse-delay is more western AND more
+fire-support; costs AI flee-the-blast work.
 
 **Cover is DYNAMIC + material-typed:**
 - **Heavy** (boulders, solid walls): effectively indestructible vs in-game
