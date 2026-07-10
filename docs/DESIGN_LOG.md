@@ -358,3 +358,40 @@ fight, dilute XP) with no reorder UI
   hunker-economy options (2b) can't be sim-compared until the bot learns it.
 - **d86802b (forge-imggen img2img) landed mid-session from the imggen lane**
   — no combat overlap, noted for the record.
+
+---
+## Session #2 ANNEX — Njord red-team of the memos (2026-07-10 overnight)
+Full verdict: **docs/REDTEAM_MEMOS_NJORD_2026-07-10.md** — read it whole; it
+has a flip-summary table (Njord counter-recs vs Calder recs on all 9 memos)
+and a "what I'd tell Tim in one pass" close. Author≠verifier held: the memos
+were red-teamed by a different node than wrote them. Picks remain Tim's —
+you now have two argued positions per question instead of one.
+
+**Corrections Calder OWNS (Njord caught real errors in the memo text above):**
+1. **2a option B is mis-specified.** Adjacency attack-of-opportunity as
+   written fires when an enemy LEAVES melee — but the point-blank flank
+   happens on ENTER. As listed, B does NOT tax the v1 flank. If a cheap
+   reaction is wanted, the trigger must be enter-adjacent (or leave-cover).
+2. **2f option C is NOT "zero balance risk."** Re-routing FAVORED pairs
+   means hexslinger/tinkerer start gaining REAL combat stats every level
+   where today they gain none — that's a buff, and it needs a baseline
+   re-run like everything else. (Low-risk ≠ zero. Mea culpa.)
+3. **2g option A is not a "gold sink."** Shop stock is a POWER FAUCET that
+   happens to absorb gold; it only sinks if prices hurt and something
+   (upkeep/ammo/repair) keeps pulling gold out. Njord: price the tiers
+   against the real gold curve + land at least one sink first, or Act II
+   gets a power spike on top of already over-band encounters.
+4. **2h's "~15 lines each" understated the true cost.** That figure is the
+   AUDIT's estimate for the behavior mapping alone (enemy_to_unit/
+   enemy_phase); telegraphs, FX, statuses, parity cases, and per-boss
+   balance re-runs are the real bill. The option stands; the estimate
+   doesn't.
+
+**Njord's baselines frame (endorsed as the sharper read):** treat the
+blind→positional DELTAS as the finding (Pillar 2 proof: foreman +42,
+finale +38), not the absolute win rates as tuning targets. Saturated rows
+(skirmish 1.00, trail-T1 1.00) are ALARMS — the metric is pegged and can't
+see buffs there. The positional bot prices offense only (no hunker, no
+overwatch, no baiting), so today's numbers are a pre-defense snapshot that
+2a/2b/2c will invalidate. Human playtest sets band centers; the sim detects
+regressions and soft content.
