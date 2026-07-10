@@ -6,7 +6,9 @@
 #
 # Routes:
 #   GET  /            -> the web portal (type prompt, see image, download)
-#   POST /generate    -> {prompt, profile?, width?, height?, seed?} -> {artifacts:[{base64}], meta}
+#   POST /generate    -> {prompt, profile?, width?, height?, seed?,
+#                         init_image? (base64/data-URI -> img2img), strength?}
+#                      -> {artifacts:[{base64}], meta}
 #   GET  /gallery     -> recent generations (JSON: file, meta, ts)
 #   GET  /img/<name>  -> a saved PNG
 #   GET  /health      -> {ok, gpu_used_mib, busy}
@@ -40,25 +42,42 @@ def run_job(spec):
             raise RuntimeError("GPU stayed busy (ollama/memory-engine) > 5 min")
         ts = int(time.time())
         prof = spec.get("profile", "concept")
-        name = "%d_%s.png" % (ts, prof)
+        init_path = None
+        b64img = spec.get("init_image")
+        if b64img:
+            if "," in b64img[:100]:  # strip a data-URI header if present
+                b64img = b64img.split(",", 1)[1]
+            init_path = "%s/.init_%d.png" % (HERE, ts)
+            with open(init_path, "wb") as f:
+                f.write(base64.b64decode(b64img))
+        name = "%d_%s%s.png" % (ts, prof, "_i2i" if init_path else "")
         out = "%s/%s" % (GALLERY, name)
         job = {"prompt": spec["prompt"], "profile": prof,
                "width": int(spec.get("width", 1024)), "height": int(spec.get("height", 1024)),
                "seed": int(spec.get("seed", 0)), "style": spec.get("style", True),
                "lora": (spec.get("lora") or None),
-               "negative_prompt": (spec.get("negative_prompt") or None), "out": out}
+               "negative_prompt": (spec.get("negative_prompt") or None),
+               "init": init_path, "strength": float(spec.get("strength", 0.6)),
+               "out": out}
         jf = "%s/.job_%d.json" % (HERE, ts)
         json.dump(job, open(jf, "w"))
         t0 = time.time()
-        r = subprocess.run([sys.executable, "%s/worker.py" % HERE, jf],
-                           capture_output=True, text=True, cwd=HERE, timeout=600)
-        os.remove(jf)
+        try:
+            r = subprocess.run([sys.executable, "%s/worker.py" % HERE, jf],
+                               capture_output=True, text=True, cwd=HERE, timeout=600)
+        finally:
+            os.remove(jf)
+            if init_path and os.path.exists(init_path):
+                os.remove(init_path)
         if r.returncode != 0 or not os.path.exists(out):
             raise RuntimeError("worker failed rc=%s: %s" % (r.returncode, (r.stderr or "")[-800:]))
         data = open(out, "rb").read()
         meta = {"gen_s": round(time.time() - t0, 1), "vram_after_mib": imggen.gpu_used_mib(),
                 "profile": prof, "size": [job["width"], job["height"]], "prompt": spec["prompt"],
-                "seed": job["seed"], "file": name, "ts": ts}
+                "seed": job["seed"], "file": name, "ts": ts,
+                "mode": "img2img" if init_path else "txt2img"}
+        if init_path:
+            meta["strength"] = job["strength"]
         json.dump(meta, open(out + ".json", "w"))
         return data, name, meta
 
@@ -113,6 +132,10 @@ h3{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
   <select id=profile><option value=concept>Concept — painterly (30-step)</option><option value=pixel>Pixel — fast (Lightning 8-step)</option></select>
   <label>Subject LoRA <span style=text-transform:none>(trained people/subjects)</span></label>
   <select id=lora><option value="">none</option></select>
+  <label>Init photo <span style=text-transform:none>(img2img — output follows the photo)</span></label>
+  <div class=row><input id=init type=file accept="image/*" style="padding:6px"><button class=mini id=clr title="clear photo">✕</button></div>
+  <label>Strength <span id=sv style=text-transform:none>0.60</span> <span style=text-transform:none>(low = faithful, high = reimagined)</span></label>
+  <input id=strength type=range min=20 max=95 value=60>
   <div class=row><div><label>Width</label><select id=w><option>768</option><option selected>1024</option><option>512</option></select></div>
   <div><label>Height</label><select id=h><option>768</option><option selected>1024</option><option>512</option></select></div></div>
   <label>Seed</label><div class=row><input id=seed type=number value=0><button class=mini id=rnd>🎲</button></div>
@@ -124,7 +147,8 @@ h3{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;
 <script>
 const $=s=>document.querySelector(s);
 // DOM-safe rendering: prompt text always via textContent / setAttribute, never innerHTML.
-function metaText(m){return `${m.profile} · ${m.size?m.size.join('×'):''} · seed ${m.seed} · ${m.gen_s||'?'}s · VRAM after ${m.vram_after_mib}MiB`;}
+function metaText(m){let t=`${m.profile} · ${m.size?m.size.join('×'):''} · seed ${m.seed} · ${m.gen_s||'?'}s · VRAM after ${m.vram_after_mib}MiB`;
+  if(m.mode==='img2img')t+=` · img2img s=${m.strength}`;return t;}
 function show(m){
   const st=$('#stage');st.textContent='';
   const img=document.createElement('img');img.src='/img/'+m.file;st.appendChild(img);
@@ -148,17 +172,24 @@ async function loadGal(){try{const g=await(await fetch('/gallery')).json();
   g.forEach(m=>{const img=document.createElement('img');img.src='/img/'+m.file;
     img.setAttribute('title',(m.prompt||'').slice(0,140));img.addEventListener('click',()=>show(m));gal.appendChild(img);});
  }catch(e){}}
+function readInit(){const f=$('#init').files[0];if(!f)return Promise.resolve(null);
+  return new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result);rd.onerror=rej;rd.readAsDataURL(f);});}
 async function gen(){const p=$('#prompt').value.trim();if(!p)return;
   const go=$('#go');go.disabled=true;go.textContent='Generating…';
   let t=0;stageSpin();const tick=setInterval(()=>{t++;const el=$('#meta');if(el)el.textContent='generating… '+t+'s';},1000);
-  try{const r=await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({prompt:p,profile:$('#profile').value,lora:$('#lora').value,width:+$('#w').value,height:+$('#h').value,seed:+$('#seed').value})});
+  try{const body={prompt:p,profile:$('#profile').value,lora:$('#lora').value,width:+$('#w').value,height:+$('#h').value,seed:+$('#seed').value};
+   const init=await readInit();
+   if(init){body.init_image=init;body.strength=(+$('#strength').value)/100;}
+   const r=await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)});
    const d=await r.json();clearInterval(tick);
    if(d.error){stageMsg(d.error,true);}else{show(d.meta);loadGal();}
   }catch(e){clearInterval(tick);stageMsg(''+e,true);}
   go.disabled=false;go.textContent='Generate';}
 $('#go').addEventListener('click',gen);
 $('#rnd').addEventListener('click',()=>{$('#seed').value=Math.floor(Math.random()*1e6);});
+$('#strength').addEventListener('input',()=>{$('#sv').textContent=((+$('#strength').value)/100).toFixed(2);});
+$('#clr').addEventListener('click',()=>{$('#init').value='';});
 async function loadLoras(){try{const l=await(await fetch('/loras')).json();
   const sel=$('#lora');while(sel.options.length>1)sel.remove(1);
   l.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}catch(e){}}
