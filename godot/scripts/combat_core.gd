@@ -91,7 +91,9 @@ func build_grid() -> Array:
 			# cover: current bonus (0..0.4). cover0: original (for FX/repair ref).
 			# chp: cover durability. -1 = heavy/indestructible-by-bullets; >0 =
 			# light, decays toward 0. heavy: material flag for explosive rules.
-			row.append({"h": 0, "cover": 0.0, "cover0": 0.0, "chp": 0, "heavy": false})
+			# rough: difficult terrain (2e) — double MP to enter; persists after
+			# the cover object breaks (wreckage/brush stays slow).
+			row.append({"h": 0, "cover": 0.0, "cover0": 0.0, "chp": 0, "heavy": false, "rough": false})
 		grid.append(row)
 	for p in [[3, 2], [6, 7], [2, 6], [7, 3]]:
 		grid[p[1]][p[0]]["h"] = 1
@@ -101,10 +103,13 @@ func build_grid() -> Array:
 	for p in [[2, 3], [7, 6], [4, 7], [5, 2], [1, 5], [8, 4]]:
 		var c: Dictionary = grid[p[1]][p[0]]
 		c["cover"] = 0.4; c["cover0"] = 0.4; c["chp"] = -1; c["heavy"] = true
-	# light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits
+	# light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits.
+	# Soft tiles are also ROUGH (2e, Tim 2026-07-10): brush/wreckage costs
+	# double MP to enter — the covered path is the slow path.
 	for p in [[3, 5], [6, 4], [2, 8], [7, 8], [4, 1], [5, 8]]:
 		var c: Dictionary = grid[p[1]][p[0]]
 		c["cover"] = 0.2; c["cover0"] = 0.2; c["chp"] = LIGHT_COVER_HP; c["heavy"] = false
+		c["rough"] = true
 	return grid
 
 const LIGHT_COVER_HP := 3  # absorbed would-be-hits before light cover is gone
@@ -315,7 +320,8 @@ func reach(grid: Array, units: Array, u: Dictionary) -> Dictionary:
 					break
 			if occupied:
 				continue
-			var step := 1 + (1 if int(cell["h"]) > int(grid[r][q]["h"]) else 0)
+			var step := 1 + (1 if int(cell["h"]) > int(grid[r][q]["h"]) else 0) \
+				+ (1 if bool(cell.get("rough", false)) else 0)
 			var nc := c + step
 			var key := "%d,%d" % [nq, nr]
 			if nc <= int(u["ap"]) and (not res.has(key) or nc < int(res[key])):

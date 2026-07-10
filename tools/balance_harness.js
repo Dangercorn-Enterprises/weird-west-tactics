@@ -71,8 +71,16 @@ function buildGrid() {
     grid.push([]);
     // cover: current bonus (0..0.4). cover0: original. chp: durability
     // (-1 = heavy/bullet-immune; >0 = light, decays). heavy: material flag.
+    // rough: difficult terrain (2e) — double MP to enter, persists after break.
     for (let q = 0; q < COLS; q++)
-      grid[r].push({ h: 0, cover: 0, cover0: 0, chp: 0, heavy: false });
+      grid[r].push({
+        h: 0,
+        cover: 0,
+        cover0: 0,
+        chp: 0,
+        heavy: false,
+        rough: false,
+      });
   }
   const set = (q, r, o) => Object.assign(grid[r][q], o);
   [
@@ -96,7 +104,8 @@ function buildGrid() {
   ].forEach(([q, r]) =>
     set(q, r, { cover: 0.4, cover0: 0.4, chp: -1, heavy: true }),
   );
-  // light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits
+  // light cover (wagon/table/cactus): 0.2 bonus, decays over ~3 absorbed hits.
+  // Soft tiles are also ROUGH (2e): brush/wreckage costs double MP to enter.
   [
     [3, 5],
     [6, 4],
@@ -105,7 +114,13 @@ function buildGrid() {
     [4, 1],
     [5, 8],
   ].forEach(([q, r]) =>
-    set(q, r, { cover: 0.2, cover0: 0.2, chp: LIGHT_COVER_HP, heavy: false }),
+    set(q, r, {
+      cover: 0.2,
+      cover0: 0.2,
+      chp: LIGHT_COVER_HP,
+      heavy: false,
+      rough: true,
+    }),
   );
   return grid;
 }
@@ -342,7 +357,7 @@ function reach(grid, units, u) {
       const cell = grid[nr][nq];
       if (cell.h >= 2) return;
       if (occupied(nq, nr)) return;
-      const step = 1 + (cell.h > grid[r][q].h ? 1 : 0);
+      const step = 1 + (cell.h > grid[r][q].h ? 1 : 0) + (cell.rough ? 1 : 0);
       const nc = c + step;
       if (
         nc <= u.ap &&

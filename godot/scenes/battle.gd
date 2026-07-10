@@ -108,10 +108,10 @@ func _build_biome_grid(biome: Dictionary) -> Array:
 	for r in core.ROWS:
 		var row: Array = []
 		for q in core.COLS:
-			# cover0/chp/heavy mirror CombatCore.build_grid so destructible cover
-			# works in interactive play (chp -1 heavy, >0 light, decays to 0).
+			# cover0/chp/heavy/rough mirror CombatCore.build_grid so destructible
+			# cover + difficult terrain work in interactive play.
 			row.append({"h": 0, "cover": 0.0, "cover0": 0.0, "chp": 0,
-				"heavy": false, "deco": null})
+				"heavy": false, "rough": false, "deco": null})
 		g.append(row)
 	for p in biome.get("h1", []):
 		g[p[1]][p[0]]["h"] = 1
@@ -125,6 +125,7 @@ func _build_biome_grid(biome: Dictionary) -> Array:
 		var c: Dictionary = g[p[1]][p[0]]
 		c["cover"] = 0.2; c["cover0"] = 0.2; c["chp"] = core.LIGHT_COVER_HP
 		c["heavy"] = false
+		c["rough"] = true  # 2e: brush/wreckage is difficult terrain (double MP)
 		c["deco"] = biome.get("softDeco", "cactus")
 	return g
 
