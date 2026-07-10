@@ -128,3 +128,233 @@ PLAYTEST gate.
 makes flanking risky, load-bearing), full edge-directional cover, difficult
 terrain (double MP), hunker-turtle economy (ends-turn/no-move), the dynamite
 LOB doctrine (scatter/spotter). Njord's full report: docs/COVER_REDTEAM_2026-07-09.md.
+
+---
+## Sim instrument fixed — positional bot + NEW BASELINES (2026-07-09 night,
+## commits 57eddf9 · f485756 · 0017e4f · 20119b2)
+
+**What happened, in order:**
+1. **God-swearing port regression FIXED** (audit clusters 4+5): party_to_unit
+   now carries p['god'], so shrine Swear actually redirects the divine's favor
+   pool, favor-on-win, and blessing alignment (web behavior restored). New
+   tests/god_swear_test.gd 5/5 — the parity harness could never see this
+   (mk_party has no god field).
+2. **Parity was RED and nobody knew** — exactly the risk this log flagged:
+   Positioning v1 went into the Godot core only; the Node harness still ran
+   pre-v1 math (skirmish node 98.9 vs godot 67.3). v1 is now line-mirrored
+   into balance_harness.js; the harness header names combat_core.gd as the
+   canonical engine. Parity re-proven at Δ 0.0 pts on all 7 encounters —
+   bit-exact, both engines consume identical RNG draw sequences (stronger
+   than the old ±2.1pt statistical green).
+3. **Interactive LOS truth** (battle.gd): the UI let the player PAY for
+   LOS-blocked shots (2 AP basic fire logged as a fake "miss", ability AP,
+   even the once-per-fight divine + favor) while the hover preview showed
+   invented odds. Now: refusal at zero cost ("No line of sight."), preview
+   says NO LINE OF SIGHT, blast divines/AoE still lob. Boots clean, 17/17.
+4. **Positional bot** built into BOTH engines (the playtest-gate item):
+   Rule A — only VISIBLE targets count; with none, hunt a reachable firing
+   tile scored by shot-EV (the real hit_chance prices height bonus, cover
+   halving, beacon, point-blank flanks) + 2.0×tile-cover, else close
+   distance. Rule B — holding a <50% shot with move+shoot AP, take a perch
+   worth ≥0.15×avg-damage more. Rule C — focus lowest-HP visible; single-
+   target divines require LOS (no more wasted ults). Zero added RNG draws.
+
+**NEW 2000-run baselines (positional bot, v1 rules) — the numbers to tune from:**
+
+| encounter | blind bot (deprecated) | positional bot | band |
+|---|---|---|---|
+| skirmish (starter) | .67 | **1.00** | story .70–.85 ↑over |
+| vanguard (starter) | .81 | **.96** | story ↑over |
+| deacon (starter) | .62 | **.71** | boss .45–.65 ~over |
+| foreman (starter) | .47 | **.89** | boss ↑over |
+| weaver (starter) | .71 | **.93** | boss ↑over |
+| hollow (starter) | .68 | **.92** | boss ↑over |
+| finale4 (full) | .53 | **.91** | boss ↑over |
+| trail T1 ambush (harness) | .35 | **1.00** | ambush .80–.90 ↑over |
+| wilderness T2 ambush (harness) | .00 | **.79** | ambush ~in band |
+
+**How to read this (do not skip):** the positional bot ≈ an UPPER-BOUND
+competent player (optimal focus fire, perch-hunting, no mistakes, but no
+hunkering/overwatch since those don't exist for it). A real human sits
+between the deprecated blind numbers and these. The blind→positional spread
+(foreman +42pts, finale +38pts) is the measured value of position under v1 —
+Pillar 2 is mechanically real. Most encounters now sit ABOVE their bands for
+a positional player: whether that means "retune enemies up" or "bands assumed
+a weaker player, adjust bands" is a TIM DECISION for a tuning session with
+this instrument + his own playtest. No retuning was done in this pass.
+
+---
+# Session #2 — DECISION MEMOS (options prepared for Tim, nothing built)
+*Calder, 2026-07-10. Every open question from v1 + the GUTS pass (audit
+2026-07-09), 2–3 concrete options each with tradeoffs. Recs marked; picks are
+Tim's. Receipts: SYSTEMS_AUDIT_2026-07-09.md clusters cited per item,
+COVER_REDTEAM_2026-07-09.md (Njord).*
+
+## 2a. OVERWATCH / reaction fire — v2 #1, Njord's "one thing missing"
+Without it, flanking is free movement math and directional cover never faces
+risk (red-team §4). Interacts with 2b and 2c below.
+- **A. Universal overwatch action (XCOM):** reserve ≥2 AP, snap shot (−15
+  aim?) at the first enemy moving through your LOS. + Standard, legible,
+  symmetric (enemies get it too — sentries/lawdogs first); makes flanks cost
+  blood; the flush-them-with-dynamite combo needs it. − Biggest AI cost
+  (enemies must respect threatened lanes or look dumb), needs stance UI +
+  telegraphs, slows turns.
+- **B. Adjacency attack-of-opportunity only:** free snap shot when an enemy
+  LEAVES melee range. + Tiny scope; taxes exactly the point-blank flank v1
+  introduced. − Long sightlines stay unguarded; not really "overwatch."
+- **C. Covering Fire as a per-kit ABILITY (lawdog/sentry/tinkerer turret
+  flavor):** only some units threaten movement. + Characterful, bounded AI,
+  no universal economy change. − Flanking stays free vs most comps.
+- **Calder rec:** A, scoped to players + sentry-class enemies in the first
+  cut. B is a cheap stopgap that can ship inside A later.
+
+## 2b. HUNKER economy — Njord's always-hunker turtle
+Today: 1 AP, +0.20 to the block band (cap 0.60), no restrictions — behind
+heavy cover, shoot-then-hunker is near-strictly-correct every turn.
+- **A. Hunker ENDS the turn:** the classic fix. + One rule kills the dominant
+  line; instantly legible. − Binary; removes shoot-then-brace as a texture.
+- **B. Hunker requires not having moved:** "braced" flavor. + Softer, keeps
+  brace-and-shoot positioning identity. − Doesn't stop the static turtle —
+  the exact case Njord flagged (bunker stalemates).
+- **C. Hunker tags you PINNED:** keep 1 AP, but while hunkered you can't
+  overwatch (2a) and point-blank/flank shots vs you gain +hit. + Counterplay
+  instead of prohibition; synergizes with the flank game. − Two moving parts,
+  needs 2a to exist for half its teeth.
+- **Calder rec:** A for v2 simplicity; revisit C once overwatch lands.
+
+## 2c. DYNAMITE fuse — Tim's own trope, still open
+- **A. Fuse-delay:** lands this turn, detonates at the start of your next;
+  enemies get one panicked move. + The cowboy-sees-the-lit-stick beat; turns
+  dynamite into AREA DENIAL/herding (flush → gun line / overwatch line — the
+  fire-support fantasy). − AI must flee blast markers (new behavior), needs a
+  lit-fuse telegraph, and herding pays off fully only WITH overwatch (2a).
+- **B. Instant boom:** current do_blast behavior, ship as-is. + Zero work,
+  classic feel. − Loses the trope AND the herding layer; dynamite stays
+  "damage in a circle."
+- **C. Split by item:** alchemical ashfall_charge stays INSTANT; stick
+  dynamite (bandits + future player item) is FUSE-DELAY. + Teaches both,
+  preserves the charge's feel, gives bandits their signature. − Two rules for
+  one category; must read clearly in the HUD.
+- **Calder rec:** C — the trope lives where the flavor is, and the existing
+  consumable doesn't change under players' feet.
+
+## 2d. EDGE-DIRECTIONAL cover — v1 shipped the point-blank proxy
+- **A. Full edge model (XCOM):** cover lives on tile EDGES; the bonus applies
+  only against shots crossing a covered face; flanking = any uncovered-face
+  shot. + Real flanking geometry, the "do it properly" endgame. − The
+  costliest option on the board: per-edge grid data for 6 boards, cover calc,
+  shield-pip UI, AI move scoring must understand faces, full re-balance.
+- **B. Facing-arc approximation:** each cover tile gets ONE protected arc
+  (derived from board authoring); cover applies only if the shot crosses it.
+  + Most of the flank game at a fraction of A's cost. − Auto-deriving facing
+  on scatter-cover desert boards is ambiguous; hand-authoring is real work.
+- **C. Keep the v1 proxy (adjacent = flank) + overwatch as the tax:** revisit
+  after a human playtest. + Zero cost now; overwatch (2a) already makes the
+  walk-around risky. − Flanking stays binary adjacent-or-nothing.
+- **Calder rec:** C until Tim's playtest says the proxy feels wrong; if the
+  flank game needs to be the star, B before A.
+
+## 2e. DIFFICULT terrain (double-MP tiles)
+- **A. Data-only pass:** mark existing rough/brush tiles double move cost on
+  the 6 boards (reach() already prices ascent; a tile moveCost is ~10 lines
+  in both engines + parity re-run). + Cheap, real "safe path is the slow
+  path" economy. − On ONE fixed board per biome the players memorize it fast.
+- **B. New terrain type with visuals + procedural boards:** mud/scree/web
+  tiles as part of a map-variety push (audit: every mesa fight is literally
+  the same map — repeat-board fatigue is the bigger lever). + Fixes two
+  things at once; the unwired map_gen.py exists. − A project, not a pass.
+- **C. Defer until board variety exists.** + Focus. − P2's movement economy
+  stays two-axis (distance + climb) meanwhile.
+- **Calder rec:** C now, A folded into whatever board-variety direction Tim
+  picks (see GUTS: the map problem outranks it).
+
+## GUTS PASS (calder-031) — the four holes the audit says matter most
+
+## 2f. THE 5 DEAD STATS (nimbleness/cognition/knowledge/mien/spirit)
+Cluster 4: hexslinger + tinkerer level-ups are 100% dead (favored pairs are
+both dead stats), preacher/lawdog/drifter 50%; design.json PROMISES dodge /
+ability accuracy / crafting / intimidation / fear resistance.
+- **A. Wire them minimally to what exists** (one derivation line each, no new
+  systems): nimbleness → dodge (flat −hit% on you, composes before the 0.60
+  cap) · cognition → +aim on ABILITIES only · spirit → divine efficiency
+  (empower threshold or divine mult) · knowledge → consumable potency ·
+  mien → recruit price / bounty pay (town-side). + Honors the printed
+  promises; fixes caster-archetype scaling invisibly broken since the web
+  build. − Every mapping is a BALANCE change (parity + baselines re-run);
+  the exact mapping list is a design pick, not a given.
+- **B. Cut to 4 real stats:** delete the dead five from pregens/creator/
+  FAVORED, rebalance. + Honest, small sheet, no fake depth. − Kills the
+  Deadlands-breadth flavor and every future skill-check hook; touches
+  creator data + any future sheet.
+- **C. Re-route FAVORED pairs only** (2-line data fix): every archetype
+  levels stats that exist; the five stay dead but progression works. + Ships
+  tonight, zero balance risk beyond +stat growth. − The sheet still shows
+  numbers that do nothing; the lie stays printed.
+- **Calder rec:** C immediately as a stopgap once Tim nods; A as the real
+  fix WITH Tim choosing the mappings (the list above is a menu, not a spec).
+
+## 2g. LOOT / DROPS — cluster 3: zero drops anywhere, 8 of 22 items
+unobtainable, economy exhausted by mid-Act II
+- **A. Tier-unlock the catalog tail:** outfitter/forge stock keyed to town
+  tier (T2 adds mid gear, T3 sells hex_focus / steam_cannon /
+  blessed_vestments / clockwork_exo). + Pure data change; instant gold sink;
+  the items are already statted, gated, and parity-tested. − Which item lands
+  at which tier/price IS the economy design (Tim's table to fill); no
+  drop-thrill, just shopping. (Note: ashfall_pistol's armor-piercing niche
+  needs enemies to HAVE armor first — separate decision.)
+- **B. Battle drops:** port the haunts.js/encounter_gen loot tables into a
+  post-battle drop roll by encounter tier. + The actual "loot game"; makes
+  ambushes/bounties worth fighting past gold-cap. − New system: drop tables,
+  result-screen UI, inventory pressure → wants the character/inventory
+  screen (2i) to exist.
+- **C. Staged both:** A now, B behind the haunts-wiring decision (audit
+  cluster 1 flags haunts.js as the cheapest playtime multiplier overall).
+- **Calder rec:** C — A is a lunch-break build once Tim fills the tier table.
+
+## 2h. BOSS MECHANICS — cluster 6: five bosses, one enrage template, while
+design.json promises boss-summon / boss-turret / boss-possess / boss-clones /
+boss-webs (strings mapped by NOTHING in either build, ever)
+- **A. Implement the five promised kits minimally** (~15 lines each in
+  enemy_to_unit/enemy_phase per the audit): Deacon raises 1 walkin_dead every
+  other turn pre-enrage · Foreman goes sentry-mode + deploys a forge_sentry
+  once · Hollow Man's hits confuse (1 turn, cooldown) · Coyote's Shadow
+  spawns 1-HP decoy clones · Weaver webs tiles (slow/root status; full web
+  terrain wants 2e). + Highest depth-per-line on the board; each boss finally
+  matches its lore card; parity harness catches drift per boss. − Five
+  balance passes, five telegraphs/FX, boss-band re-tune after (they're
+  already over-band vs the positional bot).
+- **B. One shared SECOND mechanic for all five** (e.g. midfight lieutenant
+  call or arena change). + One build, some variety. − Bosses stay reskins,
+  just two-beat reskins.
+- **C. Defer; spend the effort on board variety** (audit argues repeat-board
+  fatigue ≥ boss sameness for the $10 ask).
+- **Calder rec:** A, one boss at a time, Deacon first (he's the demo's Act-I
+  face) — each behind its own baseline re-run.
+
+## 2i. CHARACTER SHEET / party screen — clusters 4+5: stats, XP, level, and
+wounds are INVISIBLE everywhere; bench slots 5-6 strictly negative (never
+fight, dilute XP) with no reorder UI
+- **A. Town "Posse" tab:** read-only member rows (level, XP bar, 9 stats,
+  gear, wounds) inside the existing town UI. + Cheapest real surface; no new
+  scene. − Not visible in battle or on the worldmap where the questions
+  ("who's hurt? who levels next?") actually arise.
+- **B. Pause-menu party sheet, everywhere:** new panel in the pause autoload;
+  the natural home for BENCH REORDER (choose your four) later. + The real
+  answer; kills the invisible-math problem game-wide; reorder fixes the
+  strictly-negative bench. − Largest UI build of the three; pause menu is
+  currently just audio/quit.
+- **C. Battle hover-card only:** stats on unit hover in fights. + Tiny.
+  − Doesn't answer between-fight questions; XP/level stay hidden.
+- **Calder rec:** B, shipped WITH bench reorder (the sheet without the fix
+  it enables is half the value). Reorder mechanics are mechanical once the
+  sheet exists; changing the bench XP-dilution rule itself = Tim's call.
+
+## Flags noticed while working (no action taken)
+- **Ability range is ungated in the interactive game:** basic fire enforces
+  dist ≤ rng+1 (battle.gd), but targeted ABILITIES fire at any distance —
+  the math just piles on −15/tile falloff. Bug or "desperate long shots are
+  very western"? Tim's call which way to make it consistent.
+- **Sim bot still never hunkers** — fine for offense measurement, but the
+  hunker-economy options (2b) can't be sim-compared until the bot learns it.
+- **d86802b (forge-imggen img2img) landed mid-session from the imggen lane**
+  — no combat overlap, noted for the record.
