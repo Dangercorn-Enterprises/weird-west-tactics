@@ -153,11 +153,19 @@ func load_game() -> bool:
 func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
-# ---- progression (mirror of DF.gainXP) ------------------------------------------
+# ---- progression -----------------------------------------------------------------
+# Combat reads exactly these four stats (party_to_unit); everything else is
+# dead data until the stat-wiring design session. UI that shows stats grays
+# anything not in LIVE_STATS — the sheet must not print dead numbers as live.
+const LIVE_STATS := ["vigor", "quickness", "strength", "deftness"]
+# Session #2 decision 2f (Tim, 2026-07-10): FAVORED re-routed onto LIVE stats
+# so every archetype levels something real (hexslinger/tinkerer used to level
+# NOTHING — both favored stats were dead; audit cluster 4). Old pairs kept in
+# the design log; full stat wiring is a future design session.
 const FAVORED := {
-	"gunslinger": ["deftness", "quickness"], "hexslinger": ["cognition", "spirit"],
-	"tinkerer": ["knowledge", "cognition"], "preacher": ["spirit", "vigor"],
-	"lawdog": ["vigor", "mien"], "drifter": ["nimbleness", "quickness"],
+	"gunslinger": ["deftness", "quickness"], "hexslinger": ["deftness", "vigor"],
+	"tinkerer": ["deftness", "quickness"], "preacher": ["vigor", "strength"],
+	"lawdog": ["vigor", "quickness"], "drifter": ["quickness", "deftness"],
 }
 
 func xp_for_level(lvl: int) -> int:
