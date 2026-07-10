@@ -53,11 +53,14 @@ flat damage reduction**. Half cover = ~50% of the body shielded = ~50% chance
 an incoming shot **hits the cover object instead of you**. This is directional
 (protects from the covered side → flanking is real).
 
-⚠️ **KEYSTONE (confirm):** the elegant reading of Tim's spec is a **block roll**:
-if a shot would hit, roll cover% → on block, the damage lands on the COVER, not
-the unit. This makes destructible cover fall out for free — cover degrades by
-eating the hits it blocks. (Alt: cover as a pure to-hit penalty like today, with
-a separate HP track — messier.) Calder rec: block-roll.
+**KEYSTONE — CONFIRMED (Tim, 2026-07-09):** BT over XCOM — cover is a **block
+roll**, not a to-hit penalty. Shots that would hit are absorbed by cover at the
+cover's %; absorbed damage lands on the cover object.
+⚠️ **Anti-exploit rule (Tim's explicit catch):** cover durability degrades ONLY
+on successful absorbs of would-be HITS — never on outright missed shots.
+Otherwise players strip cover for free by spamming low-accuracy shots at it.
+Sequence per shot: roll to-hit FIRST → on hit, roll cover block → on block,
+cover takes the damage. Misses touch nothing.
 
 **Cover is DYNAMIC + material-typed:**
 - **Heavy** (boulders, solid walls): effectively indestructible vs in-game
