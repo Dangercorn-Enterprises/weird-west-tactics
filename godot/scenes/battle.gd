@@ -53,6 +53,7 @@ func _ready() -> void:
 	core.design = GS.design
 	core.seed_rng(int(Time.get_ticks_usec()) & 0x7FFFFFFF)
 	core.on_damage = _on_unit_damaged
+	core.on_cover_hit = _on_cover_hit
 	params = GS.pending_battle if not GS.pending_battle.is_empty() else {
 		"title": "Skirmish at the Crossing", "biome": "mesa",
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
@@ -107,18 +108,24 @@ func _build_biome_grid(biome: Dictionary) -> Array:
 	for r in core.ROWS:
 		var row: Array = []
 		for q in core.COLS:
-			row.append({"h": 0, "cover": 0.0, "deco": null})
+			# cover0/chp/heavy mirror CombatCore.build_grid so destructible cover
+			# works in interactive play (chp -1 heavy, >0 light, decays to 0).
+			row.append({"h": 0, "cover": 0.0, "cover0": 0.0, "chp": 0,
+				"heavy": false, "deco": null})
 		g.append(row)
 	for p in biome.get("h1", []):
 		g[p[1]][p[0]]["h"] = 1
 	for p in biome.get("h2", []):
 		g[p[1]][p[0]]["h"] = 2
 	for p in biome.get("hard", []):
-		g[p[1]][p[0]]["cover"] = 0.4
-		g[p[1]][p[0]]["deco"] = biome.get("hardDeco", "crate")
+		var c: Dictionary = g[p[1]][p[0]]
+		c["cover"] = 0.4; c["cover0"] = 0.4; c["chp"] = -1; c["heavy"] = true
+		c["deco"] = biome.get("hardDeco", "crate")
 	for p in biome.get("soft", []):
-		g[p[1]][p[0]]["cover"] = 0.2
-		g[p[1]][p[0]]["deco"] = biome.get("softDeco", "cactus")
+		var c: Dictionary = g[p[1]][p[0]]
+		c["cover"] = 0.2; c["cover0"] = 0.2; c["chp"] = core.LIGHT_COVER_HP
+		c["heavy"] = false
+		c["deco"] = biome.get("softDeco", "cactus")
 	return g
 
 func _apply_blessing() -> void:
@@ -249,7 +256,10 @@ func _add_scatter(name: String, q: int, r: int, h: float) -> void:
 	spr.position = Vector3(_tx(q) + jx, h + world_h / 2.0 - 0.02, _tz(r) + jz)
 	add_child(spr)
 
+var _cover_props := {} # "q,r" -> the cover Node3D, so it can degrade/shatter
+
 func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
+	var key := "%d,%d" % [q, r]
 	var path := "res://assets/props/%s.png" % deco
 	if ResourceLoader.exists(path):
 		var spr := Sprite3D.new()
@@ -262,6 +272,7 @@ func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
 		spr.position = Vector3(_tx(q), h + world_h / 2.0 - 0.02, _tz(r))
 		add_child(spr)
 		_add_ground_shadow(Vector3(_tx(q), h, _tz(r)), 0.4)
+		_cover_props[key] = spr
 	else:
 		var deco_mesh := BoxMesh.new()
 		deco_mesh.size = Vector3(0.34, 0.5 if big else 0.3, 0.34)
@@ -272,6 +283,49 @@ func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
 		dmi.mesh = deco_mesh
 		dmi.position = Vector3(_tx(q), h + deco_mesh.size.y / 2.0, _tz(r))
 		add_child(dmi)
+		_cover_props[key] = dmi
+
+# CombatCore.on_cover_hit(q, r, chp_left): light cover degrades (lean it,
+# darken it) and, when destroyed (chp<=0 or blast=-1), topples and vanishes.
+func _on_cover_hit(q: int, r: int, chp_left: int) -> void:
+	var node: Node3D = _cover_props.get("%d,%d" % [q, r])
+	if node == null or not is_instance_valid(node):
+		return
+	if chp_left <= 0:
+		# destroyed — topple + shrink out, leave the tile bare
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(node, "rotation:z", 1.4, 0.35).set_trans(Tween.TRANS_BACK)
+		tw.tween_property(node, "scale", Vector3(0.05, 0.05, 0.05), 0.4)
+		tw.chain().tween_callback(node.queue_free)
+		_cover_props.erase("%d,%d" % [q, r])
+		if node is Sprite3D:
+			_spawn_puff(node.position, Color("#c9b89a"))
+	else:
+		# degraded — a shove and a darker, more battered look
+		var tw2 := create_tween()
+		tw2.tween_property(node, "position:x", node.position.x + 0.04, 0.06)
+		tw2.tween_property(node, "position:x", node.position.x, 0.10)
+		if node is Sprite3D:
+			node.modulate = node.modulate.darkened(0.18)
+
+# Quick dust burst when cover shatters (a few blob sprites that expand + fade).
+func _spawn_puff(pos: Vector3, tint: Color) -> void:
+	for i in 5:
+		var p := Sprite3D.new()
+		p.texture = _blob_texture()
+		p.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		p.shaded = false
+		p.modulate = tint
+		p.pixel_size = 0.006
+		var ang := float(i) * TAU / 5.0
+		p.position = pos
+		add_child(p)
+		var dst := pos + Vector3(cos(ang) * 0.35, 0.15 + 0.2 * float(i % 2), sin(ang) * 0.35)
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(p, "position", dst, 0.45).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(p, "modulate:a", 0.0, 0.45)
+		tw.tween_property(p, "scale", Vector3(2.2, 2.2, 2.2), 0.45)
+		tw.chain().tween_callback(p.queue_free)
 
 static var _blob_tex: ImageTexture = null
 func _blob_texture() -> ImageTexture:
