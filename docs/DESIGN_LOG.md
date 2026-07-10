@@ -564,3 +564,19 @@ calder-032 (P0 farm) · calder-033 (hunker mutex) — TIM-GATED picks filed;
 calder-034 (overwatch build, unblocks the hour you pick); calder-035
 (instrument columns) filed AND LANDED overnight (9314550). calder-027
 verify-blocker flagged to the SiteLens lane, untouched from here.
+
+---
+# MORNING PICKS — Tim, 2026-07-10 morning (in-chat, decided)
+1. **P0 farm closure → KIT ADDS PAY 0 XP.** Airtight one-line-class fix:
+   raised dead grant no kill XP; clearing them is its own reward (safety).
+   Kill COUNT stays truthful everywhere (banner, instrument conveyor
+   column) — only the XP payout excludes raised units (new xpKills
+   counter, both engines; battle-end XP now pays on xpKills).
+2. **Hunker mutex → NO HUNKER AFTER ATTACKING.** Kills exactly the
+   shoot-then-brace dominant line; move-then-brace (hold the line) stays.
+   Applies to the interactive button AND the sim bot's end-of-activation
+   brace (which was itself the shoot-then-brace line) — defense baselines
+   re-measured after.
+3. **Rough scar → KEPT.** Wreckage stays slow after the cover object
+   breaks; the inverted incentive (blasting a path can slow your own
+   approach) is ruled a tactical tradeoff, not a bug. Playtest may reopen.

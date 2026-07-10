@@ -342,6 +342,11 @@ func apply_damage(b: Dictionary, def: Dictionary, dmg: int, crit := false) -> vo
 		def["alive"] = false
 		if def["side"] == "e":
 			b["kills"] += 1
+			# P0 farm closure (Tim, 2026-07-10 morning): boss-raised units pay
+			# NO XP — kills stays the truthful body count, xpKills is what the
+			# battle-end XP actually pays on.
+			if str(def.get("raisedBy", "")) == "":
+				b["xpKills"] = int(b.get("xpKills", 0)) + 1
 		else:
 			b["playerDeaths"] += 1
 	else:
@@ -811,6 +816,7 @@ func player_phase(b: Dictionary) -> void:
 		if not p["alive"]:
 			continue
 		p["ap"] = p["maxAp"]
+		p["attacked"] = false  # 2b mutex: brace is forbidden after attacking
 		tick_status(b, p)
 		if not p["alive"]:
 			continue
@@ -905,6 +911,7 @@ func player_phase(b: Dictionary) -> void:
 				return _exp_atk_dmg(b["grid"], p, focus, a) / float(a["cost"]) > _exp_atk_dmg(b["grid"], p, focus, c) / float(c["cost"]))
 			var choice: Dictionary = aff[0]
 			_exec_atk(b, p, focus, choice)
+			p["attacked"] = true
 			p["ap"] -= int(choice["cost"])
 			var any_e := false
 			for e in b["enemies"]:
@@ -913,10 +920,10 @@ func player_phase(b: Dictionary) -> void:
 					break
 			if not any_e:
 				return
-		# 2b (hunker ends turn): a competent player banks leftover AP as a brace —
-		# the activation was over anyway, so this is strictly-correct defense and
-		# finally prices hunker into the baselines.
-		if p["alive"] and int(p["ap"]) >= 1:
+		# 2b (hunker ends turn + morning mutex): brace leftover AP ONLY if the
+		# unit didn't attack this activation — shoot-then-brace is dead by rule;
+		# move-then-brace (hold the line) remains.
+		if p["alive"] and int(p["ap"]) >= 1 and not p.get("attacked", false):
 			p["status"]["hunker"] = maxi(int(p["status"]["hunker"]), 2)
 			p["ap"] = 0
 	for p in b["players"]:
@@ -952,7 +959,7 @@ func run_battle(party_specs: Array, enemy_specs: Array, max_rounds: int) -> Dict
 		enemies.append(u)
 	var b := {
 		"grid": grid, "players": players, "enemies": enemies,
-		"units": players + enemies, "kills": 0, "playerDeaths": 0,
+		"units": players + enemies, "kills": 0, "xpKills": 0, "playerDeaths": 0,
 		"charges": [],
 	}
 	var round_n := 0
@@ -971,8 +978,10 @@ func run_battle(party_specs: Array, enemy_specs: Array, max_rounds: int) -> Dict
 		not b["players"].filter(func(p): return p["alive"]).is_empty()
 		and b["enemies"].filter(func(e): return e["alive"]).is_empty()
 	)
-	# kills incl. raised adds — WR alone can't see farms/stalls (Njord RT#2)
-	return {"win": win, "rounds": round_n, "timedOut": timed_out, "kills": b["kills"]}
+	# kills incl. raised adds — WR alone can't see farms/stalls (Njord RT#2);
+	# xpKills = what progression actually pays on (raised adds excluded)
+	return {"win": win, "rounds": round_n, "timedOut": timed_out,
+		"kills": b["kills"], "xpKills": int(b.get("xpKills", 0))}
 
 func eval_encounter(party: Array, enemy_ids: Array, runs: int) -> Dictionary:
 	var raw: Array = []

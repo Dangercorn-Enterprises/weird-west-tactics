@@ -88,6 +88,7 @@ function cell(party, specs) {
   let wins = 0,
     rounds = 0,
     kills = 0,
+    xpKills = 0,
     timeouts = 0;
   for (let i = 0; i < RUNS; i++) {
     const r = H.runBattle(party, specs, 60);
@@ -95,12 +96,14 @@ function cell(party, specs) {
     if (r.timedOut) timeouts++;
     rounds += r.rounds;
     kills += r.kills;
+    xpKills += r.xpKills;
   }
   return {
     wr: wins / RUNS,
     rounds: rounds / RUNS,
-    kills: kills / RUNS,
-    xp: (kills / RUNS) * 10 + 25 * (wins / RUNS), // gross deployed-pool inflow
+    kills: kills / RUNS, // truthful body count (raised adds included)
+    // gross deployed-pool inflow — pays on xpKills (P0 closure: raised = 0 XP)
+    xp: (xpKills / RUNS) * 10 + 25 * (wins / RUNS),
     to: timeouts / RUNS,
   };
 }

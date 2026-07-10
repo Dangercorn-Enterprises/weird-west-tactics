@@ -53,6 +53,19 @@ func _init() -> void:
 	ok("blast cracked heavy cover at (5,2) one tier",
 		absf(float(b["grid"][2][5]["cover"]) - (heavy0 - 0.2)) < 0.0001)
 
+	# ---- P0 farm closure: raised adds pay 0 XP (kills stays truthful) -------------
+	var normal := core.enemy_to_unit(core.design["enemies"][0], 0)
+	var raised := core.enemy_to_unit(core.design["enemies"][0], 1)
+	raised["raisedBy"] = "e_boss"
+	normal["hp"] = 1
+	raised["hp"] = 1
+	var bx := _mk_battle(core, [], [normal, raised])
+	bx["xpKills"] = 0
+	core.apply_damage(bx, normal, 5)
+	core.apply_damage(bx, raised, 5)
+	ok("both deaths count as kills (truthful body count)", int(bx["kills"]) == 2)
+	ok("only the un-raised death pays XP (xpKills 1)", int(bx["xpKills"]) == 1)
+
 	# charge danger pricing (bot panic instinct)
 	var b2 := _mk_battle(core, [], [])
 	core.plant_charge(b2, "e", {"q": 5, "r": 5})
@@ -104,7 +117,7 @@ func _init() -> void:
 	ok("plain neighbor (2,4) costs 1 MP", int(rc.get("2,4", -1)) == 1)
 	ok("rough flag persists on the soft tile", bool(grid[5][3].get("rough", false)))
 
-	# ---- hunker ends turn (2b): bot banks leftover AP as a brace ------------------
+	# ---- hunker mutex (2b + morning pick): no brace after attacking ----------------
 	var brawler: Dictionary = core.party_to_unit(core.mk_party(["gunslinger"])[0], 0)
 	brawler["q"] = 1; brawler["r"] = 1
 	brawler["ap"] = 3; brawler["maxAp"] = 3
@@ -115,8 +128,20 @@ func _init() -> void:
 	tank["hp"] = 999; tank["maxHp"] = 999
 	var bh := _mk_battle(core, [brawler], [tank])
 	core.player_phase(bh)
-	ok("leftover AP became a brace (hunker 2)", int(brawler["status"]["hunker"]) == 2)
-	ok("brace ended the turn (AP 0)", int(brawler["ap"]) == 0)
+	ok("no brace after attacking (mutex)", int(brawler["status"]["hunker"]) == 0)
+	ok("leftover AP simply remains (AP 1)", int(brawler["ap"]) == 1)
+	# a unit that CANNOT attack (1 AP) still braces — move/hold texture lives
+	var holder: Dictionary = core.party_to_unit(core.mk_party(["gunslinger"])[0], 0)
+	holder["q"] = 1; holder["r"] = 1
+	holder["maxAp"] = 1
+	holder["divineFavor"] = 0
+	var tank2 := core.enemy_to_unit(core.design["enemies"][0], 0)
+	tank2["q"] = 1; tank2["r"] = 2
+	tank2["hp"] = 999; tank2["maxHp"] = 999
+	var bh2 := _mk_battle(core, [holder], [tank2])
+	core.player_phase(bh2)
+	ok("non-attacker still braces (hunker 2)", int(holder["status"]["hunker"]) == 2)
+	ok("brace ended the turn (AP 0)", int(holder["ap"]) == 0)
 
 	# ---- FAVORED re-route (2f): every level-up grows LIVE stats only --------------
 	var gss: GDScript = load("res://scripts/game_state.gd")

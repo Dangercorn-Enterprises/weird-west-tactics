@@ -103,7 +103,7 @@ func _setup_battle() -> void:
 		u["r"] = sp[1]
 		enemies.append(u)
 	battle = {"grid": grid, "players": players, "enemies": enemies,
-		"units": players + enemies, "kills": 0, "playerDeaths": 0,
+		"units": players + enemies, "kills": 0, "xpKills": 0, "playerDeaths": 0,
 		"charges": []}
 
 func _build_biome_grid(biome: Dictionary) -> Array:
@@ -825,11 +825,14 @@ func _rebuild_ability_bar() -> void:
 		db.pressed.connect(_choose_ability.bind(str(sel["divine"])))
 		ability_bar.add_child(db)
 	var hb := Button.new()
-	# Session #2 decision 2b (Tim): hunkering ends the unit's turn — kills the
-	# shoot-then-hunker dominant line (Njord's turtle exploit).
+	# Session #2 decision 2b + morning mutex (Tim): hunkering ends the turn AND
+	# is forbidden after attacking — move-then-brace stays, shoot-then-brace dies.
 	hb.text = "Hunker (ends turn)"
-	hb.disabled = int(sel["ap"]) < 1
+	hb.disabled = int(sel["ap"]) < 1 or sel.get("attacked", false)
+	hb.tooltip_text = "Can't brace after attacking." if sel.get("attacked", false) else ""
 	hb.pressed.connect(func():
+		if sel.get("attacked", false):
+			return
 		sel["ap"] = 0
 		sel["status"]["hunker"] = maxi(int(sel["status"]["hunker"]), 2)
 		_log("%s hunkers down for the rest of the turn." % sel["name"])
@@ -919,6 +922,7 @@ func _exec_pending_on(target: Dictionary) -> void:
 	if pending_item == "ashfall_charge":
 		pending_item = ""
 		sel["ap"] = int(sel["ap"]) - 1
+		sel["attacked"] = true  # 2b mutex: offensive blast counts as attacking
 		GS.state["inventory"]["ashfall_charge"] = int(GS.state["inventory"]["ashfall_charge"]) - 1
 		GS.save_game()
 		# item blast: 6-10, mirror of the web build
@@ -952,6 +956,7 @@ func _exec_pending_on(target: Dictionary) -> void:
 	if fx.is_empty():
 		return
 	sel["ap"] = int(sel["ap"]) - int(fx.get("cost", 2))
+	sel["attacked"] = true  # 2b mutex: attack abilities forbid hunker this turn
 	core._exec_atk(battle, sel, target, fx)
 	_log("%s — %s!" % [sel["name"], aname])
 	_after_action()
@@ -1211,6 +1216,7 @@ func _click(screen_pos: Vector2) -> void:
 			sel["facing"] = Vector2(int(occ["q"]) - int(sel["q"]), int(occ["r"]) - int(sel["r"])).normalized()
 			_animate_lunge(sel, occ)
 			var hp0: int = occ["hp"]
+			sel["attacked"] = true  # 2b mutex: no hunker after attacking
 			var landed: bool = core.do_fire(battle, sel, occ, {"ignoreCover": sel.get("wIC", false)})
 			_log("%s %s %s%s" % [sel["name"], "hits" if landed else "misses", occ["name"],
 				(" for %d" % (hp0 - int(occ["hp"]))) if landed else ""])
@@ -1275,6 +1281,7 @@ func _end_turn() -> void:
 	for p in battle["players"]:
 		if p["alive"]:
 			p["ap"] = p["maxAp"]
+			p["attacked"] = false  # 2b mutex: fresh turn, brace available again
 			core.tick_status(battle, p)
 	_sync_units()
 	if _check_end():
@@ -1298,7 +1305,9 @@ func _check_end() -> bool:
 		return false
 	ended = true
 	var win := p_alive
-	var summary: Dictionary = GS.apply_battle_result(battle, win, int(battle["kills"]))
+	# XP pays on xpKills (raised adds excluded — P0 farm closure); the banner's
+	# kill count below stays the truthful total body count.
+	var summary: Dictionary = GS.apply_battle_result(battle, win, int(battle.get("xpKills", battle["kills"])))
 	GS.last_result = {"win": win, "kills": int(battle["kills"]),
 		"xp": summary["xp"], "context": params.get("context", {})}
 	banner_label.text = "THE DUST SETTLES" if win else "WIPED OUT"

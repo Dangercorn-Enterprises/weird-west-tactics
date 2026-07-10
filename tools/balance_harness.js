@@ -378,8 +378,12 @@ function applyDamage(B, def, dmg) {
   def.hp -= dmg;
   if (def.hp <= 0) {
     def.alive = false;
-    if (def.side === "e") B.kills++;
-    else B.playerDeaths++;
+    if (def.side === "e") {
+      B.kills++;
+      // P0 farm closure: boss-raised units pay NO XP — kills stays the
+      // truthful body count, xpKills is what progression pays on.
+      if (!def.raisedBy) B.xpKills = (B.xpKills || 0) + 1;
+    } else B.playerDeaths++;
   } else {
     checkBossPhase(B, def);
   }
@@ -882,6 +886,7 @@ function playerPhaseAbilities(B) {
   for (const p of order) {
     if (!p.alive) continue;
     p.ap = p.maxAp;
+    p.attacked = false; // 2b mutex: brace is forbidden after attacking
     tickStatus(B, p);
     if (!p.alive) continue;
     let guard = 0;
@@ -992,12 +997,13 @@ function playerPhaseAbilities(B) {
       );
       const choice = aff[0];
       execAtk(B, p, focus, choice.fx);
+      p.attacked = true;
       p.ap -= choice.fx.cost;
       if (!B.enemies.some((e) => e.alive)) return;
     }
-    // 2b (hunker ends turn): a competent player banks leftover AP as a brace —
-    // the activation was over anyway; prices hunker into the baselines.
-    if (p.alive && p.ap >= 1) {
+    // 2b (hunker ends turn + morning mutex): brace leftover AP ONLY if the
+    // unit didn't attack this activation — shoot-then-brace is dead by rule.
+    if (p.alive && p.ap >= 1 && !p.attacked) {
       p.status.hunker = Math.max(p.status.hunker, 2);
       p.ap = 0;
     }
@@ -1023,6 +1029,7 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
     enemies,
     units: [...players, ...enemies],
     kills: 0,
+    xpKills: 0,
     playerDeaths: 0,
     charges: [],
   };
@@ -1046,6 +1053,7 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
     survivors: B.players.filter((p) => p.alive).length,
     enemyDeathRound,
     kills: B.kills, // incl. raised adds — lets tooling see XP inflow, not just WR
+    xpKills: B.xpKills, // what progression actually pays on (raised excluded)
   };
 }
 
