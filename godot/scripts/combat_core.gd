@@ -53,6 +53,7 @@ var scale_enabled := true
 var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
 var on_cover_hit: Callable = Callable() # UI hook (q, r, chp_left) — cover chip/shatter
 var on_charge: Callable = Callable() # UI hook (q, r, lit) — lit=true plant, false boom
+var on_summon: Callable = Callable() # UI hook (unit) — a boss kit raised a unit
 
 # ---- seeded RNG: exact mulberry32 port so runs are reproducible -------------
 var _rng_state: int = 0
@@ -257,6 +258,7 @@ func enemy_to_unit(spec: Dictionary, i: int) -> Dictionary:
 		"blinker": beh == "teleport",
 		"bomber": beh == "bomber",
 		"slammer": beh == "tank",
+		"summoner": beh == "boss-summon",  # 2h: the Deacon's kit
 		"sentry": beh == "sentry",
 		"zealot": beh == "zealot",
 		"swarmer": beh == "swarm",
@@ -538,6 +540,38 @@ func enemy_phase(b: Dictionary) -> void:
 		if int(e["status"].get("stun", 0)) > 0: # Perun's stun
 			e["status"]["stun"] -= 1
 			continue
+		# 2h Deacon kit (boss-summon, Tim 2026-07-10): pre-enrage, every OTHER
+		# activation he raises one of the dead ON TOP of his normal action —
+		# the raise is FREE (Tim's pick: the costed version measured +7pts
+		# EASIER — he was trading a boss shot for a slow zombie). Kit adds
+		# capped at 2 alive (enrage keeps its own 2). Deterministic slot, no RNG.
+		if e.get("summoner", false) and not e.get("enraged", false):
+			e["raiseTick"] = not bool(e.get("raiseTick", false))
+			if e["raiseTick"]:
+				var raised_alive := 0
+				for x in b["enemies"]:
+					if x.get("raisedBy", "") == e["id"] and x["alive"]:
+						raised_alive += 1
+				var tmpl := _find(design["enemies"], "walkin_dead")
+				if raised_alive < 2 and not tmpl.is_empty():
+					var taken := {}
+					for u2 in b["units"]:
+						if u2["alive"]:
+							taken["%d,%d" % [u2["q"], u2["r"]]] = true
+					for sp in SPAWNS:
+						if taken.has("%d,%d" % [sp[0], sp[1]]):
+							continue
+						var m := enemy_to_unit(tmpl, 80 + int(e.get("raisedN", 0)))
+						m["name"] = "Risen Dead"
+						m["raisedBy"] = e["id"]
+						m["q"] = sp[0]
+						m["r"] = sp[1]
+						b["enemies"].append(m)
+						b["units"].append(m)
+						e["raisedN"] = int(e.get("raisedN", 0)) + 1
+						if on_summon.is_valid():
+							on_summon.call(m)
+						break
 		var guard := 0
 		while guard < 12:
 			guard += 1

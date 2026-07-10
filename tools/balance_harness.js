@@ -301,6 +301,7 @@ function enemyToUnit(spec, i) {
     blinker: beh === "teleport",
     bomber: beh === "bomber",
     slammer: beh === "tank",
+    summoner: beh === "boss-summon", // 2h: the Deacon's kit
     // Pass 10 mirror: behavior flags
     sentry: beh === "sentry",
     zealot: beh === "zealot",
@@ -571,6 +572,36 @@ function enemyPhase(B) {
     if ((e.status.stun || 0) > 0) {
       e.status.stun--;
       continue;
+    }
+    // 2h Deacon kit (boss-summon): pre-enrage, every OTHER activation he
+    // raises one of the dead ON TOP of his normal action — FREE raise (Tim's
+    // pick; the costed version measured +7pts easier). Kit adds capped at 2
+    // alive (enrage keeps its own 2). Deterministic slot, no RNG.
+    if (e.summoner && !e.enraged) {
+      e.raiseTick = !e.raiseTick;
+      if (e.raiseTick) {
+        const raisedAlive = B.enemies.filter(
+          (x) => x.raisedBy === e.id && x.alive,
+        ).length;
+        const tmpl = ENEMY_CATALOG.find((x) => x.id === "walkin_dead");
+        if (raisedAlive < 2 && tmpl) {
+          const taken = new Set(
+            B.units.filter((u) => u.alive).map((u) => u.q + "," + u.r),
+          );
+          for (const [q, r] of SPAWNS) {
+            if (taken.has(q + "," + r)) continue;
+            const m = enemyToUnit(tmpl, 80 + (e.raisedN || 0));
+            m.name = "Risen Dead";
+            m.raisedBy = e.id;
+            m.q = q;
+            m.r = r;
+            B.enemies.push(m);
+            B.units.push(m);
+            e.raisedN = (e.raisedN || 0) + 1;
+            break;
+          }
+        }
+      }
     }
     let guard = 0;
     while (guard++ < 12) {

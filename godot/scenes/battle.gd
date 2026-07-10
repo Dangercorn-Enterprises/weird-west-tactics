@@ -55,6 +55,7 @@ func _ready() -> void:
 	core.on_damage = _on_unit_damaged
 	core.on_cover_hit = _on_cover_hit
 	core.on_charge = _on_charge
+	core.on_summon = func(m: Dictionary): _log("%s claws out of the dust!" % m["name"])
 	params = GS.pending_battle if not GS.pending_battle.is_empty() else {
 		"title": "Skirmish at the Crossing", "biome": "mesa",
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
