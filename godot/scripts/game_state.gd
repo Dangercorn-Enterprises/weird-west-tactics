@@ -206,17 +206,27 @@ func apply_battle_result(battle: Dictionary, win: bool, kills: int) -> Dictionar
 				gods[g] = true
 		for g in gods.keys():
 			state["favor"][g] = int(state["favor"].get(g, 0)) + 1
-	# XP share + level-ups
+	# XP — Session #2 decision 2i (Tim, 2026-07-10): only DEPLOYED riders earn.
+	# The bench is free storage, not an XP tax (audit: slots 5-6 were strictly
+	# negative — never fought, diluted every share).
 	var xp := kills * 10 + (25 if win else 0)
-	var ups: Array = []
-	if state["party"].size() > 0:
-		var share := roundi(float(xp) / float(state["party"].size()))
+	var deployed: Array = []
+	for u in battle["players"]:
 		for m in state["party"]:
+			if m["uid"] == u["id"]:
+				deployed.append(m)
+	var ups: Array = []
+	var gains: Array = []  # per-rider breakdown for the results banner
+	if deployed.size() > 0:
+		var share := roundi(float(xp) / float(deployed.size()))
+		for m in deployed:
 			var reached := gain_xp(m, share)
 			if reached.size() > 0:
 				ups.append("%s → Lv %d" % [m["name"], m["level"]])
+			gains.append({"name": m["name"], "xp": share, "level": int(m["level"]),
+				"into": int(m["xp"]), "next": xp_for_level(int(m["level"]))})
 	save_game()
-	return {"xp": xp, "levelUps": ups}
+	return {"xp": xp, "levelUps": ups, "gains": gains}
 
 # ---- helpers ---------------------------------------------------------------------
 func node_by_id(id: String) -> Dictionary:

@@ -1266,6 +1266,10 @@ func _check_end() -> bool:
 	banner_label.text = "THE DUST SETTLES" if win else "WIPED OUT"
 	banner_label.modulate = Color("#d4a843") if win else Color("#c0392b")
 	var lines := "%d kills · +%d XP" % [int(battle["kills"]), int(summary["xp"])]
+	# 2i: XP surfaced where it lands — one line per deployed rider
+	for g in summary.get("gains", []):
+		lines += "\n%s  +%d XP — Lv %d (%d/%d)" % [g["name"], int(g["xp"]),
+			int(g["level"]), int(g["into"]), int(g["next"])]
 	if summary["levelUps"].size() > 0:
 		lines += "\nLEVEL UP — " + ", ".join(summary["levelUps"])
 	var hurt: Array = []
