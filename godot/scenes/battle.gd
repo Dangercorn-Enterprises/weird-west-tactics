@@ -807,6 +807,8 @@ func _rebuild_ability_bar() -> void:
 		c.queue_free()
 	if sel.is_empty() or ended:
 		return
+	# a dead rider gets no action surface: every button below is forced off
+	var dead: bool = not sel.get("alive", false)
 	var ap_lbl := Label.new()
 	ap_lbl.text = "%s  AP %d/%d   " % [sel["name"], int(sel["ap"]), int(sel["maxAp"])]
 	ability_bar.add_child(ap_lbl)
@@ -851,6 +853,10 @@ func _rebuild_ability_bar() -> void:
 	endb.text = "End Turn"
 	endb.pressed.connect(_end_turn)
 	ability_bar.add_child(endb)
+	if dead:
+		for c in ability_bar.get_children():
+			if c is Button:
+				c.disabled = true
 
 # ---- abilities / items (interactive port of doAbility) ------------------------------
 func _choose_ability(aname: String) -> void:
@@ -858,8 +864,9 @@ func _choose_ability(aname: String) -> void:
 	if aname == "Lay on Hands" or aname == "Soul Drain":
 		var fallen := {}
 		if aname == "Lay on Hands":
+			# the caster can never be their own fallen target
 			for p in battle["players"]:
-				if not p["alive"]:
+				if not p["alive"] and p["id"] != sel["id"]:
 					fallen = p
 					break
 		var who: Dictionary
@@ -1006,22 +1013,37 @@ func _cast_divine(target: Dictionary) -> void:
 # CombatCore.hit_chance + the shared ABIL_FX table (no PREVIEW_FX duplication).
 # Returns a small dict the HUD renders; null when there's nothing to preview.
 func combat_preview(attacker: Dictionary, target: Dictionary, ability := "") -> Dictionary:
-	var fx: Dictionary = core.ABIL_FX.get(ability, {}) if ability != "" else {"ic": attacker.get("wIC", false)}
+	var fx: Dictionary = core.ABIL_FX.get(ability, {})
 	var kind := str(fx.get("kind", "atk"))
+	var armor := int(target.get("armorDef", 0))
+	# Divines are not in ABIL_FX: mirror _cast_divine (aim 999, ignore cover,
+	# x2.5 or x3.5 when the favor snapshot is empowered, blasts of 4-7 each).
+	var is_divine: bool = ability != "" and ability == attacker.get("divine")
+	var emp: bool = is_divine and int(attacker.get("divineFavor", 0)) >= 3
+	if is_divine and core.DIVINE_BLAST.has(ability):
+		var blasts := 3 if emp else 2
+		var blo := maxi(1, 4 - armor) if armor > 0 else 4
+		var bhi := maxi(1, 7 - armor) if armor > 0 else 7
+		return {"ability": ability, "kind": "blast", "in_range": true,
+			"blasts": blasts, "lo": blo * blasts, "hi": bhi * blasts}
 	if kind in ["heal", "blast"]:
 		# support/AoE abilities: no single-target hit roll to preview honestly
 		return {"ability": ability, "kind": kind, "in_range": true}
-	var ic := bool(fx.get("ic", false))
+	# do_fire: ignore cover when the ability OR the weapon says so
+	var ic: bool = is_divine or bool(fx.get("ic", false)) or bool(attacker.get("wIC", false))
 	# hit chance: apply aimMod on a copy so we never mutate live unit state mid-frame
 	var att := attacker.duplicate()
-	att["aim"] = int(att["aim"]) + int(fx.get("aimMod", 0))
+	att["aim"] = 999 if is_divine else int(att["aim"]) + int(fx.get("aimMod", 0))
 	var ch: int = 95 if bool(fx.get("guaranteed", false)) else core.hit_chance(grid, att, target, ic)
-	var mult := float(fx.get("mult", 1.0))
-	var marked_f := 1.3 if int(target.get("status", {}).get("marked", 0)) > 0 else 1.0
+	var mult: float = (3.5 if emp else 2.5) if is_divine else float(fx.get("mult", 1.0))
+	var marked: bool = int(target.get("status", {}).get("marked", 0)) > 0
 	var base := int(attacker["str"]) / 3 # integer div, mirrors floor(str/3)
-	var lo := int(round(float(int(attacker["wmin"]) + base) * mult * marked_f))
-	var hi := int(round(float(int(attacker["wmax"]) + base) * mult * marked_f))
-	var armor := int(target.get("armorDef", 0))
+	# do_fire rounds twice: round(base * mult) first, then round(dmg * 1.3) if marked
+	var lo := int(round(float(int(attacker["wmin"]) + base) * mult))
+	var hi := int(round(float(int(attacker["wmax"]) + base) * mult))
+	if marked:
+		lo = int(round(float(lo) * 1.3))
+		hi = int(round(float(hi) * 1.3))
 	if armor > 0:
 		lo = maxi(1, lo - armor)
 		hi = maxi(1, hi - armor)
@@ -1035,7 +1057,11 @@ func combat_preview(attacker: Dictionary, target: Dictionary, ability := "") -> 
 func _preview_text(p: Dictionary) -> String:
 	if p.get("kind", "atk") in ["heal", "blast"]:
 		var verb := "AoE strike" if p["kind"] == "blast" else "Support"
-		return "%s\n%s" % [p.get("ability", ""), verb]
+		var blasts: int = p.get("blasts", 1)
+		var out := "%s\n%s%s" % [p.get("ability", ""), verb, (" x%d" % blasts) if blasts > 1 else ""]
+		if p.has("lo"):
+			out += "\n%d-%d dmg" % [int(p["lo"]), int(p["hi"])]
+		return out
 	var head := str(p.get("ability", "")).strip_edges()
 	# a blocked shot has no honest odds to show — say why instead of a fake %
 	if not p.get("los", true):
@@ -1244,7 +1270,8 @@ func _do_move(q: int, r: int) -> void:
 	if int(sel["status"]["bleed"]) > 0:
 		core.apply_damage(battle, sel, 2)
 		sel["status"]["bleed"] = int(sel["status"]["bleed"]) - 1
-	_select(sel)
+	# a bleed-out on the move can be the last rider standing: reselect + end check
+	_after_action()
 
 func _end_turn() -> void:
 	if ended:
@@ -1293,8 +1320,19 @@ func _end_turn() -> void:
 
 func _after_action() -> void:
 	_sync_units()
-	_select(sel if sel.get("alive", false) else sel)
+	_select(_living_selection())
 	_check_end()
+
+# A rider who dies on their own action (friendly-fire charge, bleed-out on a
+# move) must not keep a live action surface: fall through to the first living
+# rider, or clear the selection when nobody is left standing.
+func _living_selection() -> Dictionary:
+	if sel.get("alive", false):
+		return sel
+	for p in battle["players"]:
+		if p["alive"]:
+			return p
+	return {}
 
 func _check_end() -> bool:
 	if ended:
