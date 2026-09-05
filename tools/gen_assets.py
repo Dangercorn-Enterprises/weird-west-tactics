@@ -12,7 +12,9 @@
 import json, base64, urllib.request, urllib.error, time, sys, os
 from PIL import Image
 
-KEY = "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"
+# NIM fallback credential, read from the environment only (repo is public,
+# never hardcode it). Only required when the local forge-imggen path fails.
+KEY = os.environ.get("NVIDIA_NIM_API_KEY", "")
 URL = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev"
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 ASSETS = os.path.join(ROOT, "godot", "assets")
@@ -61,6 +63,8 @@ def gen(prompt, w=1024, h=1024, seed=7, retries=4, profile="concept", negative=N
         return _gen_local(prompt, w, h, seed, profile, negative=negative)
     except Exception as e:
         print("  local imggen unavailable (%s) -> NIM" % str(e)[:80])
+    if not KEY:
+        raise RuntimeError("NIM fallback needs NVIDIA_NIM_API_KEY set in the environment (local imggen at %s failed)" % LOCAL_URL)
     body = {"prompt": prompt, "mode": "base", "cfg_scale": 3.5,
             "width": w, "height": h, "seed": seed, "steps": 30}
     if negative:
