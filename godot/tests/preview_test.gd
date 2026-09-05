@@ -1,8 +1,9 @@
 # =============================================================================
 # DUSTFALL, ATTACK PREVIEW TEST (headless)
 # combat_preview must describe what do_fire / _cast_divine will actually
-# resolve. Boots battle.tscn (like anim_test), swaps in a flat synthetic grid
-# and drives combat_preview with fixture units:
+# resolve. Boots battle.tscn (like anim_test, on the in-memory GameState from
+# tests/_memory_state.gd so user://save.json is never written), swaps in a
+# flat synthetic grid and drives combat_preview with fixture units:
 #   1) divine: aim 999 + ignore cover reads 95, damage is x2.5 (x3.5 empowered)
 #   2) blast divine: AoE damage range times the blast count, no hit chance
 #   3) ability on a wIC weapon: weapon ignore-cover OR'd in (cover ignored)
@@ -10,6 +11,8 @@
 # Run: godot --headless --path godot --script res://tests/preview_test.gd
 # =============================================================================
 extends SceneTree
+
+const MemoryState = preload("res://tests/_memory_state.gd")
 
 var fails: Array = []
 var stage := 0
@@ -36,7 +39,7 @@ func _finish() -> void:
 func _tick() -> void:
 	match stage:
 		-1:
-			var gs = root.get_node_or_null("GameState")
+			var gs = MemoryState.mount(self)
 			if gs == null:
 				_fail("GameState autoload missing under --script")
 				_finish()

@@ -3,17 +3,18 @@
 # 1) path_from_reach: BFS cost-map path reconstruction (hand maps + every
 #    reachable tile of a real CombatCore.reach() map must yield a contiguous
 #    in-reach path ending on the destination).
-# 2) Live scene: boot battle.tscn with a manually-mounted GameState (autoloads
-#    are absent under --script), drive _do_move and _animate_lunge, pump real
-#    frames — sprites must land exactly on their logic tiles and every
-#    animation lock must clear. Catches tween/bookkeeping regressions that a
-#    pure unit test can't.
+# 2) Live scene: boot battle.tscn with an in-memory GameState (tests/
+#    _memory_state.gd, so nothing here touches user://save.json), drive
+#    _do_move and _animate_lunge, pump real frames, sprites must land exactly
+#    on their logic tiles and every animation lock must clear. Catches
+#    tween/bookkeeping regressions that a pure unit test can't.
 # Run: godot --headless --path godot --script res://tests/anim_test.gd
 # =============================================================================
 extends SceneTree
 
 const BattleScript = preload("res://scenes/battle.gd")
 const CombatCoreScript = preload("res://scripts/combat_core.gd")
+const MemoryState = preload("res://tests/_memory_state.gd")
 
 var fails: Array = []
 var battle_scene
@@ -92,7 +93,8 @@ func _init() -> void:
 
 func _setup_scene() -> void:
 	print("== live battle scene ==")
-	var gs = root.get_node_or_null("GameState")
+	# in-memory GameState: new_game/apply_battle_result never reach user://save.json
+	var gs = MemoryState.mount(self)
 	if gs == null:
 		_fail("GameState autoload missing under --script")
 		_finish()

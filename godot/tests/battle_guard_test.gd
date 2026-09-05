@@ -8,16 +8,19 @@
 # 2) Lay on Hands never picks the caster as the fallen target.
 # 3) a bleed-out on _do_move that drops the last rider ends the battle at once
 #    (WIPED OUT banner) instead of waiting for End Turn.
-# The campaign save is backed up before new_game() and restored on exit.
+# Runs on the in-memory GameState (tests/_memory_state.gd): new_game() and the
+# WIPED OUT apply_battle_result() save to a Dictionary, never user://save.json.
 # Run: godot --headless --path godot --script res://tests/battle_guard_test.gd
 # =============================================================================
 extends SceneTree
+
+const MemoryState = preload("res://tests/_memory_state.gd")
 
 var fails: Array = []
 var battle_scene
 var stage := 0
 var stage_start_ms := 0
-var saved_text = null
+var gs
 var dead_id = null
 var p_dead: Dictionary = {}
 var p_live: Dictionary = {}
@@ -38,16 +41,7 @@ func _next_stage() -> void:
 	stage += 1
 	stage_start_ms = Time.get_ticks_msec()
 
-func _restore_save() -> void:
-	if saved_text == null:
-		if FileAccess.file_exists("user://save.json"):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save.json"))
-		return
-	var f := FileAccess.open("user://save.json", FileAccess.WRITE)
-	f.store_string(saved_text)
-
 func _finish() -> void:
-	_restore_save()
 	if fails.is_empty():
 		print("BATTLE GUARD TEST: ALL PASS")
 		quit(0)
@@ -57,13 +51,11 @@ func _finish() -> void:
 
 func _setup_scene() -> void:
 	print("== live battle scene ==")
-	var gs = root.get_node_or_null("GameState")
+	gs = MemoryState.mount(self)
 	if gs == null:
 		_fail("GameState autoload missing under --script")
 		_finish()
 		return
-	if FileAccess.file_exists("user://save.json"):
-		saved_text = FileAccess.open("user://save.json", FileAccess.READ).get_as_text()
 	gs.new_game()
 	battle_scene = preload("res://scenes/battle.tscn").instantiate()
 	if not ("sel" in battle_scene):
@@ -171,4 +163,7 @@ func _tick() -> void:
 		3: # let the walk tween release before quitting
 			if not battle_scene._animating.is_empty() and _elapsed() < 4.0:
 				return
+			# the wipe-out saved through apply_battle_result: to the Dictionary only
+			if int(gs.writes) < 2 or not gs.disk.has("party"):
+				_fail("expected new_game + battle-end saves on the memory disk, got %d" % int(gs.writes))
 			_finish()

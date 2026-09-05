@@ -51,66 +51,143 @@ func set_setting(key: String, value) -> void:
 	f.store_string(JSON.stringify(settings))
 
 # ---- dev autopilot (DUSTFALL_AUTOPILOT=1): tour scenes, screenshot each ----------
+# Stage order (tests/autopilot_test.gd asserts it): a scene that owns an intro
+# card is never shot by the timer below; its representative shot is an explicit
+# stage AFTER the card is dismissed. The 2026-07-09 capture took shot_battle at
+# the battle stage with the card still up (docs/steam_screens/shot_battle.png).
+# The tour's new_game()/save_game() calls land on the real user://save.json, so
+# the campaign save is copied to AP_BACKUP before the tour and put back at the
+# end. A backup left by a tour that crashed mid-way is the campaign: it is kept,
+# never overwritten, and restored when the next tour completes.
+const AP_BACKUP := "user://save.json.autopilot-bak"
+const AP_STAGE_CREATOR := 1
+const AP_STAGE_WORLDMAP := 2        # new_game() here writes the save (backed up)
+const AP_STAGE_TOWN := 3
+const AP_STAGE_BATTLE := 4          # go_battle, intro card up while the board settles
+const AP_STAGE_INTRO_DISMISS := 5   # shot_battle_intro.png, then close the card
+const AP_STAGE_BATTLE_SHOT := 6     # shot_battle.png (card gone), then turn 180
+const AP_STAGE_ROTATED_SHOT := 7    # shot_battle_rotated.png
+const AP_STAGE_PAUSE_OPEN := 8
+const AP_STAGE_PAUSE_SHOT := 9      # shot_pause.png, restore the save, quit
 var _ap_stage := 0
 var _ap_t := 0.0
+var _ap_started := false
 var _shot_done := {}
+
+# true for scenes whose first frames are covered by an intro card (battle):
+# the timer shot skips them, an explicit stage shoots them after the card closes
+static func ap_has_intro(scene: Object) -> bool:
+	return scene != null and "intro_open" in scene
 
 func _process(delta: float) -> void:
 	if OS.get_environment("DUSTFALL_AUTOPILOT") != "1":
 		return
+	if not _ap_started:
+		_ap_started = true
+		_ap_backup_save()
 	_ap_t += delta
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
 	var sname := String(scene.name)
-	if _ap_t > 2.2 and not _shot_done.has(sname):
+	if _ap_t > 2.2 and not _shot_done.has(sname) and not ap_has_intro(scene):
 		_shot_done[sname] = true
-		var img := get_viewport().get_texture().get_image()
-		img.save_png("user://shot_%s.png" % sname.to_lower())
-		print("AUTOPILOT shot: ", sname)
+		_ap_shot("shot_%s" % sname.to_lower(), scene)
 	if _ap_t > 3.0:
 		_ap_t = 0.0
 		_ap_stage += 1
 		match _ap_stage:
-			1:
+			AP_STAGE_CREATOR:
 				get_tree().change_scene_to_file("res://scenes/creator.tscn")
-			2:
+			AP_STAGE_WORLDMAP:
 				new_game()
 				get_tree().change_scene_to_file("res://scenes/worldmap.tscn")
-			3:
+			AP_STAGE_TOWN:
 				get_tree().change_scene_to_file("res://scenes/town.tscn")
-			4:
+			AP_STAGE_BATTLE:
 				go_battle({"title": "The Deacon's Reckoning", "biome": "boneyard",
 					"enemies": enemies_by_ids(["the_deacon", "walkin_dead", "coyote_beast", "dust_devil"]),
 					"intro": "Death Valley earns its name tonight. The Deacon stands in a church with no roof, preaching to graves that empty themselves. End the sermon.",
 					"context": {}})
-			5:
-				var sc := get_tree().current_scene
-				if sc != null and "intro_open" in sc and sc.intro_open:
-					var img_i := get_viewport().get_texture().get_image()
-					img_i.save_png("user://shot_battle_intro.png")
-					print("AUTOPILOT shot: BattleIntro")
-					sc.intro_open = false
-					sc.intro_panel.queue_free()
-				if sc != null and "cam_target_azimuth" in sc:
-					sc.cam_target_azimuth += PI # 180° — should show unit BACKS
-			6:
-				var img2 := get_viewport().get_texture().get_image()
-				img2.save_png("user://shot_battle_rotated.png")
-				print("AUTOPILOT shot: BattleRotated")
-			7:
+			AP_STAGE_INTRO_DISMISS:
+				if ap_has_intro(scene) and scene.intro_open:
+					_ap_shot("shot_battle_intro", scene)
+					scene.intro_open = false
+					scene.intro_panel.queue_free()
+			AP_STAGE_BATTLE_SHOT:
+				_ap_shot("shot_battle", scene)
+				if "cam_target_azimuth" in scene:
+					scene.cam_target_azimuth += PI # 180 degrees, should show unit BACKS
+			AP_STAGE_ROTATED_SHOT:
+				_ap_shot("shot_battle_rotated", scene)
+			AP_STAGE_PAUSE_OPEN:
 				var pm := get_node_or_null("/root/PauseMenu")
 				if pm:
 					pm.open_menu()
-			8:
-				var img3 := get_viewport().get_texture().get_image()
-				img3.save_png("user://shot_pause.png")
-				print("AUTOPILOT shot: PauseMenu")
+			AP_STAGE_PAUSE_SHOT:
+				_ap_shot("shot_pause", scene)
 				var pm2 := get_node_or_null("/root/PauseMenu")
 				if pm2:
 					pm2.close()
+				_ap_restore_save()
 				print("AUTOPILOT done")
 				get_tree().quit()
+
+# save the viewport and log the capture context (one JSON line per shot, so a
+# sidecar can be rebuilt from the Godot log): scene, stage, biome/title, the
+# core's current mulberry32 state (battle seeds from the clock and keeps no
+# seed), camera heading in degrees, intro card state, campaign location/day.
+func _ap_shot(shot: String, scene: Node) -> void:
+	var img := get_viewport().get_texture().get_image()
+	if img != null: # null under --headless (no renderer): the tour still walks
+		img.save_png("user://%s.png" % shot)
+	var ctx := _ap_shot_context(scene)
+	ctx["saved"] = img != null
+	print("AUTOPILOT shot: %s %s" % [shot, JSON.stringify(ctx)])
+
+func _ap_shot_context(scene: Node) -> Dictionary:
+	var ctx := {"scene": String(scene.name), "stage": _ap_stage}
+	if "params" in scene and scene.params is Dictionary:
+		ctx["biome"] = String(scene.params.get("biome", ""))
+		ctx["title"] = String(scene.params.get("title", ""))
+	if "core" in scene and scene.core != null and "_rng_state" in scene.core:
+		ctx["rng_state"] = int(scene.core._rng_state)
+	if "cam_azimuth" in scene:
+		ctx["camera_heading_deg"] = int(round(rad_to_deg(float(scene.cam_azimuth)))) % 360
+	if ap_has_intro(scene):
+		ctx["intro_open"] = bool(scene.intro_open)
+	if not state.is_empty():
+		ctx["location"] = String(state.get("location", ""))
+		ctx["day"] = int(state.get("day", 0))
+	return ctx
+
+# The backup is the campaign save verbatim; an empty backup means "there was no
+# save", so the restore deletes whatever the tour wrote. Paths are parameters
+# so tests/autopilot_test.gd can round-trip on scratch files.
+func _ap_backup_save(save_path := SAVE_PATH, backup_path := AP_BACKUP) -> void:
+	if FileAccess.file_exists(backup_path):
+		print("AUTOPILOT: leftover ", backup_path, " kept as the campaign save")
+		return
+	var text := ""
+	if FileAccess.file_exists(save_path):
+		text = FileAccess.open(save_path, FileAccess.READ).get_as_text()
+	var f := FileAccess.open(backup_path, FileAccess.WRITE)
+	f.store_string(text)
+	print("AUTOPILOT: campaign save backed up (%d bytes)" % text.length())
+
+func _ap_restore_save(save_path := SAVE_PATH, backup_path := AP_BACKUP) -> void:
+	if not FileAccess.file_exists(backup_path):
+		print("AUTOPILOT: no backup to restore")
+		return
+	var text := FileAccess.open(backup_path, FileAccess.READ).get_as_text()
+	if text.is_empty():
+		if FileAccess.file_exists(save_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
+	else:
+		var f := FileAccess.open(save_path, FileAccess.WRITE)
+		f.store_string(text)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(backup_path))
+	print("AUTOPILOT: campaign save restored (%d bytes)" % text.length())
 
 # ---- lifecycle -----------------------------------------------------------------
 func new_game(lead_archetype := "gunslinger", lead_name := "") -> void:

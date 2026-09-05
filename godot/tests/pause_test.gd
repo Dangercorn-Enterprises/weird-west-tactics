@@ -8,9 +8,15 @@
 # 3) Mute: persists, stops music, and RESUMES the scene mood on unmute.
 # 4) PauseMenu autoload: open pauses the tree + shows the overlay with synced
 #    sliders, close unpauses, quit-to-title lands on the Title scene unpaused.
+# GameState is the in-memory one (tests/_memory_state.gd), the shared posture
+# for every scene-booting test: nothing driven here can reach user://save.json
+# (title.tscn only reads has_save(), the posse probe swaps state in memory).
+# Settings still persist to user://settings.json, that file is what part 1 tests.
 # Run: godot --headless --path godot --script res://tests/pause_test.gd
 # =============================================================================
 extends SceneTree
+
+const MemoryState = preload("res://tests/_memory_state.gd")
 
 var fails: Array = []
 var stage := 0
@@ -46,7 +52,7 @@ func _finish() -> void:
 func _tick() -> void:
 	match stage:
 		-1:
-			gs = root.get_node_or_null("GameState")
+			gs = MemoryState.mount(self)
 			audio = root.get_node_or_null("Audio")
 			pm = root.get_node_or_null("PauseMenu")
 			if gs == null or audio == null or pm == null:
