@@ -18,8 +18,9 @@ func _ready() -> void:
 		GS.load_game()
 		get_tree().change_scene_to_file("res://scenes/worldmap.tscn"))
 	$Menu/SkirmishBtn.pressed.connect(func():
-		if GS.state.is_empty():
-			GS.new_game()
+		# load the campaign before falling back to new_game() — the old bare
+		# new_game() here clobbered user://save.json on a fresh launch
+		GS.ensure_party()
 		GS.go_battle({"title": "Skirmish at the Crossing", "biome": "mesa",
 			"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
 			"context": {}}))

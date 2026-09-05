@@ -153,6 +153,19 @@ func load_game() -> bool:
 func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
+# Riders must exist before a battle launched outside the campaign flow (title
+# Quick Skirmish; battle/worldmap direct launch do the same inline). The save
+# on disk is the campaign — load it FIRST. new_game() ends in save_game(), so
+# falling straight to it from an empty state overwrote a real campaign with a
+# fresh 2-rider/300g/day-1 party, no prompt (Quick Skirmish clobber, 2026-09-04
+# audit). Only a missing/unreadable save starts a new game.
+func ensure_party() -> void:
+	if not state.is_empty():
+		return
+	if has_save() and load_game():
+		return
+	new_game()
+
 # ---- progression -----------------------------------------------------------------
 # Combat reads exactly these four stats (party_to_unit); everything else is
 # dead data until the stat-wiring design session. UI that shows stats grays
