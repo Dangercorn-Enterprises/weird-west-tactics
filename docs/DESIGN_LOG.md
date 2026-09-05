@@ -19,6 +19,11 @@ inert. See SYSTEMS_AUDIT_2026-07-09.md cluster 6.
 - **C (milestone 1):** real LOS. Direct fire (all guns) is blocked by
   full-height terrain (h≥2), degraded by intervening cover. Terrain finally
   means something; the ridge, the mesa, the boulder all matter.
+  > **CORRECTION 2026-09-04 (code-verified):** "degraded by intervening
+  > cover" was NOT built. has_los (combat_core.gd) reads only tile height;
+  > it never reads cover. Cover affects the shot only through the target's
+  > own tile (cover_bonus), never through tiles along the line. The decision
+  > text above stands as the decision; the mechanic remains unbuilt.
 - **B (the doctrine layer), SCOPED DOWN:** indirect fire stays **RARE and
   characterful**, NOT a weapon class. The signature move is **lobbing a stick
   of dynamite over a hill to hit what's behind it** — "very western" (Tim).
@@ -113,6 +118,15 @@ negates cover (v1 flank proxy), destructible LIGHT cover decaying its bonus,
 heavy bullet-immune, explosives crack/delete cover; AI + player policy LOS-aware;
 battle-scene FX (cover topples + dust puff on break). tests/positioning_test.gd
 17/17. Battle boots clean.
+> **CORRECTION 2026-09-04 (code-verified): "high ground sees over" is NOT
+> shipped.** The has_los exception (combat_core.gd, the `att_h > def_h and
+> wall_h <= att_h` branch) only fires when the attacker stands on a tile of
+> h>=2, and reach() treats every h>=2 tile as impassable, so no unit can ever
+> occupy one on any shipped board. The branch is dead code in practice. What
+> IS live from the high-ground list: the shooter-higher-than-target cover
+> halving (cover_bonus) and the beacon strip (defender on h>=1 gets no
+> cover, hunker aside). The
+> LOS raycast itself (h>=2 blocks direct fire) is live and unchanged.
 
 **Balance shift (2000-run bot-vs-bot):** skirmish .99->.67, finale .84->.53,
 foreman .62->.47 DOWN; vanguard .74->.81, deacon .52->.62, weaver .65->.70,

@@ -126,6 +126,17 @@ Steam requires disclosure of AI-generated content. Honest wording:
 FLUX.1-dev assets were non-commercial-licensed and are gone from the tree;
 every shipped image is now commercially clean.)*
 
+> **ACCURACY FLAG 2026-09-04 (code-verified, must be resolved before
+> submission):** the sentence above claims "palette snapping". The helper
+> that does it (`pixelize`, tools/gen_assets.py, BOX downscale + median-cut
+> quantize) is defined but never called: `sprite_process` does rembg/flood
+> matting, crop, and a BOX resize only; `tile_process` is a BOX resize;
+> `scene_process` saves at full resolution. No shipped asset was palette
+> quantized. Before this disclosure is filed, either wire `pixelize` into
+> the pipeline and regenerate, or reword the sentence to what was actually
+> done (AI background matting, content crop, pixel-resolution downscale).
+> A Steam disclosure that overstates the processing is a false statement.
+
 ## Screenshots — CAPTURED 2026-07-09 (docs/steam_screens/, 1920x1080)
 
 All captured from the shipping build (SDXL art) via the DUSTFALL_AUTOPILOT tour.
@@ -136,18 +147,32 @@ Extras: `shot_battle`, `shot_battle_rotated` (Q/E world turn), `shot_pause`.
 
 ## Store asset checklist (what still needs making)
 
-*(Sizes below are from memory of Steamworks specs — re-verify current specs at
-partner.steamgames.com before upload.)*
+*(Sizes verified live against the Steamworks store/library graphical asset
+spec on 2026-09-04; the earlier from-memory sizes were the pre-2024 spec and
+would be rejected at upload. Re-check partner.steamgames.com once more on
+upload day. Rule for every store capsule: artwork, game name, and the
+official subtitle ONLY, no other text, no awards, no review quotes.)*
 
-- [ ] Main capsule 616×353 (title art exists: assets/scenes/title.png — needs
-      logo lockup + crop)
-- [ ] Small capsule 231×87
-- [ ] Header capsule 460×215
-- [ ] Library capsule 600×900 (vertical — generate on forge-imggen, no longer
+**Store capsules (all required)**
+- [ ] Header capsule 920×430 (title art exists: assets/scenes/title.png,
+      needs logo lockup + crop)
+- [ ] Small capsule 462×174 (Steam auto-derives the 120×45 and 184×69 sizes)
+- [ ] Main capsule 1232×706
+- [ ] Vertical capsule 748×896
+
+**Library assets (all required, previously missing from this list)**
+- [ ] Library capsule 600×900 (vertical, generate on forge-imggen, no longer
       NIM-blocked)
-- [ ] Library hero 3840×1240 (generate on forge-imggen, no longer NIM-blocked)
-- [x] 5+ screenshots 1920×1080 — DONE 2026-07-09, docs/steam_screens/ (8 shots
-      from the shipping SDXL build)
+- [ ] Library header 920×430 (may reuse the store header)
+- [ ] Library hero 3840×1240, keep the logo and key art inside the centered
+      860×380 safe area (generate on forge-imggen, no longer NIM-blocked)
+- [ ] Library logo 1280×720, transparent PNG, logo only
+
+**Screenshots**
+- [x] At least 5 screenshots, 1920×1080 minimum, 16:9, gameplay only (no
+      concept art, no pre-rendered scenes, no marketing text). DONE
+      2026-07-09, docs/steam_screens/ (8 shots from the shipping SDXL build,
+      all in-engine)
 - [ ] Trailer (30–60s) — screen-capture the autopilot tour as a placeholder
       cut; real trailer after walk-cycle art
 - [x] Demo build depot — DONE 2026-07-09: dist/dustfall-demo.exe (Act-I capped

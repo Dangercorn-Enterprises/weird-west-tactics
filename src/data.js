@@ -968,8 +968,9 @@ const ENEMY_CATALOG = [
     boss: true,
   },
   {
-    // balance 2026-07-01: was hp 60 / wmin 7 / wmax 12 — a 21% brick wall for a
-    // 2-strong posse (target 45-65%). Softened; still the toughest tank boss.
+    // balance 2026-07-01: was wmin 7 / wmax 12, a 21% brick wall for a
+    // 2-strong posse (target 45-65%). Damage softened to wmin 6 / wmax 10;
+    // hp stays 60 (unchanged). Still the toughest tank boss.
     id: "iron_foreman",
     name: "The Iron Foreman",
     tier: 3,
