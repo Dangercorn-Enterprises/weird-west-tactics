@@ -4,7 +4,16 @@
 // Runs the same encounters through the Node balance harness and through the
 // Godot combat core (headless), then compares:
 //   - unit derivations: EXACT match required
-//   - encounter win rates: within TOLERANCE (independent RNG streams)
+//   - encounter win rate / avg rounds / avg kills: EXACT match required
+// Contract (bit-exact, since 2026-07-10): both sides seed the shared mulberry32
+// stream with 1337 and make the same random draws in the same order, so every
+// row must agree with delta 0.0. There is no tolerance. Any non-zero delta
+// means a draw was added, removed or reordered on one side. Fix the drift,
+// never loosen this gate. godot/scripts/combat_core.gd is canonical, and
+// tools/balance_harness.js must mirror it draw for draw.
+// Float comparison: the Godot side snaps its aggregates to 4 decimals
+// (parity_test.gd, snappedf 0.0001) before printing, so the Node side is
+// rounded to the same 4 decimals and the two are compared exactly.
 // Usage: node tools/parity_check.js [path-to-godot-exe]
 // =============================================================================
 "use strict";
@@ -13,8 +22,9 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..");
 const H = require(path.join(ROOT, "tools", "balance_harness.js"));
 
-const TOLERANCE = 0.04; // 4 pts on 2000 runs (~3-sigma for p≈0.5)
 const RUNS = 2000;
+// Both sides are compared at the precision the Godot side emits (4 decimals).
+const r4 = (x) => Number(x.toFixed(4));
 
 const godot =
   process.argv[2] ||
@@ -95,7 +105,7 @@ check("geared maxAp", g.unit.geared_maxAp === geared.maxAp);
 check("geared armorDef", g.unit.geared_armorDef === geared.armorDef);
 check("hit clamps", g.unit.hit_clamp_lo === 5 && g.unit.hit_clamp_hi === 95);
 
-// ---- statistical win-rate parity ---------------------------------------------
+// ---- bit-exact encounter parity ---------------------------------------------
 const ENC = {
   skirmish: [
     "starter",
@@ -116,16 +126,22 @@ const ENC = {
 };
 const parties = { starter: H.starterParty(), full: H.fullParty() };
 console.log(
-  "encounter win rates (±" + TOLERANCE * 100 + " pts, " + RUNS + " runs/side):",
+  "encounter win rate / rounds / kills (exact, " + RUNS + " runs/side):",
 );
 for (const [key, [pk, ids]] of Object.entries(ENC)) {
   const node = H.evalEncounter(key, parties[pk], ids, RUNS);
   const gd = g.encounters[key];
-  const diff = Math.abs(node.winRate - gd.wr);
-  // rounds/kills ride along (XP-inflow + stall visibility — WR can't see
-  // farms). Same seed + same draws -> effectively exact; 0.05 = float dust.
-  const dR = Math.abs(node.avgRounds - gd.rounds);
-  const dK = Math.abs(node.avgKills - gd.kills);
+  // Shared seed + same draws -> exact. Compare at the 4 decimals Godot emits.
+  const nWr = r4(node.winRate);
+  const nR = r4(node.avgRounds);
+  const nK = r4(node.avgKills);
+  const gWr = r4(gd.wr);
+  const gR = r4(gd.rounds);
+  const gK = r4(gd.kills);
+  const diff = Math.abs(nWr - gWr);
+  // rounds/kills ride along (XP-inflow + stall visibility, WR can't see farms).
+  const dR = Math.abs(nR - gR);
+  const dK = Math.abs(nK - gK);
   check(
     key.padEnd(9) +
       " node " +
@@ -136,13 +152,13 @@ for (const [key, [pk, ids]] of Object.entries(ENC)) {
       gd.rounds.toFixed(1) +
       " k" +
       gd.kills.toFixed(2),
-    diff <= TOLERANCE && dR <= 0.05 && dK <= 0.05,
+    nWr === gWr && nR === gR && nK === gK,
     "Δwr " +
-      (diff * 100).toFixed(1) +
+      (diff * 100).toFixed(2) +
       "pts Δr " +
-      dR.toFixed(3) +
+      dR.toFixed(4) +
       " Δk " +
-      dK.toFixed(3),
+      dK.toFixed(4),
   );
 }
 

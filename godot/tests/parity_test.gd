@@ -3,7 +3,9 @@
 # Proves the Godot combat core produces the same balance as the Node harness.
 # Run:  godot --headless --path godot --script res://tests/parity_test.gd
 # Prints JSON: {"unit": {...exact derivations...}, "encounters": {...win rates}}
-# tools/parity_check.js compares against the Node harness within tolerance.
+# tools/parity_check.js compares against the Node harness exactly (shared seed
+# 1337, same draws, delta 0.0). Aggregates are snapped to 4 decimals here and
+# the Node side rounds to the same 4 decimals before comparing.
 # =============================================================================
 extends SceneTree
 
