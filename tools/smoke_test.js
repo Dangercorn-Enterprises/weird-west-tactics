@@ -9,6 +9,8 @@
 //      (hit clamps, reach costs, scaling floors, battles terminate).
 //   4. Quick win-rate sanity: the default skirmish must be winnable and the
 //      hardest boss must not be a guaranteed loss.
+//   5. Persistent-wound regression against the SHIPPED src/scene_battle.js,
+//      loaded headlessly (mirror of godot/tests/wound_test.gd).
 // Exit 0 = green. Any assert failure prints and exits 1.
 // =============================================================================
 "use strict";
@@ -187,6 +189,195 @@ check(
   boss.winRate > 0.2 && boss.winRate < 0.9,
   (boss.winRate * 100).toFixed(1) + "%",
 );
+
+// ---- 5. persistent wounds (audit C1, 2026-09-04) — the SHIPPED battle scene --
+// Mirror of godot/tests/wound_test.gd, run against src/scene_battle.js itself
+// rather than the harness. Bug: mkUnit set maxHp = hp with hp already reduced
+// by the rider's stored hpDamage, and finish() stores hpDamage = maxHp - hp, so
+// any wound older than the last battle was silently healed and a fallen rider
+// with prior wounds came back above 1 HP. Fix: maxHp is the TRUE max
+// (10 + vigor*2). Tim's picks (2026-09-04): Fork A1 — in-battle heals cure
+// campaign wounds; Fork B2 — a fallen rider who levels returns at 1 HP plus the
+// vigor headroom (no 1-HP pin loop), symmetric with surviving riders.
+// The real engine.js / scene_battle.js / scenes_hub.js are loaded headlessly on
+// a minimal DOM stand-in; each battle runs enter() -> forceWin() -> finish(),
+// then the real results scene awards XP. saveGame is a no-op (never touches a
+// real save), matching the Godot test's MemoryState.
+console.log("persistent wounds (src/scene_battle.js, headless):");
+{
+  // Stand-in DOM: real child lists (renderParty loops on firstChild), every
+  // selector resolves to an element, the canvas context swallows every call.
+  const CTX = new Proxy(
+    {},
+    {
+      get: (t, k) => (k in t ? t[k] : () => {}),
+      set: (t, k, v) => ((t[k] = v), true),
+    },
+  );
+  class El {
+    constructor() {
+      this.children = [];
+      this.style = {};
+      this.classList = {
+        add() {},
+        remove() {},
+        toggle() {},
+        contains: () => false,
+      };
+      this.textContent = "";
+    }
+    get firstChild() {
+      return this.children[0] || null;
+    }
+    appendChild(c) {
+      this.children.push(c);
+      return c;
+    }
+    removeChild(c) {
+      const i = this.children.indexOf(c);
+      if (i >= 0) this.children.splice(i, 1);
+      return c;
+    }
+    querySelector() {
+      return new El();
+    }
+    querySelectorAll() {
+      return [];
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    getAttribute() {
+      return null;
+    }
+    setAttribute() {}
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 900, height: 620 };
+    }
+    getContext() {
+      return CTX;
+    }
+  }
+  global.window = {
+    DF: {},
+    innerWidth: 0,
+    innerHeight: 0,
+    addEventListener() {},
+    removeEventListener() {},
+    requestAnimationFrame: () => 0,
+  };
+  global.document = {
+    hidden: true,
+    body: new El(),
+    head: new El(),
+    createElement: () => new El(),
+    querySelector: () => new El(),
+    querySelectorAll: () => [],
+    addEventListener() {},
+  };
+  global.requestAnimationFrame = () => 0;
+  global.localStorage = {
+    setItem() {},
+    getItem: () => null,
+    removeItem() {},
+  };
+  // the classic scripts read the catalogs as bare globals (ARCHETYPES, BIOMES, ...)
+  Object.assign(global, DATA);
+  for (const f of ["engine.js", "scene_battle.js", "scenes_hub.js"])
+    require(path.join(ROOT, "src", f));
+  const DF = global.window.DF;
+  DF.saveGame = () => {}; // MemoryState: the test never writes a save
+  const battle = DF.scenes.battle;
+  const results = DF.scenes.results;
+  check(
+    "battle + results scenes load headlessly",
+    !!(battle && results && DF.battle),
+  );
+
+  // One battle: spawn the persistent roster, poke the gunslinger's in-battle
+  // state, force the win, then run the results scene (XP share + level-ups).
+  // Returns the gunslinger's and the enemies' state AS SPAWNED.
+  const fight = (state, mutate) => {
+    DF.state = state;
+    battle.enter({ onComplete: () => {} });
+    const u = DF.battle.players.find((p) => p.id === "p0");
+    const spawned = {
+      hp: u.hp,
+      maxHp: u.maxHp,
+      enemies: DF.battle.enemies.map((e) => ({ hp: e.hp, maxHp: e.maxHp })),
+    };
+    if (mutate) mutate(u);
+    DF.battle.forceWin();
+    results.enter(DF.battle.result);
+    return spawned;
+  };
+
+  // Pregen gunslinger (Silas Crowe): vigor 5 -> true max 20. Carry an 8-point
+  // wound in (start 12). Each case: one battle ending at `hp`/`alive`, then a
+  // second battle with no new damage — the stored wound must be stable across
+  // both. gunslinger FAVORED = deftness/quickness, so a level adds exactly +1
+  // vigor (+2 max HP) with no RNG in the HP path. The forced win pays 25 XP,
+  // split 2 ways (13 each): 99 + 13 crosses Lv 2, 0 + 13 + 13 never does.
+  const CASES = [
+    { name: "damage", hp: 10, alive: true, xp: 0, next: 10 },
+    { name: "unchanged", hp: 12, alive: true, xp: 0, next: 12 },
+    { name: "healed (A1)", hp: 16, alive: true, xp: 0, next: 16 },
+    { name: "fallen", hp: -4, alive: false, xp: 0, next: 1 },
+    { name: "fallen+level (B2)", hp: -4, alive: false, xp: 99, next: 3 },
+  ];
+  for (const c of CASES) {
+    const party = DF.makeStarterParty(); // gunslinger + hexslinger
+    const m = party[0];
+    m.hpDamage = 8;
+    m.xp = c.xp;
+    const state = Object.assign(DF.newGame(), { party });
+    const first = fight(state, (u) => {
+      u.hp = c.hp;
+      u.alive = c.alive;
+    });
+    check(
+      c.name + ": max HP is the true max",
+      first.maxHp === 20,
+      "got " + first.maxHp,
+    );
+    check(
+      c.name + ": start HP carries the wound",
+      first.hp === 12,
+      "got " + first.hp,
+    );
+    const second = fight(state);
+    check(
+      c.name + ": next battle HP",
+      second.hp === c.next,
+      "got " + second.hp,
+    );
+    if (c.name.startsWith("fallen+level")) {
+      check(c.name + ": rider reached Lv 2", m.level === 2, "got " + m.level);
+      check(
+        c.name + ": max HP grew with vigor",
+        second.maxHp === 22,
+        "got " + second.maxHp,
+      );
+    }
+    // A battle with no new damage must not move the wound.
+    const third = fight(state);
+    check(c.name + ": third battle HP", third.hp === c.next, "got " + third.hp);
+  }
+
+  // Rest/Doc clear hpDamage; a cleared rider spawns at full.
+  {
+    const party = DF.makeStarterParty();
+    party[0].hpDamage = 0;
+    const rested = fight(Object.assign(DF.newGame(), { party }));
+    check("rest clears wounds", rested.hp === 20, "got " + rested.hp);
+    // Enemies and summons never pass maxHp — mkUnit must still default it to hp.
+    check(
+      "mkUnit without maxHp defaults to hp",
+      rested.enemies.length > 0 &&
+        rested.enemies.every((e) => e.hp > 0 && e.maxHp === e.hp),
+      JSON.stringify(rested.enemies),
+    );
+  }
+}
 
 console.log(
   failures === 0
