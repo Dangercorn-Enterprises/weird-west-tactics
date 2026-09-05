@@ -137,9 +137,9 @@ every shipped image is now commercially clean.)*
 > done (AI background matting, content crop, pixel-resolution downscale).
 > A Steam disclosure that overstates the processing is a false statement.
 
-## Screenshots — CAPTURED 2026-07-09 (docs/steam_screens/, 1920x1080)
+## Screenshots — RECAPTURED 2026-09-04 from HEAD e441376 (docs/steam_screens/, 1920x1080)
 
-All captured from the shipping build (SDXL art) via the DUSTFALL_AUTOPILOT tour.
+All captured via the DUSTFALL_AUTOPILOT tour (run with --resolution 1920x1080; the project default is 720p). First set 2026-07-09 from the pre-July-10-rules build; six of eight recaptured 2026-09-04 from HEAD after the tour was reordered so shot_battle is taken with the intro card dismissed (shot_title and shot_creator came back byte-identical and were kept).
 Store picks, in order: `shot_title` (vista + logo), `shot_creator` (Forge Your
 Lead, 6 archetypes), `shot_battle_intro` (HD-2D diorama + story card),
 `shot_worldmap` (parchment campaign map), `shot_town` (saloon services).
@@ -171,11 +171,11 @@ official subtitle ONLY, no other text, no awards, no review quotes.)*
 **Screenshots**
 - [x] At least 5 screenshots, 1920×1080 minimum, 16:9, gameplay only (no
       concept art, no pre-rendered scenes, no marketing text). DONE
-      2026-07-09, docs/steam_screens/ (8 shots from the shipping SDXL build,
-      all in-engine)
+      2026-09-04, docs/steam_screens/ (8 shots, all in-engine, from HEAD e441376;
+      title and creator unchanged since 2026-07-09)
 - [ ] Trailer (30–60s) — screen-capture the autopilot tour as a placeholder
       cut; real trailer after walk-cycle art
-- [x] Demo build depot — DONE 2026-07-09: dist/dustfall-demo.exe (Act-I capped
+- [x] Demo build depot — re-exported 2026-09-04 from HEAD 7575fc3 (the 2026-07-09 exes predated every July 10 rule): dist/dustfall-demo.exe (Act-I capped
       via "demo" feature tag) + dist/dustfall-hd2d.exe (full), both boot-tested
 
 ## Open questions for Tim
