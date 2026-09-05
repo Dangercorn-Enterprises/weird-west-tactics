@@ -122,7 +122,7 @@ func _init() -> void:
 	brawler["q"] = 1; brawler["r"] = 1
 	brawler["ap"] = 3; brawler["maxAp"] = 3
 	brawler["abilities"] = []          # basic attacks only -> 2 AP spent, 1 left
-	brawler["divineFavor"] = 0         # keep the once-per-fight ult out of it
+	# _mk_battle carries no favorPool, so the once-per-fight ult stays out of it
 	var tank := core.enemy_to_unit(core.design["enemies"][0], 0)
 	tank["q"] = 1; tank["r"] = 2
 	tank["hp"] = 999; tank["maxHp"] = 999
@@ -134,7 +134,7 @@ func _init() -> void:
 	var holder: Dictionary = core.party_to_unit(core.mk_party(["gunslinger"])[0], 0)
 	holder["q"] = 1; holder["r"] = 1
 	holder["maxAp"] = 1
-	holder["divineFavor"] = 0
+	# (no favorPool in _mk_battle: no divine here either)
 	var tank2 := core.enemy_to_unit(core.design["enemies"][0], 0)
 	tank2["q"] = 1; tank2["r"] = 2
 	tank2["hp"] = 999; tank2["maxHp"] = 999

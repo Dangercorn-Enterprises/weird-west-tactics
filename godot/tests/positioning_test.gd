@@ -100,9 +100,42 @@ func _initialize() -> void:
 	g = core.build_grid()
 	b = {"grid": g, "units": []}
 	var heavy0: float = g[3][2]["cover"]
+	# capture what the UI hook is told about each tile in the radius
+	var reported := {}
+	core.on_cover_hit = func(hq: int, hr: int, left: int) -> void:
+		reported["%d,%d" % [hq, hr]] = left
 	core.do_blast(b, {"q": 2, "r": 3})  # centered on a heavy-cover tile
 	ok("explosive cracks heavy cover (reduced, not immune)",
 		g[3][2]["cover"] < heavy0)
+	# the cracked rock is still heavy cover: 0.2 left, chp still -1, and the
+	# hook must NOT report destroyed (0) or the UI deletes a prop that covers
+	ok("cracked heavy cover still grants 0.2",
+		is_equal_approx(g[3][2]["cover"], 0.2) and bool(g[3][2]["heavy"])
+		and int(g[3][2]["chp"]) == -1)
+	ok("hook reports cracked heavy as -1 (standing), not destroyed",
+		reported.has("2,3") and int(reported["2,3"]) == -1)
+	ok("cracked heavy cover still counts as cover for a defender",
+		is_equal_approx(core.cover_bonus(g, _u(0, 3), _u(2, 3)), 0.2))
+	# a second blast cracks it to nothing: only THEN does the hook say 0
+	core.do_blast(b, {"q": 2, "r": 3})
+	ok("second blast levels heavy cover to 0",
+		is_equal_approx(g[3][2]["cover"], 0.0) and not bool(g[3][2]["heavy"]))
+	ok("hook reports 0 only once the tile is bare", int(reported["2,3"]) == 0)
+	# light cover in a blast is vaporized outright: hook says 0, same contract
+	g = core.build_grid()
+	b = {"grid": g, "units": []}
+	reported.clear()
+	core.do_blast(b, {"q": 3, "r": 5})
+	ok("hook reports 0 for vaporized light cover",
+		reported.has("3,5") and int(reported["3,5"]) == 0 and int(g[5][3]["chp"]) == 0)
+	# and strike_cover on light reports the hits left (2 after one strike)
+	g = core.build_grid()
+	b = {"grid": g}
+	reported.clear()
+	core.strike_cover(b, 3, 5)
+	ok("strike hook reports remaining light durability (2)",
+		int(reported.get("3,5", -9)) == 2)
+	core.on_cover_hit = Callable()
 
 	print("\n%d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)

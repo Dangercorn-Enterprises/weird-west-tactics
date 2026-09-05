@@ -22,6 +22,9 @@
 //   node tools/balance_harness.js [runsPerEncounter]   (default 2000)
 //   node tools/balance_harness.js 5000 --seed 12345
 //   node tools/balance_harness.js --json               (machine-readable output)
+//   node tools/balance_harness.js --basic              (basic-attack-only floor)
+//   node tools/balance_harness.js --favor N            (seed every god's purse N)
+//   node tools/balance_harness.js --noscale            (no party-size scaling)
 // =============================================================================
 "use strict";
 const path = require("path");
@@ -45,13 +48,13 @@ function mulberry32(a) {
   };
 }
 let RNG = Math.random;
-let FAVOR = 1; // divine favor per unit's god (New Game seeds 1); --favor N to vary
+let FAVOR = 1; // seed of each god's favor purse per battle (New Game seeds 1); --favor N to vary
 let SCALE = true; // party-size encounter scaling (Phase 1d); --noscale to disable
 const rnd = () => RNG();
 const randint = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1)); // inclusive
 const chance = (pct) => rnd() * 100 < pct;
 
-// ---- grid (mirror of scene_battle.js buildGrid, lines ~189-223) -------------
+// ---- grid (mirror of combat_core.gd build_grid) ------------------------------
 const COLS = 10,
   ROWS = 10;
 const SPAWNS = [
@@ -125,7 +128,8 @@ function buildGrid() {
   return grid;
 }
 
-// Bresenham supercover line between two tiles (exclusive of endpoints).
+// Integer Bresenham line between two tiles (exclusive of endpoints). Not supercover:
+// it steps diagonally and skips corner-touched cells, so a diagonal h2/h2 seam is shootable.
 // Mirror of combat_core.gd _line_tiles.
 function lineTiles(aq, ar, bq, br) {
   const tiles = [];
@@ -152,9 +156,12 @@ function lineTiles(aq, ar, bq, br) {
   return tiles;
 }
 
-// Direct-fire line of sight: a full-height (h>=2) tile between shooter and
-// target blocks the shot. High ground shooting DOWN sees over one intervening
-// wall lower than the perch. Mirror of combat_core.gd has_los.
+// Direct-fire line of sight: any h>=2 tile on the line blocks the shot. The skip
+// below (attacker higher than defender, wall no higher than attacker) has no counter,
+// so it would pass EVERY such wall, but it needs the attacker on an h2 tile and h2 is
+// impassable (reach), so it never fires on any shipped board (see docs/DESIGN_LOG.md).
+// NOTE: LOS is direction-dependent (Bresenham tie-breaking differs A->B vs B->A) and
+// does not consult cover or units. Mirror of combat_core.gd has_los.
 function hasLos(grid, att, def) {
   const attH = grid[att.r][att.q].h,
     defH = grid[def.r][def.q].h;
@@ -207,6 +214,17 @@ const DIVINE = {
   lawdog: "Iron Verdict",
   drifter: "Anansi's Trick",
 };
+// archetype -> patron god. godot/scripts/game_state.gd ARCH_GOD is canonical
+// (combat_core.gd carries the same copy); keep all three identical.
+const ARCH_GOD = {
+  gunslinger: "coyote",
+  hexslinger: "samedi",
+  tinkerer: "vulcan",
+  preacher: "perun",
+  lawdog: "perun",
+  drifter: "anansi",
+};
+const GODS = ["coyote", "samedi", "vulcan", "perun", "anansi", "sleeper"];
 
 function mkUnit(o) {
   o.maxHp = o.maxHp ?? o.hp;
@@ -262,7 +280,6 @@ function partyToUnit(p, i) {
     wmax: w.damage[1],
     abilities: [ABIL[p.archetype], ABIL2[p.archetype]].filter(Boolean),
     divine: DIVINE[p.archetype] || null,
-    divineFavor: FAVOR,
     wIC: !!(gw && gw.ignoreCover),
     armorDef: ga ? ga.def : 0,
   });
@@ -281,6 +298,22 @@ function partyToUnit(p, i) {
   }
   return u;
 }
+// ---- divine favor: one purse per god, shared by every rider sworn to that god --
+// (mirror of combat_core.gd unit_god / favor_left / spend_favor)
+function unitGod(u) {
+  if (u.god) return String(u.god);
+  return ARCH_GOD[u.archetype] || "";
+}
+function favorLeft(B, u) {
+  const g = unitGod(u);
+  if (g === "" || !B.favorPool) return 0;
+  return B.favorPool[g] || 0;
+}
+function spendFavor(B, u) {
+  const g = unitGod(u);
+  B.favorPool[g] = Math.max(0, (B.favorPool[g] || 0) - 1);
+}
+
 function enemyToUnit(spec, i) {
   const beh = spec.behavior || "";
   const u = mkUnit({
@@ -337,7 +370,7 @@ function rollDmg(att) {
   return randint(att.wmin, att.wmax) + Math.floor(att.str / 3);
 }
 
-// BFS movement reachability (mirror of reach(), lines ~267-299)
+// BFS movement reachability (mirror of combat_core.gd reach())
 function reach(grid, units, u) {
   const occupied = (q, r) =>
     units.some((x) => x.alive && x !== u && x.q === q && x.r === r);
@@ -514,6 +547,9 @@ function triggerBossPhase(B, b) {
       if (added >= 2) break;
       if (taken.has(q + "," + r)) continue;
       const m = enemyToUnit(tmpl, 90 + added);
+      // Unique per boss (mirror of combat_core.gd): two enraging bosses in one
+      // fight must not both mint e90/e91. Ids never touch draws.
+      m.id = String(b.id) + "_phase" + added;
       m.name = "Risen Dead";
       m.q = q;
       m.r = r;
@@ -596,6 +632,9 @@ function enemyPhase(B) {
           for (const [q, r] of SPAWNS) {
             if (taken.has(q + "," + r)) continue;
             const m = enemyToUnit(tmpl, 80 + (e.raisedN || 0));
+            // Unique per raiser and per raise (mirror of combat_core.gd):
+            // raisedN is unbounded, so a stalled fight would reach the e90 ids.
+            m.id = String(e.id) + "_raise" + (e.raisedN || 0);
             m.name = "Risen Dead";
             m.raisedBy = e.id;
             m.q = q;
@@ -924,14 +963,17 @@ function playerPhaseAbilities(B) {
       // 3) divine: once per fight on the biggest eligible threat. Blast divines
       // lob (any in-range threat); single-target divines need LOS or the once-
       // per-fight ult whiffs on doFire's gate. Linear scan, no sorts.
-      if (p.divine && !p.divineUsed && (p.divineFavor || 0) >= 1) {
+      // Favor is one purse per god (B.favorPool), read live: two riders sworn
+      // to the same god share it, so the second cannot cast on an empty purse
+      // and empowerment is judged before the debit.
+      if (p.divine && !p.divineUsed && favorLeft(B, p) >= 1) {
         const pool = DIVINE_BLAST.has(p.divine) ? inRange : visible;
         let threat = null;
         for (const e of pool) if (!threat || e.hp > threat.hp) threat = e;
         if (threat && (threat.boss || threat.hp >= 18)) {
           // save the ult for real threats, not trash
-          const emp = (p.divineFavor || 0) >= 3;
-          p.divineFavor = Math.max(0, (p.divineFavor || 0) - 1);
+          const emp = favorLeft(B, p) >= 3;
+          spendFavor(B, p);
           p.divineUsed = true;
           if (DIVINE_BLAST.has(p.divine)) {
             doBlast(B, threat);
@@ -1033,6 +1075,8 @@ function runBattle(partySpecs, enemySpecs, maxRounds) {
     xpKills: 0,
     playerDeaths: 0,
     charges: [],
+    // one favor purse per god, seeded from FAVOR (mirror of GameState.state.favor)
+    favorPool: Object.fromEntries(GODS.map((g) => [g, FAVOR])),
   };
   let round = 0;
   let enemyDeathRound = null;

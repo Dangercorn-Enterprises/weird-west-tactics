@@ -87,11 +87,14 @@ func _setup_battle() -> void:
 	var roster: Array = GS.state["party"]
 	for i in mini(4, roster.size()):
 		players.append(core.party_to_unit(roster[i], i))
-	# favor snapshot per unit (Phase 1b)
+	# Phase 1b: each rider's divine draws on ONE shared purse per god
+	# (GS.state.favor[godId]), read live at the gate and at cast time like the
+	# web build. u.divineFavor is only a display/preview mirror of that purse,
+	# refreshed by _sync_favor(); it never gates or pays for a cast.
 	for u in players:
 		var g = u.get("god") if u.get("god") else GS.ARCH_GOD.get(u.get("archetype", ""))
-		u["divineFavor"] = int(GS.state["favor"].get(g, 0)) if g else 0
 		u["godId"] = g
+	_sync_favor(players)
 	var specs: Array = core.scale_encounter(params["enemies"], players.size())
 	var enemies: Array = []
 	for i in specs.size():
@@ -103,6 +106,17 @@ func _setup_battle() -> void:
 	battle = {"grid": grid, "players": players, "enemies": enemies,
 		"units": players + enemies, "kills": 0, "xpKills": 0, "playerDeaths": 0,
 		"charges": []}
+
+# live favor of the god a rider's divine draws on (shared purse, never a copy)
+func _favor_of(u: Dictionary) -> int:
+	var g = u.get("godId")
+	return int(GS.state["favor"].get(g, 0)) if g else 0
+
+# refresh every rider's divineFavor mirror from the live purse so the ability
+# bar, combat_preview (empowered at >= 3) and _cast_divine always agree
+func _sync_favor(players: Array) -> void:
+	for u in players:
+		u["divineFavor"] = _favor_of(u)
 
 func _build_biome_grid(biome: Dictionary) -> Array:
 	var g: Array = []
@@ -287,13 +301,31 @@ func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
 		add_child(dmi)
 		_cover_props[key] = dmi
 
-# CombatCore.on_cover_hit(q, r, chp_left): light cover degrades (lean it,
-# darken it) and, when destroyed (chp<=0 or blast=-1), topples and vanishes.
+# CombatCore.on_cover_hit(q, r, chp_left): chp_left is what REMAINS on the tile.
+# >0 light cover degraded (lean it, darken it); 0 the tile is bare now (topple
+# and vanish); -1 heavy cover cracked a tier by a blast but still standing and
+# still granting cover, so it stays put, only darker and smaller. Deleting on
+# -1 used to lie: the rock vanished while the tile still gave 20%.
 func _on_cover_hit(q: int, r: int, chp_left: int) -> void:
 	var node: Node3D = _cover_props.get("%d,%d" % [q, r])
 	if node == null or not is_instance_valid(node):
 		return
-	if chp_left <= 0:
+	if chp_left < 0:
+		# cracked heavy: a shove, a darker face, a chunk knocked off (smaller)
+		var tw3 := create_tween()
+		tw3.tween_property(node, "position:x", node.position.x + 0.05, 0.06)
+		tw3.tween_property(node, "position:x", node.position.x, 0.10)
+		var tw4 := create_tween()
+		tw4.tween_property(node, "scale", node.scale * 0.8, 0.25).set_trans(Tween.TRANS_BACK)
+		if node is Sprite3D:
+			node.modulate = node.modulate.darkened(0.25)
+			_spawn_puff(node.position, Color("#8a8078"))
+		elif node is MeshInstance3D:
+			var pm := (node as MeshInstance3D).mesh as PrimitiveMesh
+			if pm != null and pm.material is StandardMaterial3D:
+				var m: StandardMaterial3D = pm.material
+				m.albedo_color = m.albedo_color.darkened(0.25)
+	elif chp_left == 0:
 		# destroyed — topple + shrink out, leave the tile bare
 		var tw := create_tween().set_parallel(true)
 		tw.tween_property(node, "rotation:z", 1.4, 0.35).set_trans(Tween.TRANS_BACK)
@@ -819,9 +851,13 @@ func _rebuild_ability_bar() -> void:
 		b.pressed.connect(_choose_ability.bind(aname))
 		ability_bar.add_child(b)
 	if sel.get("divine") and not sel.get("divineUsed", false):
+		# gate on the LIVE shared purse: a god-mate's cast this fight must
+		# already show here, not a setup-time snapshot
+		_sync_favor(battle["players"])
+		var fav := _favor_of(sel)
 		var db := Button.new()
-		db.text = "✦ %s (favor %d)" % [sel["divine"], int(sel.get("divineFavor", 0))]
-		db.disabled = int(sel.get("divineFavor", 0)) < 1 or int(sel["ap"]) < 2
+		db.text = "✦ %s (favor %d)" % [sel["divine"], fav]
+		db.disabled = fav < 1 or int(sel["ap"]) < 2
 		db.pressed.connect(_choose_ability.bind(str(sel["divine"])))
 		ability_bar.add_child(db)
 	var hb := Button.new()
@@ -967,17 +1003,19 @@ func _exec_pending_on(target: Dictionary) -> void:
 	_after_action()
 
 func _cast_divine(target: Dictionary) -> void:
-	var pool := int(sel.get("divineFavor", 0))
+	# web parity (scene_battle.js): read the god's purse LIVE, refuse at < 1 at
+	# zero cost, judge empowerment on the pre-debit value, debit exactly once.
+	# Riders sharing a god share the purse; the second finds it already spent.
+	var pool := _favor_of(sel)
 	if pool < 1:
 		_log("The god is silent — earn favor at a shrine.")
 		return
 	var emp := pool >= 3
-	sel["divineFavor"] = pool - 1
 	sel["divineUsed"] = true
 	var g = sel.get("godId")
-	if g and GS.state["favor"].has(g):
-		GS.state["favor"][g] = maxi(0, int(GS.state["favor"][g]) - 1)
-		GS.save_game()
+	GS.state["favor"][g] = maxi(0, int(GS.state["favor"].get(g, 0)) - 1)
+	GS.save_game()
+	_sync_favor(battle["players"])
 	var a: String = sel["divine"]
 	_log("%s channels %s%s" % [sel["name"], a, " — EMPOWERED!" if emp else "!"])
 	if core.DIVINE_BLAST.has(a):
@@ -1015,7 +1053,8 @@ func combat_preview(attacker: Dictionary, target: Dictionary, ability := "") -> 
 	var kind := str(fx.get("kind", "atk"))
 	var armor := int(target.get("armorDef", 0))
 	# Divines are not in ABIL_FX: mirror _cast_divine (aim 999, ignore cover,
-	# x2.5 or x3.5 when the favor snapshot is empowered, blasts of 4-7 each).
+	# x2.5 or x3.5 when the god's purse is empowered (divineFavor is the live
+	# mirror kept by _sync_favor), blasts of 4-7 each).
 	var is_divine: bool = ability != "" and ability == attacker.get("divine")
 	var emp: bool = is_divine and int(attacker.get("divineFavor", 0)) >= 3
 	if is_divine and core.DIVINE_BLAST.has(ability):

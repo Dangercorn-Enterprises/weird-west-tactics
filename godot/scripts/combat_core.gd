@@ -46,12 +46,24 @@ const ABIL_FX := {
 	"Soul Drain": {"cost": 2, "kind": "heal", "self": true},
 }
 const DIVINE_BLAST := ["Vulcan's Forgefire", "Perun's Thunder"]
+# archetype -> patron god. game_state.gd ARCH_GOD is canonical; this copy must
+# match it exactly (god_swear_test compares the two). An unsworn rider's divine
+# draws on the archetype god; a sworn rider (u.god) on the shrine god instead.
+const ARCH_GOD := {
+	"gunslinger": "coyote", "hexslinger": "samedi", "tinkerer": "vulcan",
+	"preacher": "perun", "lawdog": "perun", "drifter": "anansi",
+}
+const GODS := ["coyote", "samedi", "vulcan", "perun", "anansi", "sleeper"]
 
 var design: Dictionary = {} # design.json (enemies/weapons/armor/mods/pregen...)
-var favor := 1 # divine favor snapshot per unit (New Game seeds 1)
+var favor := 1 # seed of each god's favor purse per battle (New Game seeds 1)
 var scale_enabled := true
 var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
-var on_cover_hit: Callable = Callable() # UI hook (q, r, chp_left) — cover chip/shatter
+# UI hook (q, r, chp_left), fired by strike_cover and do_blast. chp_left is the
+# cover REMAINING on the tile after the hit: >0 light cover degraded (hits
+# left), 0 the tile is bare now (delete the prop), -1 heavy cover cracked a
+# tier but still standing (never delete, it still grants cover).
+var on_cover_hit: Callable = Callable()
 var on_charge: Callable = Callable() # UI hook (q, r, lit) — lit=true plant, false boom
 var on_summon: Callable = Callable() # UI hook (unit) — a boss kit raised a unit
 
@@ -117,7 +129,8 @@ func build_grid() -> Array:
 const LIGHT_COVER_HP := 3  # absorbed would-be-hits before light cover is gone
 const HUNKER_BONUS := 0.20  # hunker adds to cover bonus (was a flat -20 to-hit)
 
-# Bresenham supercover line between two tiles (exclusive of endpoints).
+# Integer Bresenham line between two tiles (exclusive of endpoints). Not supercover:
+# it steps diagonally and skips corner-touched cells, so a diagonal h2/h2 seam is shootable.
 func _line_tiles(aq: int, ar: int, bq: int, br: int) -> Array:
 	var tiles: Array = []
 	var dq: int = absi(bq - aq)
@@ -138,9 +151,12 @@ func _line_tiles(aq: int, ar: int, bq: int, br: int) -> Array:
 		tiles.append([q, r])
 	return tiles
 
-# Direct-fire line of sight: a full-height (h>=2) tile between shooter and target
-# blocks the shot. High ground shooting DOWN sees over one intervening wall
-# (skylined target below the muzzle line) — the "I have the high ground" rule.
+# Direct-fire line of sight: any h>=2 tile on the line blocks the shot. The skip
+# below (attacker higher than defender, wall no higher than attacker) has no counter,
+# so it would pass EVERY such wall, but it needs the attacker on an h2 tile and h2 is
+# impassable (reach), so it never fires on any shipped board (see docs/DESIGN_LOG.md).
+# NOTE: LOS is direction-dependent (Bresenham tie-breaking differs A->B vs B->A) and
+# does not consult cover or units.
 func has_los(grid: Array, att: Dictionary, def: Dictionary) -> bool:
 	var att_h: int = int(grid[att["r"]][att["q"]]["h"])
 	var def_h: int = int(grid[def["r"]][def["q"]]["h"])
@@ -221,7 +237,6 @@ func party_to_unit(p: Dictionary, i: int) -> Dictionary:
 		"wmax": int(w["damage"][1]),
 		"abilities": [ABIL.get(aid), ABIL2.get(aid)].filter(func(x): return x != null),
 		"divine": DIVINE.get(aid),
-		"divineFavor": favor,
 		"divineUsed": false,
 		"wIC": not gw.is_empty() and gw.get("ignoreCover", false),
 		"armorDef": int(ga.get("def", 0)) if not ga.is_empty() else 0,
@@ -238,6 +253,23 @@ func party_to_unit(p: Dictionary, i: int) -> Dictionary:
 		u["wmin"] = max(1, u["wmin"] + int(fx.get("wmin", 0)))
 		u["wmax"] = max(u["wmin"], u["wmax"] + int(fx.get("wmax", 0)))
 	return u
+
+# ---- divine favor: one purse per god, shared by every rider sworn to that god --
+# (web parity: scene_battle.js reads DF.state.favor[god] live at cast time.)
+func unit_god(u: Dictionary) -> String:
+	if u.get("god"):
+		return str(u["god"])
+	return str(ARCH_GOD.get(str(u.get("archetype", "")), ""))
+
+func favor_left(b: Dictionary, u: Dictionary) -> int:
+	var g := unit_god(u)
+	if g == "" or not b.has("favorPool"):
+		return 0
+	return int(b["favorPool"].get(g, 0))
+
+func spend_favor(b: Dictionary, u: Dictionary) -> void:
+	var g := unit_god(u)
+	b["favorPool"][g] = maxi(0, int(b["favorPool"].get(g, 0)) - 1)
 
 func enemy_to_unit(spec: Dictionary, i: int) -> Dictionary:
 	var beh: String = spec.get("behavior", "")
@@ -415,12 +447,19 @@ func tick_status(b: Dictionary, u: Dictionary) -> void:
 			u["status"][k] -= 1
 
 func do_blast(b: Dictionary, center: Dictionary) -> void:
+	# Snapshot the caught units BEFORE any damage lands (mirror of doBlast's
+	# filter-then-forEach). apply_damage -> check_boss_phase can append enrage
+	# Risen Dead to b["units"] mid-blast, and a for-in over the live array
+	# would visit them and roll an extra randint the Node side never draws.
+	var caught: Array = []
 	for u in b["units"]:
 		if u["alive"] and absi(u["q"] - center["q"]) <= 1 and absi(u["r"] - center["r"]) <= 1:
-			var dmg := randint(4, 7)
-			if int(u.get("armorDef", 0)) > 0:
-				dmg = maxi(1, dmg - int(u["armorDef"]))
-			apply_damage(b, u, dmg)
+			caught.append(u)
+	for u in caught:
+		var dmg := randint(4, 7)
+		if int(u.get("armorDef", 0)) > 0:
+			dmg = maxi(1, dmg - int(u["armorDef"]))
+		apply_damage(b, u, dmg)
 	# Explosives are the answer to cover: delete light in the radius, crack heavy.
 	# This is the whole reason to lob (and why hunkering behind a wagon is finite).
 	for dr in range(-1, 2):
@@ -441,7 +480,12 @@ func do_blast(b: Dictionary, center: Dictionary) -> void:
 				cell["cover"] = 0.0
 				cell["chp"] = 0
 			if on_cover_hit.is_valid():
-				on_cover_hit.call(q, r, -1)  # -1 flags a blast (shatter FX)
+				# Report what is LEFT, same contract as strike_cover: 0 = the tile
+				# is bare now (light vaporized, or heavy cracked to nothing), -1 =
+				# heavy cracked a tier but still standing (cell chp stays -1, it
+				# still grants cover), so the UI never deletes a prop that covers.
+				var left: int = 0 if float(cell["cover"]) <= 0.0 else int(cell["chp"])
+				on_cover_hit.call(q, r, left)
 
 # ---- fuse-delay charges (Session #2 decision 2c: stick dynamite) ---------------
 # A lit stick lands on the target tile and detonates at the START of the
@@ -486,6 +530,9 @@ func trigger_boss_phase(b: Dictionary, boss: Dictionary) -> void:
 			if taken.has(key):
 				continue
 			var m := enemy_to_unit(tmpl, 90 + added)
+			# Unique per boss: two enraging bosses in one fight (finale) must not
+			# both mint e90/e91, battle.gd keys sprites by id. Ids never touch draws.
+			m["id"] = "%s_phase%d" % [str(boss["id"]), added]
 			m["name"] = "Risen Dead"
 			m["q"] = sp[0]
 			m["r"] = sp[1]
@@ -568,6 +615,9 @@ func enemy_phase(b: Dictionary) -> void:
 						if taken.has("%d,%d" % [sp[0], sp[1]]):
 							continue
 						var m := enemy_to_unit(tmpl, 80 + int(e.get("raisedN", 0)))
+						# Unique per raiser and per raise: raisedN is unbounded, so a
+						# stalled fight would otherwise walk into the e90 enrage ids.
+						m["id"] = "%s_raise%d" % [str(e["id"]), int(e.get("raisedN", 0))]
 						m["name"] = "Risen Dead"
 						m["raisedBy"] = e["id"]
 						m["q"] = sp[0]
@@ -853,15 +903,18 @@ func player_phase(b: Dictionary) -> void:
 			# 3) divine: once per fight on the biggest eligible threat. Blast divines
 			# lob (any in-range threat); single-target divines need LOS or the once-
 			# per-fight ult whiffs on do_fire's gate. Linear scan, no sorts.
-			if p.get("divine") and not p.get("divineUsed", false) and int(p.get("divineFavor", 0)) >= 1:
+			# Favor is one purse per god (b.favorPool), read live: two riders
+			# sworn to the same god share it, so the second cannot cast on an
+			# empty purse and empowerment is judged before the debit.
+			if p.get("divine") and not p.get("divineUsed", false) and favor_left(b, p) >= 1:
 				var pool: Array = in_range if DIVINE_BLAST.has(p["divine"]) else visible
 				var threat: Dictionary = {}
 				for e in pool:
 					if threat.is_empty() or int(e["hp"]) > int(threat["hp"]):
 						threat = e
 				if not threat.is_empty() and (threat.get("boss", false) or int(threat["hp"]) >= 18):
-					var emp: bool = int(p["divineFavor"]) >= 3
-					p["divineFavor"] = maxi(0, int(p["divineFavor"]) - 1)
+					var emp: bool = favor_left(b, p) >= 3
+					spend_favor(b, p)
 					p["divineUsed"] = true
 					if DIVINE_BLAST.has(p["divine"]):
 						do_blast(b, threat)
@@ -958,10 +1011,14 @@ func run_battle(party_specs: Array, enemy_specs: Array, max_rounds: int) -> Dict
 		u["q"] = sp[0]
 		u["r"] = sp[1]
 		enemies.append(u)
+	# one favor purse per god, seeded from `favor` (mirror of GameState.state.favor)
+	var favor_pool := {}
+	for g in GODS:
+		favor_pool[g] = favor
 	var b := {
 		"grid": grid, "players": players, "enemies": enemies,
 		"units": players + enemies, "kills": 0, "xpKills": 0, "playerDeaths": 0,
-		"charges": [],
+		"charges": [], "favorPool": favor_pool,
 	}
 	var round_n := 0
 	var timed_out := false

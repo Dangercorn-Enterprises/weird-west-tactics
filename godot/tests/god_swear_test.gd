@@ -33,6 +33,11 @@ func _init() -> void:
 	var arch_god: Dictionary = (load("res://scripts/game_state.gd") as GDScript) \
 		.get_script_constant_map()["ARCH_GOD"]
 
+	# the resolver carries its own copy of the map (favor purse per god); the two
+	# must never drift, or the bot and the live battle would pay different gods
+	ok("combat_core.ARCH_GOD matches game_state.ARCH_GOD exactly",
+		CombatCoreScript.ARCH_GOD == arch_god)
+
 	# unsworn rider: god is null, resolution falls back to the archetype god
 	var plain: Dictionary = core.mk_party(["gunslinger"])[0]
 	var u0: Dictionary = core.party_to_unit(plain, 0)

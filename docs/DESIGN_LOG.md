@@ -197,6 +197,21 @@ a positional player: whether that means "retune enemies up" or "bands assumed
 a weaker player, adjust bands" is a TIM DECISION for a tuning session with
 this instrument + his own playtest. No retuning was done in this pass.
 
+**2026-09-04 baseline correction, finale4 only (port-regression fix, not a
+tuning change):** the Godot port snapshotted favor per rider at battle setup,
+so two riders sworn to the same god (the full party's preacher and lawdog
+both draw on Perun) could each cast on one favor and each empower on 3. The
+web build reads one purse per god live at cast time and debits it once; the
+interactive scene now does the same (battle.gd reads GS.state.favor live),
+and the resolver plus the Node mirror model it as b.favorPool, one purse per
+god seeded from `favor`. No random draw was added, removed or reordered; the
+change only alters which riders are allowed to cast. Parity stays exact
+(delta 0.0 on every row). Starter-party rows (no shared god) are unchanged.
+finale4 (full party, shared Perun) moves at the 2000-run seed-1337 parity
+position: win rate .9005 -> .8975, avg rounds 5.8700 -> 6.2065, avg kills
+6.5155 -> 6.5760. The July 10 table's finale4 .91 should be read as .90 from
+here on; the second Perun ult was never legal. Test: tests/favor_pool_test.gd.
+
 ---
 # Session #2 — DECISION MEMOS (options prepared for Tim, nothing built)
 *Calder, 2026-07-10. Every open question from v1 + the GUTS pass (audit
