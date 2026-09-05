@@ -223,7 +223,7 @@ func _shrine() -> void:
 			"Aligned" if aligned else "Swear to " + str(g["name"]), func():
 				p["god"] = g["id"]
 				GS.save_game()
-				_flash("%s swears to %s. %s granted." % [p["name"], g["name"], g["divine"]["name"]])
+				_flash("%s swears to %s. Their ultimate now draws on %s's favor." % [p["name"], g["name"], g["name"]])
 				_render(), aligned)
 	_row("Donate 50g — raise favor with " + str(g["name"]), "Donate", func():
 		GS.state["gold"] = int(GS.state["gold"]) - 50
