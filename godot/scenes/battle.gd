@@ -61,9 +61,7 @@ func _ready() -> void:
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
 		"context": {}}
 	GS.pending_battle = {}
-	if GS.state.is_empty():
-		if not GS.load_game():
-			GS.new_game()
+	GS.ensure_party()  # direct launch: load the campaign, new_game only if none
 	_setup_battle()
 	_build_camera_and_light()
 	_build_board()

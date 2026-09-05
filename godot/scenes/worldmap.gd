@@ -42,9 +42,7 @@ func _ready() -> void:
 	var _a := get_node_or_null("/root/Audio")
 	if _a: _a.on_scene("worldmap")
 	GS.headline(info_name, 26)
-	if GS.state.is_empty():
-		if not GS.load_game():
-			GS.new_game()
+	GS.ensure_party()  # direct launch: load the campaign, new_game only if none
 	nodes = GS.design["world_nodes"]
 	edges = GS.design["world_edges"]
 	for n in nodes:

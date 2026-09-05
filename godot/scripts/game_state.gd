@@ -153,9 +153,9 @@ func load_game() -> bool:
 func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
-# Riders must exist before a battle launched outside the campaign flow (title
-# Quick Skirmish; battle/worldmap direct launch do the same inline). The save
-# on disk is the campaign — load it FIRST. new_game() ends in save_game(), so
+# Riders must exist before a scene runs outside the campaign flow (title Quick
+# Skirmish, battle/worldmap direct launch — all three call this). The save on
+# disk is the campaign — load it FIRST. new_game() ends in save_game(), so
 # falling straight to it from an empty state overwrote a real campaign with a
 # fresh 2-rider/300g/day-1 party, no prompt (Quick Skirmish clobber, 2026-09-04
 # audit). Only a missing/unreadable save starts a new game.

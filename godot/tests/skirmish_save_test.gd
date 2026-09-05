@@ -103,11 +103,14 @@ func _init() -> void:
 		d.state.get("party", []).size() == 2 and d.writes == 1)
 	d.free()
 
-	# ---- wiring guard: the title scene must go through ensure_party -----------------
-	var tf := FileAccess.open("res://scenes/title.gd", FileAccess.READ)
-	var src := tf.get_as_text() if tf != null else ""
-	ok("title.gd calls GS.ensure_party()", src.contains("GS.ensure_party()"))
-	ok("title.gd has no bare GS.new_game() (the clobber path)", not src.contains("GS.new_game()"))
+	# ---- wiring guard: every out-of-flow scene must go through ensure_party -------
+	# (creator.gd's new_game(archetype, name) is the real New Game — not checked)
+	for scene in ["title", "battle", "worldmap"]:
+		var tf := FileAccess.open("res://scenes/%s.gd" % scene, FileAccess.READ)
+		var src := tf.get_as_text() if tf != null else ""
+		ok("%s.gd calls GS.ensure_party()" % scene, src.contains("GS.ensure_party()"))
+		ok("%s.gd has no bare GS.new_game() (the clobber path)" % scene,
+			not src.contains("GS.new_game()"))
 
 	print("skirmish_save_test: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
