@@ -170,7 +170,7 @@ func cover_bonus(grid: Array, att: Dictionary, def: Dictionary) -> float:
 
 # ---- unit construction --------------------------------------------------------
 func mk_unit(o: Dictionary) -> Dictionary:
-	o["maxHp"] = o["hp"]
+	o["maxHp"] = o.get("maxHp", o["hp"])
 	o["alive"] = true
 	o["maxAp"] = 3 + int(float(o["quick"]) / 4.0)
 	o["ap"] = o["maxAp"]
@@ -211,6 +211,7 @@ func party_to_unit(p: Dictionary, i: int) -> Dictionary:
 		"side": "p",
 		"q": 1,
 		"r": [1, 4, 7, 2][i] if i < 4 else 1,
+		"maxHp": 10 + vigor * 2,
 		"hp": max(1, 10 + vigor * 2 - int(p.get("hpDamage", 0))),
 		"str": strn,
 		"quick": quick,

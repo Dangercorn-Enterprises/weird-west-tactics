@@ -209,7 +209,7 @@ const DIVINE = {
 };
 
 function mkUnit(o) {
-  o.maxHp = o.hp;
+  o.maxHp = o.maxHp ?? o.hp;
   o.alive = true;
   o.maxAp = 3 + Math.floor(o.quick / 4);
   o.ap = o.maxAp;
@@ -252,6 +252,7 @@ function partyToUnit(p, i) {
     side: "p",
     q: 1,
     r: [1, 4, 7, 2][i] || 1,
+    maxHp: 10 + vigor * 2,
     hp: Math.max(1, 10 + vigor * 2 - (p.hpDamage || 0)), // mirror: wounds never spawn you dead
     str,
     quick,
