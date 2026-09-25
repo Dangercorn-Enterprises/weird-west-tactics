@@ -21,11 +21,11 @@ Usage:
   enemy = engine.generate_enemy(faction="Harrowed", tier=2)
 """
 
+import inspect
 import json
 import logging
 import os
 import random
-import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -405,7 +405,7 @@ Region: {region or 'The Flats (contested, no dominant deity)'}
 Existing world context (do not reuse these names):
 {existing}
 
-Generate a new frontier town for this world. Output ONLY a JSON object with these exact fields:
+Generate a new frontier town for this world with these fields:
 {{
   "name": "unique town name (frontier western with a hint of divine influence)",
   "deity": "{deity or 'None (neutral)'}",
@@ -452,7 +452,7 @@ Location: {town_ref}
 Existing world context:
 {existing}
 
-Generate a quest hook for this weird western world. Output ONLY a JSON object:
+Generate a quest hook for this weird western world with these fields:
 {{
   "title": "evocative quest title in frontier-western style",
   "quest_type": "Bounty | Rescue | Assault | Defense | Escort | Stealth | Choice | Divine Trial",
@@ -496,7 +496,7 @@ Item type: {item_type}
 Rarity: {rarity or 'choose appropriately (Common/Uncommon/Rare/Legendary)'}
 {names_note}
 
-Generate a unique {item_type} for this world. Output ONLY a JSON object:
+Generate a unique {item_type} for this world with these fields:
 {{
   "name": "unique item name — frontier western with divine or Ashfall flavoring",
   "item_type": "{item_type}",
@@ -549,7 +549,7 @@ def _enemy_prompt(faction: Optional[str], tier: int, db: LoreDB) -> str:
 {tier_guide.get(tier, tier_guide[1])}
 {names_note}
 
-Generate a unique enemy for this world. Output ONLY a JSON object:
+Generate a unique enemy for this world with these fields:
 {{
   "name": "enemy name — evocative, frontier-western, divine-touched",
   "faction": "{faction or 'Wild'}",
@@ -575,6 +575,131 @@ The enemy should:
 """
 
 
+_TOWN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "deity": {"type": "string"},
+        "region": {"type": "string"},
+        "population": {"type": "string", "enum": ["Small (50-200)", "Medium (200-500)", "Large (500-2000)"]},
+        "mood": {"type": "string", "enum": ["Thriving", "Stable", "Tense", "Under Siege"]},
+        "description": {"type": "string"},
+        "history": {"type": "string"},
+        "factions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "alignment": {"type": "string", "enum": ["friendly", "hostile", "neutral"]},
+                    "description": {"type": "string"},
+                },
+                "required": ["name", "alignment", "description"],
+                "additionalProperties": False,
+            },
+        },
+        "npcs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "archetype": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+                "required": ["name", "archetype", "description"],
+                "additionalProperties": False,
+            },
+        },
+        "secrets": {"type": "array", "items": {"type": "string"}},
+        "ashfall_presence": {"type": "string"},
+        "services": {"type": "array", "items": {"type": "string"}},
+        "rumor": {"type": "string"},
+    },
+    "required": ["name", "deity", "region", "population", "mood", "description", "history",
+                 "factions", "npcs", "secrets", "ashfall_presence", "services", "rumor"],
+    "additionalProperties": False,
+}
+
+_QUEST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "quest_type": {
+            "type": "string",
+            "enum": ["Bounty", "Rescue", "Assault", "Defense", "Escort", "Stealth", "Choice", "Divine Trial"],
+        },
+        "city": {"type": "string"},
+        "deity": {"type": "string"},
+        "archetype": {"type": "string"},
+        "hook": {"type": "string"},
+        "background": {"type": "string"},
+        "objectives": {"type": "array", "items": {"type": "string"}},
+        "complications": {"type": "array", "items": {"type": "string"}},
+        "enemies": {"type": "array", "items": {"type": "string"}},
+        "reward": {"type": "string"},
+        "divine_consequence": {"type": ["string", "null"]},
+        "twist": {"type": "string"},
+    },
+    "required": ["title", "quest_type", "city", "deity", "archetype", "hook", "background",
+                 "objectives", "complications", "enemies", "reward", "divine_consequence", "twist"],
+    "additionalProperties": False,
+}
+
+_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "item_type": {"type": "string"},
+        "deity": {"type": "string"},
+        "rarity": {"type": "string", "enum": ["Common", "Uncommon", "Rare", "Legendary"]},
+        "flavor_text": {"type": "string"},
+        "description": {"type": "string"},
+        "stats": {
+            "type": "object",
+            "properties": {
+                "damage_range": {"type": "string"},
+                "accuracy": {"type": "string"},
+                "special_property": {"type": "string"},
+                "range": {"type": "string"},
+            },
+            "required": ["damage_range", "accuracy", "special_property", "range"],
+            "additionalProperties": False,
+        },
+        "lore_detail": {"type": "string"},
+        "acquisition": {"type": "string"},
+        "corruption_effect": {"type": ["string", "null"]},
+        "tags": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["name", "item_type", "deity", "rarity", "flavor_text", "description", "stats",
+                 "lore_detail", "acquisition", "corruption_effect", "tags"],
+    "additionalProperties": False,
+}
+
+_ENEMY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "faction": {"type": "string"},
+        "tier": {"type": "integer"},
+        "hp": {"type": "integer"},
+        "speed": {"type": "integer"},
+        "appearance": {"type": "string"},
+        "backstory": {"type": "string"},
+        "motivation": {"type": "string"},
+        "weaknesses": {"type": "array", "items": {"type": "string"}},
+        "world_connections": {"type": "array", "items": {"type": "string"}},
+        "combat_behavior": {"type": "string"},
+        "divine_nature": {"type": "string"},
+        "loot": {"type": "array", "items": {"type": "string"}},
+        "field_notes": {"type": "string"},
+    },
+    "required": ["name", "faction", "tier", "hp", "speed", "appearance", "backstory", "motivation",
+                 "weaknesses", "world_connections", "combat_behavior", "divine_nature", "loot", "field_notes"],
+    "additionalProperties": False,
+}
+
+
 # ------------------------------------------------------------------ #
 # Main Engine                                                         #
 # ------------------------------------------------------------------ #
@@ -591,7 +716,7 @@ class LoreEngine:
         self._model = model or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-5")
         self._api_key = os.getenv("ANTHROPIC_API_KEY", "")
 
-    def _call_claude(self, prompt: str, max_tokens: int = 1500) -> Optional[dict]:  # noqa: E501
+    def _call_claude(self, prompt: str, schema: dict, max_tokens: int = 1500) -> Optional[dict]:  # noqa: E501
         """Call Claude and parse JSON response. Returns None on failure.
 
         Prefers `dcch` (dangercorn-claude-helper) for shared cost tracking
@@ -605,6 +730,12 @@ class LoreEngine:
         # Preferred path: dcch shared helper
         try:
             from dcch import Claude, ParseError
+            params = inspect.signature(Claude.text).parameters
+            if "schema" not in params and not any(
+                p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+            ):
+                # Older dcch without structured-outputs support: use the direct client
+                raise ImportError("dcch predates schema= support")
             claude = Claude(
                 api_key=self._api_key,
                 app="dustfall",
@@ -612,14 +743,12 @@ class LoreEngine:
                 max_tokens=max_tokens,
             )
             try:
-                result = claude.text(prompt, json_mode=True)
+                result = claude.text(prompt, json_mode=True, schema=schema)
                 return result.json
             except ParseError:
-                # Lore prompts sometimes return prose-wrapped JSON; fall back to regex parse
-                result = claude.text(prompt)
-                return _parse_json_response(result.content)
+                return None  # max_tokens cutoff or refusal; caller uses the fallback generator
         except ImportError:
-            pass  # dcch not installed, fall through to direct client
+            pass  # dcch not installed (or too old), fall through to direct client
 
         # Fallback: direct anthropic client (legacy code path)
         try:
@@ -629,9 +758,10 @@ class LoreEngine:
                 model=self._model,
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
+                output_config={"format": {"type": "json_schema", "schema": schema}},
             )
             text = msg.content[0].text if msg.content else ""
-            return _parse_json_response(text)
+            return json.loads(text)
         except ImportError:
             logger.warning("[lore] neither dcch nor anthropic installed")
             return None
@@ -646,7 +776,7 @@ class LoreEngine:
     ) -> dict:
         """Generate a new town. Saves to DB. Returns dict."""
         prompt = _town_prompt(deity, region, self.db)
-        data = self._call_claude(prompt, max_tokens=1800)
+        data = self._call_claude(prompt, _TOWN_SCHEMA, max_tokens=1800)
         if data is None:
             data = _fallback_town(deity, region, self.db)
 
@@ -663,7 +793,7 @@ class LoreEngine:
     ) -> dict:
         """Generate a quest hook. Saves to DB. Returns dict."""
         prompt = _quest_prompt(city, archetype, deity, self.db)
-        data = self._call_claude(prompt, max_tokens=1500)
+        data = self._call_claude(prompt, _QUEST_SCHEMA, max_tokens=1500)
         if data is None:
             data = _fallback_quest(city, archetype, deity, self.db)
 
@@ -683,7 +813,7 @@ class LoreEngine:
             item_type = "weapon"
 
         prompt = _item_prompt(item_type, deity, rarity, self.db)
-        data = self._call_claude(prompt, max_tokens=1200)
+        data = self._call_claude(prompt, _ITEM_SCHEMA, max_tokens=1200)
         if data is None:
             data = _fallback_item(item_type, deity, rarity)
 
@@ -699,7 +829,7 @@ class LoreEngine:
     ) -> dict:
         """Generate an enemy backstory. Saves to DB. Returns dict."""
         prompt = _enemy_prompt(faction, tier, self.db)
-        data = self._call_claude(prompt, max_tokens=1500)
+        data = self._call_claude(prompt, _ENEMY_SCHEMA, max_tokens=1500)
         if data is None:
             data = _fallback_enemy(faction, tier)
 
@@ -742,29 +872,6 @@ class LoreEngine:
             parts.append(to_markdown(item, kind_single))
             parts.append("\n---\n")
         return "\n".join(parts)
-
-
-# ------------------------------------------------------------------ #
-# JSON parser                                                         #
-# ------------------------------------------------------------------ #
-
-def _parse_json_response(text: str) -> Optional[dict]:
-    """Extract and parse JSON from Claude's response."""
-    text = text.strip()
-    # Find outermost { }
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1:
-        return None
-    try:
-        return json.loads(text[start:end + 1])
-    except json.JSONDecodeError:
-        # Try to fix common issues: trailing commas, single quotes
-        cleaned = re.sub(r",(\s*[}\]])", r"\1", text[start:end + 1])
-        try:
-            return json.loads(cleaned)
-        except Exception:
-            return None
 
 
 # ------------------------------------------------------------------ #
