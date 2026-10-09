@@ -61,7 +61,11 @@ func _init() -> void:
 	var st := _state()
 	var r1 := RivalsLib.mint(st, design, "walkin_dead", "p0", "tucson", _rng(1), "test")
 	_check("mint creates a live rank-1 rival with a grudge", not r1.is_empty() and r1["rank"] == 1 and r1["grudge"] == "p0" and r1["alive"])
-	_check("display name = name + epithet", RivalsLib.display_name(r1).begins_with(str(r1["name"])) and RivalsLib.display_name(r1).length() > str(r1["name"]).length())
+	var dn := RivalsLib.display_name(r1)
+	var first: String = str(r1["name"]).split(" ")[0]
+	_check("display name carries first name + epithet (%s)" % dn, dn.begins_with(first) and str(r1["epithet"]) in dn and dn.length() > str(r1["name"]).length())
+	_check("poster style: Wren \"Lantern\" Calloway", RivalsLib.display_name({"name": "Wren Calloway", "epithet": "Lantern"}) == "Wren \"Lantern\" Calloway")
+	_check("poster style: 'the' epithets trail", RivalsLib.display_name({"name": "Wren Calloway", "epithet": "the Quiet"}) == "Wren Calloway the Quiet")
 	var boss := RivalsLib.mint(st, design, "the_deacon", "p0", "tucson", _rng(2), "test")
 	_check("bosses never become rivals", boss.is_empty())
 	RivalsLib.mint(st, design, "coyote_beast", "p1", "tucson", _rng(3), "test")

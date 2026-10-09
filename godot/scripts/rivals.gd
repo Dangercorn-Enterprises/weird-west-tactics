@@ -50,8 +50,18 @@ static func bounty_for(r: Dictionary) -> int:
 static func stars(r: Dictionary) -> String:
 	return "★".repeat(int(r.get("rank", 1)))
 
+# Poster style: Wren "Lantern" Calloway; "the ..." epithets trail: Wren Calloway the Quiet.
 static func display_name(r: Dictionary) -> String:
-	return "%s %s" % [str(r.get("name", "Nobody")), str(r.get("epithet", ""))] if str(r.get("epithet", "")) != "" else str(r.get("name", "Nobody"))
+	var nm := str(r.get("name", "Nobody"))
+	var ep := str(r.get("epithet", ""))
+	if ep == "":
+		return nm
+	if ep.begins_with("the "):
+		return "%s %s" % [nm, ep]
+	var parts := nm.split(" ", false, 1)
+	if parts.size() == 2:
+		return "%s \"%s\" %s" % [parts[0], ep, parts[1]]
+	return "\"%s\" %s" % [ep, nm]
 
 # A rider with the `wanted` hindrance doubles the random mint odds.
 static func wanted_mult(state: Dictionary) -> float:

@@ -125,6 +125,9 @@ func _tag_rival(e: Dictionary) -> void:
 	tag.text = "WANTED · " + str(e["name"])
 	add_child(tag)
 	n["rival_tag"] = tag
+	# place it now; _sync_units keeps it there afterwards
+	var y := _top_y(int(grid[e["r"]][e["q"]]["h"]))
+	tag.position = Vector3(_tx(e["q"]), y + (2.35 if e.get("boss", false) else 1.6) + 0.64, _tz(e["r"]))
 	# boss-aware battle music (mirrors web scene_battle enter(): boss fights get
 	# the tighter, lower "boss" mood; normal skirmishes get "battle").
 	var abus := get_node_or_null("/root/Audio")
