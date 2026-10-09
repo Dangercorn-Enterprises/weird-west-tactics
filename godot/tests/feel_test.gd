@@ -284,7 +284,93 @@ func _tick() -> void:
 					_fail("hit-stop never released time_scale")
 					_finish()
 				return
+			_test_frames_start()
+		5: # Lane C frames: mid-walk the sprite shows a walk frame, after it the idle pose
+			var sel: Dictionary = scene.sel
+			if sel.is_empty() or not scene.unit_nodes.has(sel["id"]):
+				_fail("no selection for the frames test")
+				_finish()
+				return
+			var spr: Sprite3D = scene.unit_nodes[sel["id"]]["sprite"]
+			if scene._animating.has(sel["id"]):
+				if spr.has_meta("anim_frame"):
+					frames_seen += 1
+				if _elapsed() > 5.0:
+					_fail("frames walk never finished")
+					_finish()
+				return
+			if frames_seen == 0:
+				_fail("walk frames were never shown during the move")
+			if spr.has_meta("anim_frame"):
+				_fail("anim_frame meta not cleared after the walk")
+			var texset: Dictionary = spr.get_meta("texset")
+			var idle_ok: bool = spr.texture == texset["front"] or spr.texture == texset["side"] \
+				or spr.texture == texset["back"] or spr.texture == texset["side_r"]
+			if not idle_ok:
+				_fail("sprite did not return to an idle pose after the walk")
+			else:
+				_ok("walk frames shown on %d frames, idle pose restored" % frames_seen)
+			# attack frames: the lunge sets frame 0, then the recoil frame, then clears
+			scene._animate_lunge(sel, scene.battle["enemies"][0])
+			if not spr.has_meta("anim_frame"):
+				_fail("lunge did not set an attack frame")
+			_next()
+		6:
+			var sel: Dictionary = scene.sel
+			var spr: Sprite3D = scene.unit_nodes[sel["id"]]["sprite"]
+			if scene._animating.has(sel["id"]):
+				if _elapsed() > 3.0:
+					_fail("lunge never released")
+					_finish()
+				return
+			if spr.has_meta("anim_frame"):
+				_fail("attack frame not cleared after the lunge")
+			else:
+				_ok("attack frames: set on the lunge, cleared on recoil")
 			_finish()
+
+var frames_seen := 0
+
+# Inject synthetic walk/attack frames (two tinted copies of the idle sprite)
+# into the selected rider's texset, then start a multi-tile walk.
+func _test_frames_start() -> void:
+	print("== Lane C frame consumer ==")
+	if scene.ended or scene.sel.is_empty():
+		_ok("battle over or nothing selected; frames test skipped")
+		_finish()
+		return
+	var sel: Dictionary = scene.sel
+	var spr: Sprite3D = scene.unit_nodes[sel["id"]]["sprite"]
+	var texset: Dictionary = spr.get_meta("texset")
+	var base: Texture2D = texset["side"]
+	var img: Image = base.get_image()
+	var f0 := ImageTexture.create_from_image(img)
+	var f1 := ImageTexture.create_from_image(img.duplicate())
+	texset["walk"] = {"side": [f0, f1]}
+	texset["attack"] = {"side": [f1, f0]}
+	spr.set_meta("texset", texset)
+	if scene.anim_frames(texset, "walk", "side_r").size() != 2:
+		_fail("side_r should fall back to the side walk frames")
+	if scene.anim_frames(texset, "walk", "front").size() != 2:
+		_fail("front should fall back to the side walk frames")
+	if scene.anim_frames(texset, "death", "side").size() != 0:
+		_fail("unknown animation should have no frames")
+	# fresh AP + a multi-tile destination
+	sel["ap"] = sel["maxAp"]
+	scene._select(sel)
+	var dest := []
+	for key in scene.reach_map.keys():
+		if int(scene.reach_map[key]) >= 2:
+			var parts: PackedStringArray = (key as String).split(",")
+			dest = [int(parts[0]), int(parts[1])]
+			break
+	if dest.is_empty():
+		_ok("no multi-tile destination; frames test skipped")
+		_finish()
+		return
+	frames_seen = 0
+	scene._do_move(dest[0], dest[1])
+	_next()
 
 func _test_audio_pool() -> void:
 	print("== sfx pool ==")

@@ -1035,7 +1035,17 @@ func _anim_glide(t: float, id: Variant, a: Vector3, b: Vector3, hop: float) -> v
 	var n: Dictionary = unit_nodes[id]
 	var g := a.lerp(b, t)
 	var half := float(n.get("half", 0.7))
-	n["sprite"].position = Vector3(g.x, g.y + half + sin(t * PI) * hop, g.z)
+	var spr: Sprite3D = n["sprite"]
+	# Lane C: with walk frames the feet stay planted (frames carry the motion),
+	# so the hop shrinks to a whisper; without them the hop IS the walk.
+	if spr.has_meta("texset") and n.has("unit"):
+		var frames := anim_frames(spr.get_meta("texset"), "walk", _view_for(n["unit"]))
+		if not frames.is_empty():
+			var seg: int = int(n.get("walk_seg", 0))
+			var idx: int = (seg * 2 + int(t * 2.0)) % frames.size() # two frames per tile step
+			_set_anim_frame(spr, frames[idx])
+			hop *= 0.25
+	spr.position = Vector3(g.x, g.y + half + sin(t * PI) * hop, g.z)
 	if n.has("shadow"):
 		n["shadow"].position = Vector3(g.x, g.y + 0.012, g.z)
 	n["label"].position = Vector3(g.x, g.y + (2.35 if half > 1.0 else 1.6), g.z)
@@ -1046,10 +1056,12 @@ func _animate_move(u: Dictionary, from_q: int, from_r: int, path: Array) -> void
 	var id: Variant = u["id"]
 	_animating[id] = true
 	unit_nodes[id]["ring"].visible = false
+	unit_nodes[id]["unit"] = u # lets the glide read facing for the frame view
 	var tw := _tw()
 	var pq := from_q
 	var pr := from_r
 	var last := Vector3.ZERO
+	var seg := 0
 	for step in path:
 		var sq: int = step[0]
 		var sr: int = step[1]
@@ -1057,16 +1069,22 @@ func _animate_move(u: Dictionary, from_q: int, from_r: int, path: Array) -> void
 		var b := Vector3(_tx(sq), _top_y(int(grid[sr][sq]["h"])), _tz(sr))
 		last = b
 		var fdir := Vector2(sq - pq, sr - pr)
-		tw.tween_callback(func(): u["facing"] = fdir)
+		var this_seg := seg
+		tw.tween_callback(func():
+			u["facing"] = fdir
+			unit_nodes[id]["walk_seg"] = this_seg)
 		tw.tween_method(_anim_glide.bind(id, a, b, 0.14), 0.0, 1.0, 0.13)
 		pq = sq
 		pr = sr
+		seg += 1
 	tw.tween_callback(func():
 		_animating.erase(id)
-		if _frozen.has(id) and unit_nodes.has(id):
-			# playback owns the sprite: _sync_units won't touch it, so the idle
-			# bob needs the rest height of the tile it just reached
-			unit_nodes[id]["base_y"] = last.y + float(unit_nodes[id].get("half", 0.7))
+		if unit_nodes.has(id):
+			_set_anim_frame(unit_nodes[id]["sprite"], null) # back to the idle pose
+			if _frozen.has(id):
+				# playback owns the sprite: _sync_units won't touch it, so the idle
+				# bob needs the rest height of the tile it just reached
+				unit_nodes[id]["base_y"] = last.y + float(unit_nodes[id].get("half", 0.7))
 		_sync_units())
 
 func _animate_lunge(att: Dictionary, tgt: Dictionary) -> void:
@@ -1083,10 +1101,19 @@ func _animate_lunge(att: Dictionary, tgt: Dictionary) -> void:
 	var dirv := to - origin
 	dirv.y = 0.0
 	var push := dirv.normalized() * 0.26 if dirv.length() > 0.01 else Vector3.ZERO
+	# Lane C: attack frames when the character has them (frame 0 on the push,
+	# last frame on the recoil), else the lunge alone carries the attack
+	var frames: Array = anim_frames(spr.get_meta("texset"), "attack", _view_for(att)) if spr.has_meta("texset") else []
+	if not frames.is_empty():
+		_set_anim_frame(spr, frames[0]) # the raise shows on the very first frame of the push
 	var tw := _tw()
 	tw.tween_property(spr, "position", origin + push, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if not frames.is_empty():
+		tw.tween_callback(_set_anim_frame.bind(spr, frames[frames.size() - 1]))
 	tw.tween_property(spr, "position", origin, 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_callback(func(): _animating.erase(id))
+	tw.tween_callback(func():
+		_set_anim_frame(spr, null)
+		_animating.erase(id))
 
 # ---- status effect readout ----------------------------------------------------
 # Neither the web nor the old Godot build showed WHO is burning/bleeding/
@@ -1131,7 +1158,61 @@ func _sprite_textures(u: Dictionary) -> Dictionary:
 	if out["side_r"] == null:
 		out["side_r"] = out["side"] # fallback: mirror the left view
 		out["side_r_mirrored"] = true
+	# Lane C (2026-10-08): optional frame sheets. <arch>_<view>_walk{i}.png and
+	# <arch>_<view>_attack{i}.png, i from 0, any count. A view with no frames
+	# falls back to the next best view, then to the idle pose, so partial art
+	# never breaks a battle. The walk tween and the lunge consume these.
+	out["walk"] = {}
+	out["attack"] = {}
+	for anim in ["walk", "attack"]:
+		for view in ["side", "side_r", "front", "back"]:
+			var frames: Array = []
+			var i := 0
+			while ResourceLoader.exists("res://assets/sprites/%s_%s_%s%d.png" % [id, view, anim, i]) and i < 16:
+				frames.append(load("res://assets/sprites/%s_%s_%s%d.png" % [id, view, anim, i]))
+				i += 1
+			if not frames.is_empty():
+				out[anim][view] = frames
 	return out
+
+# Frames for an animation in a given view, with the fallback chain used by
+# the facing swap: side_r -> side (mirrored), front/back -> side. Empty when
+# the character has no frames for that animation at all.
+static func anim_frames(texset: Dictionary, anim: String, view: String) -> Array:
+	var table: Dictionary = texset.get(anim, {})
+	if table.has(view):
+		return table[view]
+	if table.has("side"):
+		return table["side"]
+	return []
+
+# The sprite's current view name, derived the same way _update_facings does it.
+func _view_for(u: Dictionary) -> String:
+	var cam_fwd := Vector2(-sin(cam_azimuth), -cos(cam_azimuth))
+	var f: Vector2 = u.get("facing", Vector2(1, 0))
+	var dot := f.dot(cam_fwd)
+	var cross := f.x * cam_fwd.y - f.y * cam_fwd.x
+	if dot > 0.5:
+		return "back"
+	if dot < -0.5:
+		return "front"
+	return "side_r" if cross < 0.0 else "side"
+
+# Set (or clear with null) the frame that overrides the idle pose this frame.
+func _set_anim_frame(spr: Sprite3D, tex) -> void:
+	var view := str(spr.get_meta("view")) if spr.has_meta("view") else ""
+	if tex == null:
+		if spr.has_meta("anim_frame"):
+			spr.remove_meta("anim_frame")
+		# back to the idle pose NOW (not next frame when _update_facings runs)
+		if spr.has_meta("texset"):
+			var texset: Dictionary = spr.get_meta("texset")
+			spr.texture = texset[view] if texset.has(view) and view != "" else texset["front"]
+	else:
+		spr.set_meta("anim_frame", tex)
+		spr.texture = tex
+	if spr.has_meta("view"):
+		spr.set_meta("view", "") # force _update_facings to re-check flip + texture
 
 func _sprite_texture(u: Dictionary) -> Texture2D:
 	var id := str(u.get("archetype", ""))
@@ -1838,7 +1919,8 @@ func _update_facings() -> void:
 				flip = false
 		if str(spr.get_meta("view")) != view or spr.flip_h != flip:
 			var texset: Dictionary = spr.get_meta("texset")
-			spr.texture = texset[view]
+			# Lane C: a running walk/attack frame outranks the idle pose
+			spr.texture = spr.get_meta("anim_frame") if spr.has_meta("anim_frame") else texset[view]
 			spr.flip_h = flip
 			spr.set_meta("view", view)
 
