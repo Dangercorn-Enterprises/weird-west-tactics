@@ -1549,6 +1549,79 @@
       "id": "hollow"
     }
   },
+  "rivals": {
+    "maxLive": 3,
+    "rankHp": 0.25,
+    "rankAim": 4,
+    "scarAim": -2,
+    "namedSpawnChance": 0.25,
+    "rivalLeadsChance": 0.5,
+    "names": [
+      "Silas Vance",
+      "Dutch Mallory",
+      "Ezra Crane",
+      "Hollis Byrne",
+      "Cassius Reed",
+      "Jonah Pike",
+      "Lyle Harrow",
+      "Boone Tanner",
+      "Abel Thorne",
+      "Rufus Quill",
+      "Mercy Dalton",
+      "Ada Sorrel",
+      "Clem Varga",
+      "Nell Ashby",
+      "Ira Fenwick",
+      "Josiah Blackwood",
+      "Tobias Rook",
+      "Wren Calloway",
+      "Amos Kettle",
+      "Delia Marsh"
+    ],
+    "epithets": [
+      "Two-Guns",
+      "the Quiet",
+      "Bloody",
+      "Ash-Eyed",
+      "the Preacher's Bane",
+      "Six-Fingers",
+      "Coffin",
+      "the Widowmaker",
+      "Iron-Jaw",
+      "the Coyote",
+      "Red",
+      "Deadwood",
+      "the Hollow",
+      "Lantern",
+      "Brass-Tooth"
+    ],
+    "scars": [
+      {
+        "id": "eye",
+        "name": "lost an eye"
+      },
+      {
+        "id": "arm",
+        "name": "a stiff gun arm"
+      },
+      {
+        "id": "jaw",
+        "name": "a shattered jaw"
+      },
+      {
+        "id": "limp",
+        "name": "a limp they hide"
+      },
+      {
+        "id": "brand",
+        "name": "a brand across the cheek"
+      },
+      {
+        "id": "ear",
+        "name": "half an ear"
+      }
+    ]
+  },
   "world_nodes": [
     {
       "id": "portland",

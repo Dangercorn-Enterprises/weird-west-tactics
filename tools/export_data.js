@@ -32,6 +32,7 @@ fs.writeFileSync(
       weapon_mods: D.WEAPON_MODS,
       mounts: D.MOUNTS,
       biomes: D.BIOMES,
+      rivals: D.RIVALS,
       world_nodes: W.WORLD_NODES,
       world_edges: W.WORLD_EDGES,
     },

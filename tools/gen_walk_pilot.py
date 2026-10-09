@@ -24,14 +24,20 @@ SPRITES = os.path.join(ROOT, "godot", "assets", "sprites")
 RAW = os.path.join(ROOT, "assets_raw", "walk_pilot")
 
 
-def sheet_prompt(char_id, frames):
+ANIM_PHRASE = {
+    "walk": "a walking animation cycle, each frame a different step of the walk",
+    "attack": "an attack animation, frame one raising the weapon to aim, the last frame the recoil with muzzle flash",
+}
+
+
+def sheet_prompt(char_id, frames, anim="walk"):
     base = CHARACTERS[char_id]
     # keep the shipped character description; swap the pose phrasing for a sheet
     desc = base.replace("standing idle facing viewer", "").rstrip(", ")
     return (
-        f"pixel art sprite sheet, {frames} frames of a walking animation cycle, "
+        f"pixel art sprite sheet, {frames} frames of {ANIM_PHRASE.get(anim, ANIM_PHRASE['walk'])}, "
         f"the SAME character repeated {frames} times in a single horizontal row, "
-        f"evenly spaced, each frame a different step of the walk, "
+        f"evenly spaced, "
         f"full side profile view facing left, {desc}, "
         f"plain solid white background, no text, no grid lines, " + STYLE_PIXEL
     )
@@ -96,23 +102,42 @@ def process_frames(sheet, spans, target_h=96):
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # skip the value that follows a flag (e.g. "--frames 4", "--anim attack")
+    skip = set()
+    for flag in ("--frames", "--anim"):
+        if flag in sys.argv:
+            skip.add(sys.argv[sys.argv.index(flag) + 1])
+    args = [a for a in args if a not in skip]
     char = args[0] if args else "gunslinger"
     frames_n = 4
     if "--frames" in sys.argv:
         frames_n = int(sys.argv[sys.argv.index("--frames") + 1])
+    # Lane C (2026-10-08): the engine consumes <char>_side_walk{i}.png and
+    # <char>_side_attack{i}.png (battle.gd anim_frames); --anim attack makes
+    # the 2-frame raise/recoil sheet with the same slicer.
+    anim = "walk"
+    if "--anim" in sys.argv:
+        anim = sys.argv[sys.argv.index("--anim") + 1]
+        if anim not in ANIM_PHRASE:
+            sys.exit(f"unknown --anim {anim} (walk|attack)")
+        if anim == "attack" and "--frames" not in sys.argv:
+            frames_n = 2
     force = "--force" in sys.argv
+    if "--dry-run" in sys.argv:
+        print(f"[{char}] {anim} x{frames_n} prompt:\n  " + sheet_prompt(char, frames_n, anim))
+        return
     if char not in CHARACTERS:
         sys.exit(f"unknown character: {char}")
 
-    first_out = os.path.join(SPRITES, f"{char}_side_walk0.png")
+    first_out = os.path.join(SPRITES, f"{char}_side_{anim}0.png")
     if os.path.exists(first_out) and not force:
         sys.exit(f"{first_out} exists — use --force to regenerate")
 
-    prompt = sheet_prompt(char, frames_n)
-    print(f"[{char}] generating {frames_n}-frame walk sheet...")
+    prompt = sheet_prompt(char, frames_n, anim)
+    print(f"[{char}] generating {frames_n}-frame {anim} sheet...")
     print("  prompt:", prompt[:120], "...")
-    data = gen(prompt, w=1344, h=768, seed=hash(char + "_walk") % 100000)
-    raw_path = os.path.join(RAW, f"{char}_sheet.png")
+    data = gen(prompt, w=1344, h=768, seed=hash(char + "_" + anim) % 100000)
+    raw_path = os.path.join(RAW, f"{char}_{anim}_sheet.png")
     save_raw(data, raw_path)
 
     sheet = Image.open(raw_path)
@@ -122,7 +147,7 @@ def main():
 
     os.makedirs(SPRITES, exist_ok=True)
     for i, f in enumerate(frames):
-        p = os.path.join(SPRITES, f"{char}_side_walk{i}.png")
+        p = os.path.join(SPRITES, f"{char}_side_{anim}{i}.png")
         f.save(p)
         print(f"  saved {p} ({f.width}x{f.height})")
 
@@ -137,7 +162,7 @@ def main():
     for c in cells:
         strip.paste(c, (x, strip.height - c.height), c)
         x += c.width + 6
-    qa_path = os.path.join(RAW, f"{char}_qa_strip.png")
+    qa_path = os.path.join(RAW, f"{char}_{anim}_qa_strip.png")
     strip.save(qa_path)
     print(f"  QA strip (static + frames): {qa_path}")
 

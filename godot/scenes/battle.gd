@@ -10,6 +10,7 @@
 extends Node3D
 
 const CombatCoreScript = preload("res://scripts/combat_core.gd")
+const RivalsLib = preload("res://scripts/rivals.gd") # Lane D (preload: headless runs don't see class_name)
 
 const TILE := 1.0
 const STEP := 0.55
@@ -95,8 +96,35 @@ func _ready() -> void:
 	_apply_blessing()
 	_select(battle["players"][0])
 	_log("— Your move — (Q/E rotate · Enter end turn)")
+	# Lane D: name the rival in the log and tag them on the board
+	for e in battle["enemies"]:
+		if bool(e.get("rival", false)):
+			_log("WANTED: %s rides with them.%s" % [str(e["name"]),
+				(" They want %s." % _rider_name(str(e.get("grudge", "")))) if str(e.get("grudge", "")) != "" else ""])
+			_tag_rival(e)
 	_fade_in()
 	_show_turn_banner("YOUR TURN", Color("#d4a843"))
+
+func _rider_name(uid: String) -> String:
+	for p in battle["players"]:
+		if str(p["id"]) == uid:
+			return str(p["name"])
+	return "one of yours"
+
+# amber name tag above a rival's HP so the poster's face is on the board
+func _tag_rival(e: Dictionary) -> void:
+	if not unit_nodes.has(e["id"]):
+		return
+	var n: Dictionary = unit_nodes[e["id"]]
+	var tag := Label3D.new()
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.font_size = 30
+	tag.pixel_size = 0.006
+	tag.outline_size = 8
+	tag.modulate = Color("#ffcf3f")
+	tag.text = "WANTED · " + str(e["name"])
+	add_child(tag)
+	n["rival_tag"] = tag
 	# boss-aware battle music (mirrors web scene_battle enter(): boss fights get
 	# the tighter, lower "boss" mood; normal skirmishes get "battle").
 	var abus := get_node_or_null("/root/Audio")
@@ -1314,6 +1342,9 @@ func _sync_units() -> void:
 			slbl.text = sd["text"]
 			slbl.modulate = sd["color"]
 			slbl.visible = u["alive"] and sd["text"] != ""
+		if n.has("rival_tag"):
+			n["rival_tag"].position = Vector3(_tx(u["q"]), hp_y + 0.64, _tz(u["r"]))
+			n["rival_tag"].visible = u["alive"]
 		n["ring"].position = Vector3(_tx(u["q"]), y + 0.03, _tz(u["r"]))
 		n["ring"].visible = u["alive"] and not sel.is_empty() and u["id"] == sel.get("id")
 	# boss-phase summons (Risen Dead) appear mid-fight. Enrage adds have no
@@ -2050,11 +2081,20 @@ func _check_end() -> bool:
 	# XP pays on xpKills (raised adds excluded — P0 farm closure); the banner's
 	# kill count below stays the truthful total body count.
 	var summary: Dictionary = GS.apply_battle_result(battle, win, int(battle.get("xpKills", battle["kills"])))
+	# Lane D: the frontier remembers — mint / escalate / collect on rivals
+	var rv: Dictionary = RivalsLib.after_battle(GS.state, GS.design, battle, win,
+		str(GS.state.get("location", "")), GS.rival_rng())
+	if int(rv["gold"]) > 0:
+		GS.state["gold"] = int(GS.state.get("gold", 0)) + int(rv["gold"])
+	if not rv["lines"].is_empty() or int(rv["gold"]) > 0:
+		GS.save_game()
 	GS.last_result = {"win": win, "kills": int(battle["kills"]),
-		"xp": summary["xp"], "context": params.get("context", {})}
+		"xp": summary["xp"], "context": params.get("context", {}), "rivals": rv}
 	banner_label.text = "THE DUST SETTLES" if win else "WIPED OUT"
 	banner_label.modulate = Color("#d4a843") if win else Color("#c0392b")
 	var lines := "%d kills · +%d XP" % [int(battle["kills"]), int(summary["xp"])]
+	for l in rv["lines"]:
+		lines += "\n" + str(l)
 	# 2i: XP surfaced where it lands — one line per deployed rider
 	for g in summary.get("gains", []):
 		lines += "\n%s  +%d XP — Lv %d (%d/%d)" % [g["name"], int(g["xp"]),

@@ -9,6 +9,8 @@
 # =============================================================================
 extends Control
 
+const RivalsLib = preload("res://scripts/rivals.gd") # Lane D
+
 var GS
 var node_data: Dictionary = {}
 var cur_service := ""
@@ -140,7 +142,9 @@ func _saloon() -> void:
 			GS.save_game()
 			_flash("They throw in with you. Crew: %d." % GS.state["party"].size())
 			_render(), full or broke)
-	_row("Rumors — lean in close", "Listen", func(): _flash(RUMORS[randi() % RUMORS.size()]))
+	# Lane D: the frontier talks about your rivals first, the old rumors after
+	var talk: Array = RivalsLib.rumors(GS.state, GS.design) + RUMORS
+	_row("Rumors — lean in close", "Listen", func(): _flash(talk[randi() % talk.size()]))
 
 func _gear_label(p: Dictionary, kind: String) -> String:
 	var id = p["gear"].get(kind)
@@ -268,6 +272,20 @@ func _stable() -> void:
 
 func _marshal() -> void:
 	_note("Bounty board, reputation, the occasional posse. Law work pays in gold and grief.")
+	# Lane D: every live rival is paper on this wall — ride out after them by name
+	for r in RivalsLib.live(GS.state):
+		var rv: Dictionary = r
+		var where: String = str(GS.node_by_id(str(rv.get("lastNode", ""))).get("name", "parts unknown"))
+		_row("WANTED %s — %s · last seen %s · %dg dead" % [RivalsLib.stars(rv), RivalsLib.display_name(rv), where, RivalsLib.bounty_for(rv)],
+			"Hunt", func():
+				var pool: Array = GS.design["enemies"].filter(
+					func(e): return int(e.get("tier", 1)) <= maxi(1, int(node_data.get("tier", 1))) and not e.get("boss", false))
+				var enemies: Array = [RivalsLib.spec_for(GS.design, rv)]
+				for i in 1 + int(node_data.get("tier", 1)):
+					enemies.append(pool[randi() % pool.size()])
+				GS.go_battle({"title": "Wanted: " + RivalsLib.display_name(rv),
+					"biome": GS.biome_for(node_data.get("god")),
+					"enemies": enemies, "context": {"rivalHunt": str(rv["id"])}}))
 	var reward := 60 + int(node_data.get("tier", 1)) * 40
 	_row("Bounty — clear a nest of trouble (%dg on success)" % reward, "Ride Out", func():
 		var pool: Array = GS.design["enemies"].filter(
@@ -276,6 +294,11 @@ func _marshal() -> void:
 		var enemies: Array = []
 		for i in count:
 			enemies.append(pool[randi() % pool.size()])
+		# Lane D: a named outlaw may be running the nest (tier 2+)
+		var leader: Dictionary = RivalsLib.pick_leader(GS.state, GS.design, node_data, str(enemies[0]["id"]), GS.rival_rng())
+		if not leader.is_empty():
+			enemies[0] = leader
+			GS.save_game()
 		GS.go_battle({"title": "Bounty: " + str(node_data["name"]),
 			"biome": GS.biome_for(node_data.get("god")),
 			"enemies": enemies, "context": {"bounty": reward}}))

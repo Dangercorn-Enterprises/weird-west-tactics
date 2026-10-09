@@ -243,6 +243,7 @@ function resolveMeleeSnap(B, mover) {
     if (!mover.alive) break;
     if (!canSnap(x, mover)) continue;
     x.snapped = true;
+    mover.lastHitBy = x.id;
     applyDamage(B, mover, meleeDmg(x, mover));
     landed++;
   }
@@ -418,13 +419,16 @@ function enemyToUnit(spec, i) {
     summoner: beh === "boss-summon", // 2h: the Deacon's kit
     // Pass 10 mirror: behavior flags
     sentry: beh === "sentry",
-    zealot: beh === "zealot",
+    zealot: beh === "zealot" || !!spec.rivalZealot, // Lane D rank-3 temperament
     swarmer: beh === "swarm",
     coverer: beh === "cover",
-    flanker: beh === "flank",
+    flanker: beh === "flank" || !!spec.rivalFlank, // Lane D rank-2 temperament
     tier: spec.tier,
     boss: spec.boss,
     cqc: !!spec.cqc,
+    rival: !!spec.rival,
+    rivalId: String(spec.rivalId || ""),
+    grudge: String(spec.grudge || ""),
     // Session #3 (Astra B2): optional one-rule boss kit, data-driven
     bossRule: spec.bossRule ? JSON.parse(JSON.stringify(spec.bossRule)) : {},
   });
@@ -519,6 +523,7 @@ function doFire(B, att, def, opts) {
   const r = rnd() * 100;
   if (r < hitThru) {
     // HIT UNIT — RNG order preserved: rollDmg() then crit chance().
+    def.lastHitBy = att.id; // Lane D: who put them down (rival minting)
     const baseDmg = rollDmg(att);
     const isCrit = chance(10); // flat 10% crit at 1.5x, both sides
     let dmg = Math.round(baseDmg * (opts.mult || 1) * (isCrit ? 1.5 : 1));
@@ -585,8 +590,9 @@ function tickStatus(B, u) {
     if (u.status[k] > 0) u.status[k]--;
   });
 }
-function doBlast(B, center) {
-  // dynamite/AoE: chebyshev<=1, 4-7 dmg (mirror of do_blast)
+function doBlast(B, center, srcId) {
+  // dynamite/AoE: chebyshev<=1, 4-7 dmg (mirror of do_blast). srcId credits
+  // the blast's author (Lane D rival minting); "" = nobody / the player.
   const caught = B.units.filter(
     (u) =>
       u.alive && Math.abs(u.q - center.q) <= 1 && Math.abs(u.r - center.r) <= 1,
@@ -594,6 +600,7 @@ function doBlast(B, center) {
   caught.forEach((u) => {
     let dmg = randint(4, 7);
     if (u.armorDef) dmg = Math.max(1, dmg - u.armorDef); // armor soaks
+    if (srcId) u.lastHitBy = srcId;
     applyDamage(B, u, dmg);
   });
   // Explosives are the answer to cover: delete light in the radius, crack heavy.
@@ -630,7 +637,7 @@ function tickCharges(B, side) {
     if (c.side === side) {
       c.fuse -= 1;
       if (c.fuse <= 0) {
-        doBlast(B, c);
+        doBlast(B, c, String(c.owner || ""));
         continue;
       }
     }
@@ -786,7 +793,18 @@ function enemyPhase(B) {
       }
       // Pass 10 mirror: behavior-driven target selection
       let tgt;
-      if (e.flanker) {
+      // Lane D mirror: a rival with a grudge goes for THAT rider whenever they can
+      let grudgeTgt = null;
+      if (e.grudge) {
+        for (const p of alive)
+          if (String(p.id) === String(e.grudge) && dist(e, p) <= e.rng + 1) {
+            grudgeTgt = p;
+            break;
+          }
+      }
+      if (grudgeTgt) {
+        tgt = grudgeTgt;
+      } else if (e.flanker) {
         tgt = alive.slice().sort((a, b) => a.hp - b.hp)[0];
       } else if (e.swarmer) {
         tgt = alive.slice().sort((a, b) => dist(e, a) - dist(e, b))[0];
@@ -810,9 +828,9 @@ function enemyPhase(B) {
         if (isBlast || hasLos(B.grid, e, tgt)) {
           e.ap -= 2;
           if (e.bomber)
-            plantCharge(B, "e", tgt); // 2c: lit stick, fuse-delay
+            plantCharge(B, "e", tgt, { owner: String(e.id) }); // 2c: lit stick, fuse-delay
           else if (isBlast)
-            doBlast(B, tgt); // slammer shockwave stays instant
+            doBlast(B, tgt, String(e.id)); // slammer shockwave stays instant
           else doFire(B, e, tgt);
           if (!B.players.some((p) => p.alive)) return;
           continue;

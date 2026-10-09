@@ -265,6 +265,7 @@ func resolve_melee_snap(b: Dictionary, mover: Dictionary) -> int:
 		x["snapped"] = true
 		if on_fire.is_valid():
 			on_fire.call(x, mover, "melee")
+		mover["lastHitBy"] = x["id"]
 		apply_damage(b, mover, melee_dmg(x, mover))
 		landed += 1
 	return landed
@@ -402,15 +403,19 @@ func enemy_to_unit(spec: Dictionary, i: int) -> Dictionary:
 		"slammer": beh == "tank",
 		"summoner": beh == "boss-summon",  # 2h: the Deacon's kit
 		"sentry": beh == "sentry",
-		"zealot": beh == "zealot",
+		# Lane D: a ranked rival picks up an extra temperament (flank at 2, zealot at 3)
+		"zealot": beh == "zealot" or bool(spec.get("rivalZealot", false)),
 		"swarmer": beh == "swarm",
 		"coverer": beh == "cover",
-		"flanker": beh == "flank",
+		"flanker": beh == "flank" or bool(spec.get("rivalFlank", false)),
 		"berserk": false,
 		"boss": spec.get("boss", false),
 		"divine": null,
 		"abilities": [],
 		"cqc": bool(spec.get("cqc", false)),
+		"rival": bool(spec.get("rival", false)),
+		"rivalId": str(spec.get("rivalId", "")),
+		"grudge": str(spec.get("grudge", "")),
 		# Session #3 (Astra B2, Tim's pick): optional one-rule boss kit, data-driven.
 		# Empty for every unit but the Iron Foreman (conducting_cover).
 		"bossRule": (spec.get("bossRule", {}) as Dictionary).duplicate(true),
@@ -515,6 +520,7 @@ func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> boo
 		# HIT UNIT — RNG order preserved: roll_dmg() then crit chance().
 		if on_fire.is_valid():
 			on_fire.call(att, def, "hit")
+		def["lastHitBy"] = att["id"]  # Lane D: who put them down (rival minting)
 		var base_dmg := roll_dmg(att)
 		var is_crit := chance(10.0)
 		var dmg := roundi(float(base_dmg) * float(opts.get("mult", 1.0)) * (1.5 if is_crit else 1.0))
@@ -595,7 +601,9 @@ func tick_status(b: Dictionary, u: Dictionary) -> void:
 		if u["status"][k] > 0:
 			u["status"][k] -= 1
 
-func do_blast(b: Dictionary, center: Dictionary) -> void:
+# src_id: the unit responsible (slammer shockwave, a charge's owner) so a blast
+# kill can credit its author (Lane D rival minting). "" = nobody / the player.
+func do_blast(b: Dictionary, center: Dictionary, src_id: String = "") -> void:
 	if on_blast.is_valid():
 		on_blast.call(center)
 	# Snapshot the caught units BEFORE any damage lands (mirror of doBlast's
@@ -610,6 +618,8 @@ func do_blast(b: Dictionary, center: Dictionary) -> void:
 		var dmg := randint(4, 7)
 		if int(u.get("armorDef", 0)) > 0:
 			dmg = maxi(1, dmg - int(u["armorDef"]))
+		if src_id != "":
+			u["lastHitBy"] = src_id
 		apply_damage(b, u, dmg)
 	# Explosives are the answer to cover: delete light in the radius, crack heavy.
 	# This is the whole reason to lob (and why hunkering behind a wagon is finite).
@@ -663,7 +673,7 @@ func tick_charges(b: Dictionary, side: String) -> void:
 			if int(c["fuse"]) <= 0:
 				if on_charge.is_valid():
 					on_charge.call(int(c["q"]), int(c["r"]), false)
-				do_blast(b, c)
+				do_blast(b, c, str(c.get("owner", "")))
 				continue
 		still.append(c)
 	b["charges"] = still
@@ -820,7 +830,16 @@ func enemy_phase(b: Dictionary) -> void:
 				e["wmax"] += 2
 			# behavior-driven target selection
 			var tgt: Dictionary
-			if e.get("flanker", false):
+			# Lane D: a rival with a grudge goes for THAT rider whenever they can
+			var grudge_tgt: Dictionary = {}
+			if str(e.get("grudge", "")) != "":
+				for p in alive:
+					if str(p["id"]) == str(e["grudge"]) and dist(e, p) <= int(e["rng"]) + 1:
+						grudge_tgt = p
+						break
+			if not grudge_tgt.is_empty():
+				tgt = grudge_tgt
+			elif e.get("flanker", false):
 				var sorted_hp := alive.duplicate()
 				sorted_hp.sort_custom(func(a, c): return int(a["hp"]) < int(c["hp"]))
 				tgt = sorted_hp[0]
@@ -852,9 +871,9 @@ func enemy_phase(b: Dictionary) -> void:
 				if is_blast or has_los(b["grid"], e, tgt):
 					e["ap"] -= 2
 					if e.get("bomber", false):
-						plant_charge(b, "e", tgt)  # 2c: lit stick, fuse-delay
+						plant_charge(b, "e", tgt, {"owner": str(e["id"])})  # 2c: lit stick, fuse-delay
 					elif is_blast:
-						do_blast(b, tgt)  # slammer shockwave stays instant
+						do_blast(b, tgt, str(e["id"]))  # slammer shockwave stays instant
 					else:
 						do_fire(b, e, tgt)
 					var any_alive := false

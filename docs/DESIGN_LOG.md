@@ -679,3 +679,51 @@ cover is doing its job); the Deacon got EASIER because his raised dead walk
 into fists. Boss-band tuning stays the held session it was. Tests:
 los_test 19, melee_snap_test 24, foreman_rule_test 28, shop_tier_test 17,
 plus the existing 16 suites green; npm test green.
+
+---
+## Session #3 LANES C + D — same day (Tim's in-chat picks)
+**Lane C, animation frames → "A pilot, then B".** Engine side shipped
+(6c35712): battle.gd consumes optional `<arch>_<view>_walk{i}.png` /
+`_attack{i}.png` sheets (side_r→side→idle fallback, 2 frames per tile
+step, attack frame 0 on the push, last frame on the recoil), feel_test
+proves it with synthetic frames; `tools/gen_walk_pilot.py` gained
+`--anim walk|attack` and `--dry-run`. The pilot itself (gunslinger, side,
+4 frames) runs the first time the fleet SDXL (Huginn :8710) is reachable
+from Legion; if the QA strip passes Tim's eye the roster goes local, else
+sorceress.games for the roster. docs/ANIMATION_FRAMES_BRIEF.md.
+
+**Lane D, the frontier remembers → A: WANTED-POSTER RIVALS, prototype
+BUILT (Godot campaign layer; combat hooks in both engines, parity Δ 0.0,
+baselines unchanged).** Tim's sub-picks: mint on ALL of (downs a rider ·
+survives a fight you lost · random named spawn at tier 2+ · `wanted`
+hindrance doubles the odds); scars cosmetic AND mechanical; rivals on the
+marshal board AND trail ambushes near their last-seen node.
+- `scripts/rivals.gd` (pure static, tests/rival_test.gd 37): a rival =
+  {name, epithet, template, rank 1-3, scars, grudge rider, lastNode, alive}
+  in `state.rivals`, cap 3 live (data: `RIVALS` in data.js → design.rivals).
+  `spec_for` bakes rank (+25% hp, +4 aim per rank) and scars (−2 aim each),
+  rank 2 adds the flank temperament, rank 3 adds zealot.
+- Mint (Calder interpretation, one per fight so it reads): on a LOSS, the
+  enemy that downed a rider and is still standing (grudge = that rider),
+  else the highest-hp survivor (grudge = whoever hurt it last). On a WIN
+  nothing is minted — a dead killer is just dead. Random named spawns
+  (25%, ×2 with `wanted`, tier 2+) lead ambushes and bounty nests; a rival
+  last seen at or one trail from the node leads 50% of the ambushes there
+  ("<name> rides again").
+- After a fight: a rival that dies pays 60 + 60×rank gold and comes off the
+  board (burial rumor in the saloon); one that survives a loss ranks up,
+  takes a scar, moves its last-seen node and re-aims its grudge at whoever
+  hurt it last. Banner lines carry all of it.
+- Combat hooks (both engines): `lastHitBy` on every hit / punch / credited
+  blast (slammer, charge owner — bombers now own their sticks); a rival
+  with a grudge targets that rider whenever it is in range; rival
+  temperaments via `rivalFlank` / `rivalZealot`. No RNG draws added.
+- Scene: WANTED name tag above the rival, log line naming the grudge,
+  marshal board "WANTED ★★ <name> · last seen <town> · <g> dead → Hunt"
+  rows, saloon rumors about live and buried rivals.
+- `wanted` hindrance: hook wired (`member.hindrances`), the Godot creator
+  does not offer hindrances yet — a creator pass is the follow-up.
+- Patent line kept: no hierarchy, no promotion among enemies, no enemy-vs-
+  enemy struggle. Rank is a number only the player's fights change.
+- Web build: campaign layer NOT mirrored (legacy); harness mirrors the
+  combat hooks only. Playtest gate, not a win-rate gate.

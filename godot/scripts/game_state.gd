@@ -211,6 +211,7 @@ func new_game(lead_archetype := "gunslinger", lead_name := "") -> void:
 		"visited": {}, "inventory": {}, "mount": null,
 		"favor": {"coyote": 1, "samedi": 1, "vulcan": 1, "perun": 1, "anansi": 1, "sleeper": 0},
 		"flags": {}, "act1": {"step": 0}, "act2": {"step": 0}, "act3": {"step": 0},
+		"rivals": [],  # Lane D: wanted-poster rivals (scripts/rivals.gd); older saves get it lazily
 		"version": 1,
 	}
 	save_game()
@@ -365,3 +366,16 @@ func biome_for(god) -> String:
 func go_battle(params: Dictionary) -> void:
 	pending_battle = params
 	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+
+# ---- Lane D: rivals (campaign-layer RNG; battle math keeps its own seeded core)
+var _rival_rng: RandomNumberGenerator = null
+
+func rival_rng() -> RandomNumberGenerator:
+	if _rival_rng == null:
+		_rival_rng = RandomNumberGenerator.new()
+		_rival_rng.randomize()
+	return _rival_rng
+
+func set_rival_seed(seed_v: int) -> void:
+	_rival_rng = RandomNumberGenerator.new()
+	_rival_rng.seed = seed_v

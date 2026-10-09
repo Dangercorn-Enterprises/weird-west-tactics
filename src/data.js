@@ -1491,6 +1491,69 @@ const MOUNTS = [
   },
 ];
 
+// Session #3 Lane D (Tim 2026-10-08): WANTED-POSTER RIVALS. Named outlaws
+// minted by events (downs a rider / survives a fight you lost / random named
+// spawn at tier 2+ / the `wanted` hindrance doubles the odds), ranked 1-3,
+// scarred (cosmetic + small mechanical), with a grudge target, posted on the
+// marshal board and hunting on trails near where they were last seen. NO
+// hierarchy, NO promotion among enemies (outside the WB Nemesis patent).
+// Runtime: godot/scripts/rivals.gd. These tables are the only data.
+const RIVALS = {
+  maxLive: 3,
+  rankHp: 0.25, // +25% hp per rank above 1
+  rankAim: 4, // +4 aim per rank above 1
+  scarAim: -2, // each scar: -2 aim (lost eye, stiff arm...) — small numbers
+  namedSpawnChance: 0.25, // random named spawn, tier 2+ ambush/bounty
+  rivalLeadsChance: 0.5, // a live rival near the trail leads the ambush
+  names: [
+    "Silas Vance",
+    "Dutch Mallory",
+    "Ezra Crane",
+    "Hollis Byrne",
+    "Cassius Reed",
+    "Jonah Pike",
+    "Lyle Harrow",
+    "Boone Tanner",
+    "Abel Thorne",
+    "Rufus Quill",
+    "Mercy Dalton",
+    "Ada Sorrel",
+    "Clem Varga",
+    "Nell Ashby",
+    "Ira Fenwick",
+    "Josiah Blackwood",
+    "Tobias Rook",
+    "Wren Calloway",
+    "Amos Kettle",
+    "Delia Marsh",
+  ],
+  epithets: [
+    "Two-Guns",
+    "the Quiet",
+    "Bloody",
+    "Ash-Eyed",
+    "the Preacher's Bane",
+    "Six-Fingers",
+    "Coffin",
+    "the Widowmaker",
+    "Iron-Jaw",
+    "the Coyote",
+    "Red",
+    "Deadwood",
+    "the Hollow",
+    "Lantern",
+    "Brass-Tooth",
+  ],
+  scars: [
+    { id: "eye", name: "lost an eye" },
+    { id: "arm", name: "a stiff gun arm" },
+    { id: "jaw", name: "a shattered jaw" },
+    { id: "limp", name: "a limp they hide" },
+    { id: "brand", name: "a brand across the cheek" },
+    { id: "ear", name: "half an ear" },
+  ],
+};
+
 // expose for scenes + scripted tests
 if (typeof window !== "undefined") {
   window.DFDATA = {
@@ -1508,6 +1571,7 @@ if (typeof window !== "undefined") {
     MOUNTS,
     BIOMES,
     shopGoods,
+    RIVALS,
   };
 }
 
@@ -1530,5 +1594,6 @@ if (typeof module !== "undefined" && module.exports) {
     MOUNTS,
     BIOMES,
     shopGoods,
+    RIVALS,
   };
 }

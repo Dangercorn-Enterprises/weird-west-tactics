@@ -6,6 +6,8 @@
 # =============================================================================
 extends Control
 
+const RivalsLib = preload("res://scripts/rivals.gd") # Lane D
+
 var GS
 var nodes: Array = []
 var edges: Array = []
@@ -289,7 +291,15 @@ func _travel(from: Dictionary, to: Dictionary) -> void:
 		var enemies: Array = []
 		for i in count:
 			enemies.append(pool[randi() % pool.size()])
-		GS.go_battle({"title": "Ambush on the " + ("wilderness" if risk == 3 else "trail"),
+		# Lane D: a rival lurking near this trail (or a fresh named outlaw at
+		# tier 2+) takes the lead slot — same headcount, a face on the ambush
+		var title := "Ambush on the " + ("wilderness" if risk == 3 else "trail")
+		var leader: Dictionary = RivalsLib.pick_leader(GS.state, GS.design, to, str(enemies[0]["id"]), GS.rival_rng())
+		if not leader.is_empty():
+			enemies[0] = leader
+			title = "%s rides again" % str(leader["name"]) if RivalsLib.by_id(GS.state, str(leader["rivalId"])).get("fights", 0) > 0 else "%s and company" % str(leader["name"])
+			GS.save_game()
+		GS.go_battle({"title": title,
 			"biome": GS.biome_for(to.get("god")), "enemies": enemies, "context": {}})
 		return
 	_refresh()
