@@ -50,6 +50,19 @@ func set_setting(key: String, value) -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify(settings))
 
+# Session #3 (Tim 2026-10-08, economy pick C): shop shelves are TIERED by town.
+# Mirror of data.js shopGoods — items with tier <= the town tier, never an
+# item whose effect is unimplemented. Used by town.gd and tests/shop_tier_test.
+static func shop_goods(list: Array, tier: int) -> Array:
+	var t := maxi(1, tier)
+	var out: Array = []
+	for it in list:
+		if bool(it.get("unimplemented", false)):
+			continue
+		if int(it.get("tier", 1)) <= t:
+			out.append(it)
+	return out
+
 # ---- dev autopilot (DUSTFALL_AUTOPILOT=1): tour scenes, screenshot each ----------
 # Stage order (tests/autopilot_test.gd asserts it): a scene that owns an intro
 # card is never shot by the timer below; its representative shot is an explicit

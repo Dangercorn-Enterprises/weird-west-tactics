@@ -68,6 +68,10 @@ const SPAWNS = [
 ];
 const LIGHT_COVER_HP = 3; // absorbed would-be-hits before light cover is gone
 const HUNKER_BONUS = 0.2; // hunker adds to cover bonus (was a flat -20 to-hit)
+// Session #3 (2026-10-08) mirrors of combat_core.gd: intervening cover cap and
+// the free melee punch on entering adjacency (see the .gd for the rationale).
+const LOS_COVER_CAP = 0.4;
+const MELEE_SNAP = true;
 function buildGrid() {
   const grid = [];
   for (let r = 0; r < ROWS; r++) {
@@ -156,16 +160,29 @@ function lineTiles(aq, ar, bq, br) {
   return tiles;
 }
 
-// Direct-fire line of sight: any h>=2 tile on the line blocks the shot. The skip
-// below (attacker higher than defender, wall no higher than attacker) has no counter,
-// so it would pass EVERY such wall, but it needs the attacker on an h2 tile and h2 is
-// impassable (reach), so it never fires on any shipped board (see docs/DESIGN_LOG.md).
-// NOTE: LOS is direction-dependent (Bresenham tie-breaking differs A->B vs B->A) and
-// does not consult cover or units. Mirror of combat_core.gd has_los.
+// Session #3: SYMMETRIC sight line = union of both Bresenham directions,
+// A->B tiles first then unseen B->A tiles (same order as combat_core.gd
+// _los_tiles so intervening cover sums identically).
+function losTiles(aq, ar, bq, br) {
+  const tiles = lineTiles(aq, ar, bq, br);
+  const seen = new Set(tiles.map(([q, r]) => q + "," + r));
+  for (const t of lineTiles(bq, br, aq, ar)) {
+    const k = t[0] + "," + t[1];
+    if (!seen.has(k)) {
+      seen.add(k);
+      tiles.push(t);
+    }
+  }
+  return tiles;
+}
+
+// Direct-fire line of sight: any h>=2 tile on the (symmetric) line blocks the
+// shot. The attacker-higher skip needs an h2 perch and h2 is impassable, so it
+// never fires on a shipped board. Mirror of combat_core.gd has_los.
 function hasLos(grid, att, def) {
   const attH = grid[att.r][att.q].h,
     defH = grid[def.r][def.q].h;
-  for (const [q, r] of lineTiles(att.q, att.r, def.q, def.r)) {
+  for (const [q, r] of losTiles(att.q, att.r, def.q, def.r)) {
     if (grid[r][q].h >= 2) {
       if (attH > defH && grid[r][q].h <= attH) continue;
       return false;
@@ -174,19 +191,81 @@ function hasLos(grid, att, def) {
   return true;
 }
 
+// Session #3: cover objects BETWEEN shooter and target add to the defender's
+// band (flat tiles only, capped, waived for a shooter on high ground).
+// Mirror of combat_core.gd intervening_cover.
+function interveningCover(grid, att, def) {
+  if (grid[att.r][att.q].h >= 1) return 0;
+  let total = 0;
+  for (const [q, r] of losTiles(att.q, att.r, def.q, def.r)) {
+    const cell = grid[r][q];
+    if (cell.h === 0 && (cell.cover || 0) > 0) total += cell.cover;
+  }
+  return Math.min(total, LOS_COVER_CAP);
+}
+
 // Effective cover bonus (0..0.6) the defender enjoys vs THIS attacker.
-// High ground on the shooter halves it; a defender on high ground gets NONE
-// (beacon — skylined); hunker adds; point-blank bypasses (v1 flank proxy).
+// Own-tile cover (beacon / point-blank / shooter-higher halves), then
+// intervening cover (Session #3), then hunker, capped.
 // Mirror of combat_core.gd cover_bonus.
 function coverBonus(grid, att, def) {
-  if (grid[def.r][def.q].h >= 1)
-    return def.status.hunker > 0 ? HUNKER_BONUS : 0; // beacon
-  let cb = grid[def.r][def.q].cover || 0;
-  if (dist(att, def) <= 1)
-    cb = 0; // point-blank flank negates cover
-  else if (grid[att.r][att.q].h > grid[def.r][def.q].h) cb *= 0.5; // shooting down over low cover — half, not erased (Njord fix)
+  let cb = 0;
+  if (grid[def.r][def.q].h < 1) {
+    cb = grid[def.r][def.q].cover || 0;
+    if (dist(att, def) <= 1)
+      cb = 0; // point-blank flank negates cover
+    else if (grid[att.r][att.q].h > grid[def.r][def.q].h) cb *= 0.5; // shooting down over low cover — half, not erased (Njord fix)
+  }
+  cb += interveningCover(grid, att, def);
   if (def.status.hunker > 0) cb += HUNKER_BONUS;
   return Math.min(cb, 0.6); // cap so hunker can't fully erase the hit band
+}
+
+// ---- Session #3: free melee hit on entering adjacency (mirror of combat_core.gd)
+function meleeDmg(att, def) {
+  let d = 1 + Math.floor(att.str / 3);
+  if (def.armorDef) d = Math.max(1, d - def.armorDef);
+  return d;
+}
+function canSnap(reactor, mover) {
+  return (
+    reactor.alive &&
+    reactor.side !== mover.side &&
+    dist(reactor, mover) === 1 &&
+    (reactor.status.stun || 0) <= 0 &&
+    !reactor.snapped
+  );
+}
+function resolveMeleeSnap(B, mover) {
+  if (!MELEE_SNAP || mover.cqc || !mover.alive) return 0;
+  let landed = 0;
+  for (const x of B.units) {
+    if (!mover.alive) break;
+    if (!canSnap(x, mover)) continue;
+    x.snapped = true;
+    applyDamage(B, mover, meleeDmg(x, mover));
+    landed++;
+  }
+  return landed;
+}
+function meleeTax(B, mover, q, r) {
+  if (!MELEE_SNAP || mover.cqc) return 0;
+  let tax = 0;
+  const probe = { q, r, side: mover.side };
+  for (const x of B.units) {
+    if (
+      x.alive &&
+      x.side !== mover.side &&
+      dist(x, probe) === 1 &&
+      (x.status.stun || 0) <= 0 &&
+      !x.snapped
+    )
+      tax += meleeDmg(x, mover);
+  }
+  return tax;
+}
+function beginPhase(B, side) {
+  for (const x of B.units) if (x.side !== side) x.snapped = false;
 }
 
 // ---- ability name maps (mirror of partyToUnit) ------------------------------
@@ -282,6 +361,7 @@ function partyToUnit(p, i) {
     divine: DIVINE[p.archetype] || null,
     wIC: !!(gw && gw.ignoreCover),
     armorDef: ga ? ga.def : 0,
+    cqc: !!(arch && arch.cqc), // Session #3: close-quarters perk (gunslinger)
   });
   if (ga && ga.speed) {
     u.maxAp = Math.max(2, u.maxAp + ga.speed);
@@ -344,6 +424,9 @@ function enemyToUnit(spec, i) {
     flanker: beh === "flank",
     tier: spec.tier,
     boss: spec.boss,
+    cqc: !!spec.cqc,
+    // Session #3 (Astra B2): optional one-rule boss kit, data-driven
+    bossRule: spec.bossRule ? JSON.parse(JSON.stringify(spec.bossRule)) : {},
   });
   return u;
 }
@@ -452,9 +535,33 @@ function doFire(B, att, def, opts) {
   } else if (!ic && r < bare) {
     // STRIKES COVER — the would-have-hit-bare band. Cover eats the shot and
     // degrades (light only); pure misses never strip cover.
+    bossOnCoverStrike(B, att, def);
     strikeCover(B, def.q, def.r);
   }
   return false;
+}
+
+// Session #3 — Iron Foreman CONDUCTING COVER (mirror of combat_core.gd
+// boss_on_cover_strike): an absorbed shot heats the cover tile — a fuse-delay
+// charge owned by the Foreman. Pure: no roll, no AP, no damage change.
+function bossOnCoverStrike(B, att, target) {
+  const rule = att.bossRule || {};
+  if (rule.id !== "conducting_cover") return;
+  if ((rule.preEnrageOnly ?? true) && att.enraged) return;
+  const hunker = (target.status.hunker || 0) > 0 ? HUNKER_BONUS : 0;
+  if (coverBonus(B.grid, att, target) <= hunker) return;
+  const cell = B.grid[target.r][target.q];
+  if (rule.heavyOnly && (cell.chp || 0) >= 0) return;
+  let pending = 0;
+  for (const c of B.charges) {
+    if (c.q === target.q && c.r === target.r) return;
+    if (String(c.owner || "") === String(att.id)) pending++;
+  }
+  if (pending >= (rule.maxPending ?? 1)) return;
+  plantCharge(B, "e", target, {
+    owner: String(att.id),
+    source: "foreman_heat",
+  });
 }
 
 // Degrade cover on an absorbed hit. Heavy (chp<0) shrugs off small arms;
@@ -511,8 +618,11 @@ function doBlast(B, center) {
 // Mirror of combat_core.gd plant_charge/tick_charges: a lit stick lands and
 // detonates at the START of the thrower's side's NEXT phase — the other side
 // gets exactly one panicked move. Slammer/ashfall/divine blasts stay instant.
-function plantCharge(B, side, center) {
-  B.charges.push({ q: center.q, r: center.r, side, fuse: 1 });
+function plantCharge(B, side, center, meta) {
+  // metadata (owner/source) can never override timing, side or position
+  B.charges.push(
+    Object.assign({}, meta || {}, { q: center.q, r: center.r, side, fuse: 1 }),
+  );
 }
 function tickCharges(B, side) {
   const still = [];
@@ -577,7 +687,9 @@ function moveToward(B, u, tgt) {
   Object.keys(rc).forEach((k) => {
     const [q, r] = k.split(",").map(Number);
     const d = Math.abs(q - tgt.q) + Math.abs(r - tgt.r);
-    const score = d * 2 - coverW * (B.grid[r][q].cover || 0);
+    // Session #3: ending next to an enemy costs a punch (mirror)
+    const score =
+      d * 2 - coverW * (B.grid[r][q].cover || 0) + meleeTax(B, u, q, r);
     if (score < bestScore) {
       bestScore = score;
       best = [q, r];
@@ -591,6 +703,7 @@ function moveToward(B, u, tgt) {
       applyDamage(B, u, STATUS_DOT.bleed); // bleed ticks on move
       u.status.bleed--;
     }
+    resolveMeleeSnap(B, u);
     return true;
   }
   return false;
@@ -598,6 +711,7 @@ function moveToward(B, u, tgt) {
 
 // ---- ENEMY phase AI (mirror of enemyTurn(), lines ~527-611) -----------------
 function enemyPhase(B) {
+  beginPhase(B, "e"); // Session #3: riders get their punches back
   // lit enemy sticks go off first — the player phase between was the panic window
   tickCharges(B, "e");
   if (!B.players.some((p) => p.alive)) return;
@@ -649,6 +763,7 @@ function enemyPhase(B) {
     }
     let guard = 0;
     while (guard++ < 12) {
+      if (!e.alive) break; // a move can kill the mover (bleed, punch): no shots from the dead
       const alive = B.players.filter((p) => p.alive);
       if (!alive.length) return;
       // Pass 11 mirror: Anansi's confusion — lash out at the nearest unit
@@ -718,6 +833,7 @@ function enemyPhase(B) {
           e.q = s[0];
           e.r = s[1];
           e.ap -= 1;
+          resolveMeleeSnap(B, e); // blinking in next to a rider still eats the punch
           continue;
         }
       }
@@ -827,7 +943,11 @@ function positionalMove(B, p, minGain) {
     const [q, r] = key.split(",").map(Number);
     const ev = bestShotEvFrom(B, p, q, r);
     if (ev <= 0) continue;
-    const s = ev + 2.0 * tileCov(B.grid, q, r) - chargeDanger(B, q, r);
+    const s =
+      ev +
+      2.0 * tileCov(B.grid, q, r) -
+      chargeDanger(B, q, r) -
+      meleeTax(B, p, q, r); // Session #3: the punch is a price
     if (s > bestScore) {
       bestScore = s;
       bestQ = q;
@@ -843,6 +963,7 @@ function positionalMove(B, p, minGain) {
       applyDamage(B, p, STATUS_DOT.bleed);
       p.status.bleed--;
     }
+    resolveMeleeSnap(B, p);
     return true;
   }
   return false;
@@ -882,6 +1003,7 @@ function execAtk(B, p, def, fx) {
 // the real hitChance), and repositions instead of burning AP on walls — so
 // Positioning v1 win rates measure the rules, not bot blindness.
 function playerPhaseBasic(B) {
+  beginPhase(B, "p"); // Session #3: enemies get their punches back
   tickCharges(B, "p"); // fuse rule is engine truth, not policy choice
   if (!B.enemies.some((e) => e.alive)) return;
   const order = B.players
@@ -893,7 +1015,7 @@ function playerPhaseBasic(B) {
     tickStatus(B, p);
     if (!p.alive) continue;
     let guard = 0;
-    while (guard++ < 12) {
+    while (guard++ < 12 && p.alive) {
       // v1: only VISIBLE targets count; reposition for a shot before approaching
       const visible = B.enemies
         .filter(
@@ -917,6 +1039,7 @@ function playerPhaseBasic(B) {
   B.players.forEach((p) => (p.jinx = 0));
 }
 function playerPhaseAbilities(B) {
+  beginPhase(B, "p"); // Session #3: enemies get their punches back
   // symmetric fuse tick (no player sticks exist yet; ready for the item)
   tickCharges(B, "p");
   if (!B.enemies.some((e) => e.alive)) return;
@@ -930,7 +1053,7 @@ function playerPhaseAbilities(B) {
     tickStatus(B, p);
     if (!p.alive) continue;
     let guard = 0;
-    while (guard++ < 12 && p.ap >= 2) {
+    while (guard++ < 12 && p.ap >= 2 && p.alive) {
       if (!B.enemies.some((e) => e.alive)) break;
       // 1) heal a badly hurt ally/self (mirror chooseAbility heal targeting)
       if (isHealer(p)) {

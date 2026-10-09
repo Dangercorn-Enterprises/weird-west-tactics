@@ -10,6 +10,9 @@ const ARCHETYPES = [
     desc: "A dead-eye with a six-shooter and nerves of steel.",
     bonuses: "+2 Deftness, +1 Quickness",
     statBonus: { deftness: 2, quickness: 1 },
+    // Session #3 (Tim 2026-10-08): close-quarters perk — steps into an enemy's
+    // reach without eating the free punch everyone else takes (John Wick edge).
+    cqc: true,
     weapons: [
       {
         name: "Peacemaker",
@@ -986,6 +989,16 @@ const ENEMY_CATALOG = [
     wmax: 10,
     behavior: "boss-turret",
     boss: true,
+    // Session #3 (Tim's pick 2026-10-08, Astra B2 contract): CONDUCTING COVER.
+    // When his shot is absorbed by terrain cover, that tile heats — a fuse-delay
+    // charge (owner Foreman) goes off at the start of the next enemy phase.
+    // Cover protects this shot and charges the position for the next one.
+    bossRule: {
+      id: "conducting_cover",
+      maxPending: 1,
+      preEnrageOnly: true,
+      heavyOnly: false,
+    },
   },
   {
     // balance 2026-07-01: was hp 35 / wmax 9 / aim 74 — an 80% pushover for a
@@ -1045,6 +1058,13 @@ const ENEMY_CATALOG = [
 ];
 
 // ---- Items (bible §6) ----
+// Session #3 (Tim 2026-10-08, economy pick C "tier-unlock now, drops later"):
+// every shop item carries a town tier. Outfitters stock items with
+// tier <= the town's tier (worldmap_data WORLD_NODES.tier, 1-3). DRAFT table,
+// Calder's interpretation, Tim's to edit: tier 1 keeps everything the old
+// fixed slices sold (nothing regresses in Act I); the previously
+// unobtainable tail opens at 2 and 3. Consumables whose effect is not yet
+// implemented carry unimplemented: true and never reach a shelf.
 const WEAPONS = [
   {
     id: "revolver",
@@ -1053,6 +1073,7 @@ const WEAPONS = [
     dmg: [4, 8],
     accuracy: 75,
     cost: 60,
+    tier: 1,
     note: "Reliable, cheap.",
   },
   {
@@ -1062,6 +1083,7 @@ const WEAPONS = [
     dmg: [5, 10],
     accuracy: 70,
     cost: 120,
+    tier: 1,
     note: "Long range, slow.",
   },
   {
@@ -1071,6 +1093,7 @@ const WEAPONS = [
     dmg: [6, 12],
     accuracy: 65,
     cost: 110,
+    tier: 1,
     note: "Devastating close, bad far.",
   },
   {
@@ -1080,6 +1103,7 @@ const WEAPONS = [
     dmg: [3, 6],
     accuracy: 80,
     cost: 100,
+    tier: 1,
     note: "Fast, light.",
   },
   {
@@ -1089,6 +1113,7 @@ const WEAPONS = [
     dmg: [5, 12],
     accuracy: 58,
     cost: 200,
+    tier: 3,
     note: "Ashfall, armor-piercing.",
   },
   {
@@ -1098,6 +1123,7 @@ const WEAPONS = [
     dmg: [7, 12],
     accuracy: 55,
     cost: 260,
+    tier: 3,
     note: "Heavy, Tinkerer only.",
     archetype: "tinkerer",
   },
@@ -1108,19 +1134,28 @@ const WEAPONS = [
     dmg: [3, 7],
     accuracy: 70,
     cost: 140,
+    tier: 2,
     note: "Ignores cover, Hexslinger only.",
     archetype: "hexslinger",
     ignoreCover: true,
   },
 ];
 const ARMOR = [
-  { id: "leather_duster", name: "Leather Duster", def: 2, speed: 0, cost: 50 },
+  {
+    id: "leather_duster",
+    name: "Leather Duster",
+    def: 2,
+    speed: 0,
+    cost: 50,
+    tier: 1,
+  },
   {
     id: "reinforced_vest",
     name: "Reinforced Vest",
     def: 4,
     speed: -1,
     cost: 120,
+    tier: 1,
   },
   {
     id: "ashfall_plating",
@@ -1128,6 +1163,7 @@ const ARMOR = [
     def: 6,
     speed: -2,
     cost: 240,
+    tier: 1,
   },
   {
     id: "blessed_vestments",
@@ -1135,6 +1171,7 @@ const ARMOR = [
     def: 3,
     speed: 0,
     cost: 160,
+    tier: 2,
     note: "+10% vs divine",
   },
   {
@@ -1143,16 +1180,25 @@ const ARMOR = [
     def: 5,
     speed: 0,
     cost: 400,
+    tier: 3,
     faction: "vulcan",
     note: "Vulcan-aligned only",
   },
 ];
 const CONSUMABLES = [
-  { id: "bandages", name: "Bandages", cost: 15, effect: "heal", amount: 8 },
+  {
+    id: "bandages",
+    name: "Bandages",
+    cost: 15,
+    tier: 1,
+    effect: "heal",
+    amount: 8,
+  },
   {
     id: "ashfall_charge",
     name: "Ashfall Charge",
     cost: 40,
+    tier: 1,
     effect: "aoe",
     amount: [6, 10],
     radius: 1,
@@ -1161,6 +1207,7 @@ const CONSUMABLES = [
     id: "smelling_salts",
     name: "Smelling Salts",
     cost: 25,
+    tier: 1,
     effect: "revive",
     amount: 5,
   },
@@ -1168,19 +1215,36 @@ const CONSUMABLES = [
     id: "tonic_vigor",
     name: "Tonic of Vigor",
     cost: 30,
+    tier: 2,
+    unimplemented: true,
     effect: "buff",
     stat: "vigor",
     amount: 2,
   },
-  { id: "holy_water", name: "Holy Water", cost: 35, effect: "antiundead" },
+  {
+    id: "holy_water",
+    name: "Holy Water",
+    cost: 35,
+    tier: 2,
+    unimplemented: true,
+    effect: "antiundead",
+  },
   {
     id: "coyote_dust",
     name: "Coyote Dust",
     cost: 50,
+    tier: 3,
+    unimplemented: true,
     effect: "invis",
     turns: 1,
   },
 ];
+// Shop shelf for a town of `tier`: tiered items only, nothing unimplemented.
+// Shared by the web town, the Godot town (via design.json) and the tests.
+function shopGoods(list, tier) {
+  const t = Math.max(1, tier || 1);
+  return (list || []).filter((it) => !it.unimplemented && (it.tier || 1) <= t);
+}
 // costs added Pass 15 (v1.1) — fitted at Forge towns, one mod per rider.
 // hollow_points simplified to flat +1/+1 (no enemy armor exists to punish it).
 const WEAPON_MODS = [
@@ -1443,6 +1507,7 @@ if (typeof window !== "undefined") {
     WEAPON_MODS,
     MOUNTS,
     BIOMES,
+    shopGoods,
   };
 }
 
@@ -1464,5 +1529,6 @@ if (typeof module !== "undefined" && module.exports) {
     WEAPON_MODS,
     MOUNTS,
     BIOMES,
+    shopGoods,
   };
 }

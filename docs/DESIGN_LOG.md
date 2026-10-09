@@ -609,3 +609,73 @@ verify-blocker flagged to the SiteLens lane, untouched from here.
 3. **Rough scar → KEPT.** Wreckage stays slow after the cover object
    breaks; the inverted incentive (blasting a path can slow your own
    approach) is ruled a tactical tradeoff, not a bug. Playtest may reopen.
+
+---
+# SESSION #3 — Tim's picks on the four held topics (2026-10-08, in-chat)
+*Options presented in-chat (overwatch brief, LOS, Foreman kit menu, economy
+datasheet); Tim picked; built the same session in BOTH engines, parity
+Δ 0.0 on all 7 rows. Interpretation notes marked (Calder, vetoable).*
+
+1. **OVERWATCH → "free melee hit adjacent unless they have some sort of
+   gunslinger / John Wick type perk"** (Tim's own door, not A/B/C/F).
+   Built: ending a move on a tile adjacent to an enemy eats ONE free punch
+   from each adjacent enemy; punch = 1 + str/3, armor-soaked (min 1), no
+   roll, no crit, no RNG draw; each reactor punches once per phase
+   (`begin_phase` resets the other side); stunned reactors don't react.
+   **Perk `cqc`** (data: archetype flag) = immune; the gunslinger carries
+   it. Calder interpretations: destination-only trigger (not path-through
+   — simpler to read, no path reconstruction in the core); reactor is any
+   adjacent enemy, not just melee-armed ones (everyone has fists); enemies
+   have no cqc for now. Both bots price the punch (`melee_tax`) and will
+   stop 2 tiles out rather than step into a lethal one; the hover tile
+   shows "N AP  PUNCH -X" in the Godot build. Also fixed while here: an
+   enemy that dies ON its move (bleed-out, now a punch) no longer keeps
+   acting that activation (latent bug in both engines).
+2. **LOS → fix asymmetry + build both July rules.** Sight line is now the
+   UNION of both Bresenham directions (the 336 one-way pairs on the mesa
+   are gone; los_test proves every flat pair symmetric; the diagonal h2/h2
+   seam is closed). **Cover-degraded LOS** (Session #1 decision C, unbuilt
+   since July): cover objects BETWEEN shooter and target add their cover to
+   the defender's band — the bullet hits the wagon — capped at
+   `LOS_COVER_CAP` 0.4 (one rock's worth), ignore-cover weapons bypass it,
+   it joins own-tile cover + hunker under the existing 0.6 cap, and a
+   "strikes cover" result still degrades the DEFENDER's tile (Calder
+   simplification: the intervening object itself does not wear). **High
+   ground sees over**: a shooter on h≥1 ignores intervening cover (the
+   old h2-perch branch stays, still unreachable).
+3. **FOREMAN KIT → Astra's conducting cover** (phase2-boss.md B2 contract,
+   built as specced): `iron_foreman.bossRule = {conducting_cover,
+   maxPending 1, preEnrageOnly true, heavyOnly false}`. When his shot is
+   absorbed by terrain cover, a fuse-delay charge (owner Foreman, source
+   `foreman_heat`) lands on that tile and blows at the start of the next
+   enemy phase (3x3, 4-7, cracks the rock). Cover protects THIS shot and
+   charges the position for the next one. Hits/misses never arm; hunker-
+   only cover never arms; one pending heat; pre-enrage only. Godot shows
+   it as a flat orange heat plate with its own log line. B1's dispatcher
+   extraction and B3's sweep were NOT done (one rule, one boss, per the
+   contract's own "do not implement five kits" line).
+4. **ECONOMY → C: tier-unlock now, drops later.** Every weapon/armor/
+   consumable now carries `tier` 1-3; shelves = items with tier ≤ town
+   tier (`shopGoods` in data.js, `GameState.shop_goods` in Godot, same
+   rule). DRAFT TABLE (Calder, Tim's to edit): tier 1 keeps exactly what
+   the old fixed slices sold (no Act-I regression); **T2 opens Hex Focus +
+   Blessed Vestments; T3 opens Ashfall Pistol, Steam Cannon, Clockwork
+   Exo** (+1,160g of new sinks). The three consumables with unimplemented
+   effects (tonic, holy water, coyote dust) are flagged and never shelved.
+   Alternative for the table if Act I should feel poorer: gate rifle /
+   shotgun / vest / plating to T2 (one-line data change). Battle drops
+   stay behind the haunts.js wiring decision.
+
+**Baselines (2000 runs/side, seed 1337, positional bot, parity Δ 0.0):**
+
+| change | skirmish | vanguard | deacon | foreman | weaver | hollow | finale4 |
+|---|---|---|---|---|---|---|---|
+| pre-Session #3 (feel pass, 5d488f2) | 1.000 | .988 | .750 | .963 | .932 | .948 | .898 |
+| + all four Session #3 picks | 1.000 | .955 | **.825** | **.901** | .928 | .928 | **.818** |
+
+Reading: the punch tax and symmetric LOS make approach fights slower
+(rounds up everywhere); the finale and the Foreman got harder (conducting
+cover is doing its job); the Deacon got EASIER because his raised dead walk
+into fists. Boss-band tuning stays the held session it was. Tests:
+los_test 19, melee_snap_test 24, foreman_rule_test 28, shop_tier_test 17,
+plus the existing 16 suites green; npm test green.

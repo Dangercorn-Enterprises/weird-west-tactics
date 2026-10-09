@@ -182,11 +182,14 @@ func _cycle_gear(p: Dictionary, kind: String) -> void:
 	_render()
 
 func _outfitter() -> void:
-	_note("Guns, armor, and Ashfall charges, frontier-style.")
+	var tier := int(node_data.get("tier", 1))
+	_note("Guns, armor, and Ashfall charges, frontier-style.%s" % (
+		"  Bigger towns stock rarer iron." if tier < 3 else "  The full catalog, for a price."))
+	# Session #3: shelves tiered by town (GameState.shop_goods), not fixed slices
 	var goods: Array = []
-	goods.append_array(GS.design["weapons"].slice(0, 4))
-	goods.append_array(GS.design["armor"].slice(0, 3))
-	goods.append_array(GS.design["consumables"].slice(0, 3))
+	goods.append_array(GS.shop_goods(GS.design["weapons"], tier))
+	goods.append_array(GS.shop_goods(GS.design["armor"], tier))
+	goods.append_array(GS.shop_goods(GS.design["consumables"], tier))
 	for it in goods:
 		var own := int(GS.state["inventory"].get(it["id"], 0))
 		_row("%s%s%s  [%dg]" % [it["name"],

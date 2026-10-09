@@ -139,6 +139,15 @@ func build_grid() -> Array:
 
 const LIGHT_COVER_HP := 3  # absorbed would-be-hits before light cover is gone
 const HUNKER_BONUS := 0.20  # hunker adds to cover bonus (was a flat -20 to-hit)
+# Session #3 (Tim 2026-10-08): shots THROUGH cover strike it. Intervening cover
+# along the line adds to the defender's cover band, capped here (one heavy
+# object's worth), and is waived for a shooter on high ground (sees over).
+const LOS_COVER_CAP := 0.4
+# Session #3 (Tim 2026-10-08): "free melee hit adjacent unless they have a
+# gunslinger / John Wick type perk". Ending a move next to an enemy eats one
+# free punch from each adjacent enemy (once per reactor per phase); a mover
+# with the cqc perk steps in untouched. Deterministic: no RNG draw.
+const MELEE_SNAP := true
 
 # Integer Bresenham line between two tiles (exclusive of endpoints). Not supercover:
 # it steps diagonally and skips corner-touched cells, so a diagonal h2/h2 seam is shootable.
@@ -162,16 +171,31 @@ func _line_tiles(aq: int, ar: int, bq: int, br: int) -> Array:
 		tiles.append([q, r])
 	return tiles
 
-# Direct-fire line of sight: any h>=2 tile on the line blocks the shot. The skip
-# below (attacker higher than defender, wall no higher than attacker) has no counter,
-# so it would pass EVERY such wall, but it needs the attacker on an h2 tile and h2 is
-# impassable (reach), so it never fires on any shipped board (see docs/DESIGN_LOG.md).
-# NOTE: LOS is direction-dependent (Bresenham tie-breaking differs A->B vs B->A) and
-# does not consult cover or units.
+# Session #3: SYMMETRIC sight line = the union of both Bresenham directions,
+# A->B tiles first, then any B->A tile not already present. The old single
+# direction had 336 one-way pairs on the mesa ("he can hit me, I can't hit
+# him"). Order is fixed so both engines sum intervening cover identically.
+func _los_tiles(aq: int, ar: int, bq: int, br: int) -> Array:
+	var tiles: Array = _line_tiles(aq, ar, bq, br)
+	var seen := {}
+	for t in tiles:
+		seen["%d,%d" % [t[0], t[1]]] = true
+	for t in _line_tiles(bq, br, aq, ar):
+		var k := "%d,%d" % [t[0], t[1]]
+		if not seen.has(k):
+			seen[k] = true
+			tiles.append(t)
+	return tiles
+
+# Direct-fire line of sight: any h>=2 tile on the (symmetric) line blocks the
+# shot. The skip below (attacker higher than defender, wall no higher than
+# attacker) needs the attacker on an h2 tile and h2 is impassable (reach), so
+# it never fires on any shipped board (see docs/DESIGN_LOG.md). LOS does not
+# consult units; intervening COVER is priced in cover_bonus, not here.
 func has_los(grid: Array, att: Dictionary, def: Dictionary) -> bool:
 	var att_h: int = int(grid[att["r"]][att["q"]]["h"])
 	var def_h: int = int(grid[def["r"]][def["q"]]["h"])
-	for t in _line_tiles(int(att["q"]), int(att["r"]), int(def["q"]), int(def["r"])):
+	for t in _los_tiles(int(att["q"]), int(att["r"]), int(def["q"]), int(def["r"])):
 		if int(grid[t[1]][t[0]]["h"]) >= 2:
 			# elevation advantage lets you see over a wall lower than your perch
 			if att_h > def_h and int(grid[t[1]][t[0]]["h"]) <= att_h:
@@ -179,21 +203,92 @@ func has_los(grid: Array, att: Dictionary, def: Dictionary) -> bool:
 			return false
 	return true
 
+# Session #3 (Session #1 decision C, finally built): cover objects BETWEEN the
+# shooter and the target add their cover to the defender's band (the bullet
+# hits the wagon). Only flat-tile cover counts (cover sits on h0 tiles); the
+# sum is capped at LOS_COVER_CAP; a shooter on high ground sees over all of it.
+func intervening_cover(grid: Array, att: Dictionary, def: Dictionary) -> float:
+	if int(grid[att["r"]][att["q"]]["h"]) >= 1:
+		return 0.0  # high ground sees over lower cover
+	var total := 0.0
+	for t in _los_tiles(int(att["q"]), int(att["r"]), int(def["q"]), int(def["r"])):
+		var cell: Dictionary = grid[t[1]][t[0]]
+		if int(cell["h"]) == 0 and float(cell["cover"]) > 0.0:
+			total += float(cell["cover"])
+	return minf(total, LOS_COVER_CAP)
+
 # Effective cover bonus (0..~0.6) the defender enjoys vs THIS attacker.
-# High ground on the shooter halves it (sees over); a defender on high ground
-# gets NONE (beacon — skylined); hunker adds to it. Directional flanking:
-# point-blank (adjacent) attacks bypass cover in v1 (full edge-facing = v2).
+# Own-tile cover: high ground on the shooter halves it (sees over); a defender
+# on high ground gets NONE (beacon — skylined); point-blank (adjacent) attacks
+# bypass it (v1 directional proxy). Then intervening cover along the line
+# (Session #3), then hunker; capped so the hit band never closes.
 func cover_bonus(grid: Array, att: Dictionary, def: Dictionary) -> float:
-	if int(grid[def["r"]][def["q"]]["h"]) >= 1:
-		return HUNKER_BONUS if def["status"]["hunker"] > 0 else 0.0  # beacon
-	var cb: float = float(grid[def["r"]][def["q"]]["cover"])
-	if dist(att, def) <= 1:
-		cb = 0.0  # point-blank flank negates cover (v1 directional proxy)
-	elif int(grid[att["r"]][att["q"]]["h"]) > int(grid[def["r"]][def["q"]]["h"]):
-		cb *= 0.5  # shooting down over low cover — half, not erased (Njord fix)
+	var cb := 0.0
+	if int(grid[def["r"]][def["q"]]["h"]) < 1:  # beacon: high tiles protect nothing
+		cb = float(grid[def["r"]][def["q"]]["cover"])
+		if dist(att, def) <= 1:
+			cb = 0.0  # point-blank flank negates cover (v1 directional proxy)
+		elif int(grid[att["r"]][att["q"]]["h"]) > int(grid[def["r"]][def["q"]]["h"]):
+			cb *= 0.5  # shooting down over low cover — half, not erased (Njord fix)
+	cb += intervening_cover(grid, att, def)
 	if def["status"]["hunker"] > 0:
 		cb += HUNKER_BONUS
 	return minf(cb, 0.60)  # cap so hunker can't fully erase the hit band
+
+# ---- Session #3: free melee hit on entering adjacency (Tim's overwatch pick) ----
+# Punch = 1 + str/3, armor-soaked (min 1). No roll, no crit, no RNG draw.
+func melee_dmg(att: Dictionary, def: Dictionary) -> int:
+	var d: int = 1 + int(float(att["str"]) / 3.0)
+	if int(def.get("armorDef", 0)) > 0:
+		d = maxi(1, d - int(def["armorDef"]))
+	return d
+
+# A reactor gets one free punch per phase: alive, opposing side, adjacent to
+# the mover's destination, not stunned, not already spent this phase.
+func _can_snap(reactor: Dictionary, mover: Dictionary) -> bool:
+	return reactor["alive"] and reactor["side"] != mover["side"] \
+		and dist(reactor, mover) == 1 \
+		and int(reactor["status"].get("stun", 0)) <= 0 \
+		and not reactor.get("snapped", false)
+
+# Resolve the punches a mover eats for ENDING a move on its current tile.
+# Returns the number of punches landed. A cqc mover (gunslinger perk) is immune.
+func resolve_melee_snap(b: Dictionary, mover: Dictionary) -> int:
+	if not MELEE_SNAP or mover.get("cqc", false) or not mover["alive"]:
+		return 0
+	var landed := 0
+	for x in b["units"]:
+		if not mover["alive"]:
+			break
+		if not _can_snap(x, mover):
+			continue
+		x["snapped"] = true
+		if on_fire.is_valid():
+			on_fire.call(x, mover, "melee")
+		apply_damage(b, mover, melee_dmg(x, mover))
+		landed += 1
+	return landed
+
+# Expected punch damage for a mover ENDING on (q, r). The bots price it into
+# their move scores; 0 for a cqc mover. Pure (reads snapped/stun as they are).
+func melee_tax(b: Dictionary, mover: Dictionary, q: int, r: int) -> int:
+	if not MELEE_SNAP or mover.get("cqc", false):
+		return 0
+	var tax := 0
+	var probe := {"q": q, "r": r, "side": mover["side"]}
+	for x in b["units"]:
+		if x["alive"] and x["side"] != mover["side"] and dist(x, probe) == 1 \
+			and int(x["status"].get("stun", 0)) <= 0 and not x.get("snapped", false):
+			tax += melee_dmg(x, mover)
+	return tax
+
+# Called at the start of side's phase: the OTHER side are the reactors this
+# phase, so their punches reset. (enemy_phase/player_phase call it; battle.gd
+# calls begin_phase("p") when the player's turn starts.)
+func begin_phase(b: Dictionary, side: String) -> void:
+	for x in b["units"]:
+		if x["side"] != side:
+			x["snapped"] = false
 
 # ---- unit construction --------------------------------------------------------
 func mk_unit(o: Dictionary) -> Dictionary:
@@ -252,6 +347,9 @@ func party_to_unit(p: Dictionary, i: int) -> Dictionary:
 		"wIC": not gw.is_empty() and gw.get("ignoreCover", false),
 		"armorDef": int(ga.get("def", 0)) if not ga.is_empty() else 0,
 		"boss": false,
+		# Session #3: close-quarters perk — steps into adjacency without eating
+		# the free punch (data: archetype cqc, the gunslinger's John Wick edge)
+		"cqc": bool(arch.get("cqc", false)) if not arch.is_empty() else false,
 	})
 	if not ga.is_empty() and int(ga.get("speed", 0)) != 0:
 		u["maxAp"] = max(2, u["maxAp"] + int(ga["speed"]))
@@ -312,6 +410,10 @@ func enemy_to_unit(spec: Dictionary, i: int) -> Dictionary:
 		"boss": spec.get("boss", false),
 		"divine": null,
 		"abilities": [],
+		"cqc": bool(spec.get("cqc", false)),
+		# Session #3 (Astra B2, Tim's pick): optional one-rule boss kit, data-driven.
+		# Empty for every unit but the Iron Foreman (conducting_cover).
+		"bossRule": (spec.get("bossRule", {}) as Dictionary).duplicate(true),
 	})
 
 # ---- combat math (verbatim mirror) -------------------------------------------
@@ -433,10 +535,40 @@ func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> boo
 		# nothing, so accuracy-spam can never strip cover.
 		if on_fire.is_valid():
 			on_fire.call(att, def, "cover")
+		boss_on_cover_strike(b, att, def)
 		strike_cover(b, def["q"], def["r"])
 	elif on_fire.is_valid():
 		on_fire.call(att, def, "miss")
 	return false
+
+# Session #3 — the Iron Foreman's CONDUCTING COVER (Astra B2 contract, Tim's
+# pick 2026-10-08): when his shot is absorbed by terrain cover, that cover
+# tile heats up — a fuse-delay charge lands on it (owner Foreman) and goes off
+# at the start of the next enemy phase. Cover still protects THIS shot; it
+# charges the position for the next one. Pure hook: never rolls, never spends
+# AP, never changes damage; hunker-only cover does not arm it; one pending
+# heat per Foreman; pre-enrage only by default. No RNG draw.
+func boss_on_cover_strike(b: Dictionary, att: Dictionary, target: Dictionary) -> void:
+	var rule: Dictionary = att.get("bossRule", {})
+	if rule.get("id", "") != "conducting_cover":
+		return
+	if rule.get("preEnrageOnly", true) and att.get("enraged", false):
+		return
+	var hunker: float = HUNKER_BONUS if int(target["status"].get("hunker", 0)) > 0 else 0.0
+	if cover_bonus(b["grid"], att, target) <= hunker:
+		return  # terrain must contribute after adjacency/height/intervening rules
+	var cell: Dictionary = b["grid"][target["r"]][target["q"]]
+	if rule.get("heavyOnly", false) and int(cell.get("chp", 0)) >= 0:
+		return
+	var pending := 0
+	for c in b.get("charges", []):
+		if int(c["q"]) == int(target["q"]) and int(c["r"]) == int(target["r"]):
+			return  # never stack heat on an already marked tile
+		if str(c.get("owner", "")) == str(att["id"]):
+			pending += 1
+	if pending >= int(rule.get("maxPending", 1)):
+		return
+	plant_charge(b, "e", target, {"owner": str(att["id"]), "source": "foreman_heat"})
 
 # Degrade cover on an absorbed hit. Heavy (chp<0) shrugs off small arms; light
 # decays its bonus as its durability drops, so coverage weakens as it breaks.
@@ -510,10 +642,18 @@ func do_blast(b: Dictionary, center: Dictionary) -> void:
 # A lit stick lands on the target tile and detonates at the START of the
 # thrower's side's NEXT phase — the other side gets exactly one panicked move.
 # (Ashfall charge, divine blasts, and slammer shockwaves stay instant.)
-func plant_charge(b: Dictionary, side: String, center: Dictionary) -> void:
-	b["charges"].append({"q": int(center["q"]), "r": int(center["r"]), "side": side, "fuse": 1})
+func plant_charge(b: Dictionary, side: String, center: Dictionary, meta: Dictionary = {}) -> void:
+	var c := {"q": int(center["q"]), "r": int(center["r"]), "side": side, "fuse": 1}
+	c.merge(meta, false)  # metadata (owner/source) can never override timing, side or position
+	b["charges"].append(c)
+	last_charge_source = str(c.get("source", ""))
 	if on_charge.is_valid():
 		on_charge.call(int(center["q"]), int(center["r"]), true)
+
+# Source tag of the most recently planted charge ("" = ordinary bomber stick,
+# "foreman_heat" = conducting cover). Read by the UI inside its on_charge hook;
+# the hook keeps its (q, r, lit) shape so existing callers/tests are untouched.
+var last_charge_source := ""
 
 func tick_charges(b: Dictionary, side: String) -> void:
 	var still: Array = []
@@ -580,7 +720,10 @@ func move_unit_toward(b: Dictionary, u: Dictionary, tgt: Dictionary) -> bool:
 		var q := int(parts[0])
 		var r := int(parts[1])
 		var d := absi(q - tgt["q"]) + absi(r - tgt["r"])
-		var score := float(d) * 2.0 - cover_w * float(b["grid"][r][q]["cover"])
+		# Session #3: ending next to an enemy costs a punch — priced in damage
+		# units against the 2-per-tile distance term (staying put costs 0)
+		var score := float(d) * 2.0 - cover_w * float(b["grid"][r][q]["cover"]) \
+			+ float(melee_tax(b, u, q, r))
 		if score < best_score:
 			best_score = score
 			best = [q, r]
@@ -595,11 +738,13 @@ func move_unit_toward(b: Dictionary, u: Dictionary, tgt: Dictionary) -> bool:
 		if u["status"]["bleed"] > 0:
 			apply_damage(b, u, STATUS_DOT["bleed"])
 			u["status"]["bleed"] -= 1
+		resolve_melee_snap(b, u)
 		return true
 	return false
 
 # ---- ENEMY phase (mirror of enemyPhase) ----------------------------------------
 func enemy_phase(b: Dictionary) -> void:
+	begin_phase(b, "e")  # Session #3: riders get their punches back
 	# lit enemy sticks go off first — the player phase between was the panic window
 	tick_charges(b, "e")
 	if b["players"].filter(func(p): return p["alive"]).is_empty():
@@ -654,6 +799,8 @@ func enemy_phase(b: Dictionary) -> void:
 		var guard := 0
 		while guard < 12:
 			guard += 1
+			if not e["alive"]:
+				break  # a move can kill the mover (bleed, Session #3 punch): no shots from the dead
 			var alive: Array = b["players"].filter(func(p): return p["alive"])
 			if alive.is_empty():
 				return
@@ -743,6 +890,7 @@ func enemy_phase(b: Dictionary) -> void:
 					e["ap"] -= 1
 					if on_move.is_valid():
 						on_move.call(e, bq, br, {}) # {} = blink, no walkable path
+					resolve_melee_snap(b, e)  # blinking in next to a rider still eats the punch
 					continue
 			if int(e["ap"]) > 0 and move_unit_toward(b, e, tgt):
 				continue
@@ -842,7 +990,8 @@ func positional_move(b: Dictionary, p: Dictionary, min_gain: float) -> bool:
 		var ev := _best_shot_ev_from(b, p, q, r)
 		if ev <= 0.0:
 			continue
-		var s: float = ev + 2.0 * _tile_cov(b["grid"], q, r) - _charge_danger(b, q, r)
+		var s: float = ev + 2.0 * _tile_cov(b["grid"], q, r) - _charge_danger(b, q, r) \
+			- float(melee_tax(b, p, q, r))  # Session #3: the punch is a price
 		if s > best_score:
 			best_score = s
 			best_q = q
@@ -855,6 +1004,7 @@ func positional_move(b: Dictionary, p: Dictionary, min_gain: float) -> bool:
 		if int(p["status"]["bleed"]) > 0:
 			apply_damage(b, p, STATUS_DOT["bleed"])
 			p["status"]["bleed"] -= 1
+		resolve_melee_snap(b, p)
 		return true
 	return false
 
@@ -885,6 +1035,7 @@ func player_phase(b: Dictionary) -> void:
 	# symmetric fuse tick (no player sticks exist yet; ready for the item).
 	# NOTE: the interactive battle drives the player phase itself — when a
 	# player stick item ships, battle.gd needs this tick at turn start too.
+	begin_phase(b, "p")  # Session #3: enemies get their punches back
 	tick_charges(b, "p")
 	if b["enemies"].filter(func(e): return e["alive"]).is_empty():
 		return
@@ -899,7 +1050,7 @@ func player_phase(b: Dictionary) -> void:
 		if not p["alive"]:
 			continue
 		var guard := 0
-		while guard < 12 and int(p["ap"]) >= 2:
+		while guard < 12 and int(p["ap"]) >= 2 and p["alive"]:
 			guard += 1
 			var live_enemies: Array = b["enemies"].filter(func(e): return e["alive"])
 			if live_enemies.is_empty():

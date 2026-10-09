@@ -346,16 +346,25 @@
         style: { color: "#9a8a6a", fontStyle: "italic", marginBottom: "8px" },
       }),
     );
+    // Session #3: shelves are tiered by town (data.js shopGoods), not fixed slices
     const goods = [];
-    (typeof WEAPONS !== "undefined" ? WEAPONS : [])
-      .slice(0, 4)
-      .forEach((w) => goods.push({ k: "weapon", it: w }));
-    (typeof ARMOR !== "undefined" ? ARMOR : [])
-      .slice(0, 3)
-      .forEach((a) => goods.push({ k: "armor", it: a }));
-    (typeof CONSUMABLES !== "undefined" ? CONSUMABLES : [])
-      .slice(0, 3)
-      .forEach((x) => goods.push({ k: "item", it: x }));
+    const townNode = node();
+    const townTier = (townNode && townNode.tier) || 1;
+    const shelf = (list) =>
+      typeof shopGoods === "function"
+        ? shopGoods(list, townTier)
+        : (list || []).filter(
+            (it) => !it.unimplemented && (it.tier || 1) <= townTier,
+          );
+    shelf(typeof WEAPONS !== "undefined" ? WEAPONS : []).forEach((w) =>
+      goods.push({ k: "weapon", it: w }),
+    );
+    shelf(typeof ARMOR !== "undefined" ? ARMOR : []).forEach((a) =>
+      goods.push({ k: "armor", it: a }),
+    );
+    shelf(typeof CONSUMABLES !== "undefined" ? CONSUMABLES : []).forEach((x) =>
+      goods.push({ k: "item", it: x }),
+    );
     goods.forEach(({ k, it }) => {
       const own = DF.state.inventory[it.id] || 0;
       c.appendChild(

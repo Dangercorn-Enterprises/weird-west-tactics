@@ -412,31 +412,36 @@ func _blob_texture() -> ImageTexture:
 var _charge_props := {}
 
 func _on_charge(q: int, r: int, lit: bool) -> void:
+	var src: String = str(core.last_charge_source) if lit else ""
 	if _recording:
-		_events.append({"t": "charge", "q": q, "r": r, "lit": lit})
+		_events.append({"t": "charge", "q": q, "r": r, "lit": lit, "src": src})
 		return
-	_play_charge(q, r, lit)
+	_play_charge(q, r, lit, src)
 
-func _play_charge(q: int, r: int, lit: bool) -> void:
+func _play_charge(q: int, r: int, lit: bool, src := "") -> void:
 	var key := "%d,%d" % [q, r]
 	if lit:
+		var heat: bool = src == "foreman_heat"  # Session #3: the Foreman's conducting cover
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.18, 0.18, 0.18)
+		bm.size = Vector3(0.18, 0.18, 0.18) if not heat else Vector3(0.5, 0.06, 0.5)
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color("#c0392b")
+		mat.albedo_color = Color("#e8823a") if heat else Color("#c0392b")
 		mat.emission_enabled = true
-		mat.emission = Color("#ff6b4a")
-		mat.emission_energy_multiplier = 1.2
+		mat.emission = Color("#ffb347") if heat else Color("#ff6b4a")
+		mat.emission_energy_multiplier = 1.6 if heat else 1.2
 		bm.material = mat
 		mi.mesh = bm
-		mi.position = Vector3(_tx(q), _top_y(int(grid[r][q]["h"])) + 0.12, _tz(r))
+		mi.position = Vector3(_tx(q), _top_y(int(grid[r][q]["h"])) + (0.04 if heat else 0.12), _tz(r))
 		add_child(mi)
 		var tw := create_tween().set_loops()
 		tw.tween_property(mi, "scale", Vector3(1.35, 1.35, 1.35), 0.35)
 		tw.tween_property(mi, "scale", Vector3.ONE, 0.35)
 		_charge_props[key] = mi
-		_log("A lit stick of dynamite lands — MOVE!")
+		if heat:
+			_log("The Foreman's shot heats the cover — it will blow next turn. MOVE!")
+		else:
+			_log("A lit stick of dynamite lands — MOVE!")
 	else:
 		var node: Node3D = _charge_props.get(key)
 		if node != null and is_instance_valid(node):
@@ -557,6 +562,13 @@ func _play_fire(att: Dictionary, def: Dictionary, result: String) -> void:
 	var b := _unit_world(def)
 	var ah := 0.95 if att.get("boss", false) else 0.8
 	var bh := 0.95 if def.get("boss", false) else 0.8
+	if result == "melee":
+		# Session #3 free punch: the reactor lunges, dust at the mover's feet; the
+		# damage floater + hit sound follow from on_damage.
+		_face_and_lunge(att, def)
+		_spawn_puff(b + Vector3(0, 0.3, 0), Color("#a08a6a"))
+		_log("%s lashes out as %s steps in close." % [att["name"], def["name"]])
+		return
 	_spawn_muzzle(a + Vector3(0, ah, 0) + (b - a).normalized() * 0.3)
 	_spawn_tracer(a + Vector3(0, ah, 0), b + Vector3(0, bh, 0))
 	var abus := get_node_or_null("/root/Audio")
@@ -850,11 +862,16 @@ func _play_events() -> void:
 				chain.tween_interval(beat)
 				waited += beat
 			"fire":
-				chain.tween_callback(_face_and_lunge.bind(ev["att"], ev["def"]))
-				chain.tween_interval(0.09)
-				chain.tween_callback(_play_fire.bind(ev["att"], ev["def"], str(ev["result"])))
-				chain.tween_interval(0.24 if ev["result"] == "hit" else 0.34)
-				waited += 0.43
+				if str(ev["result"]) == "melee":
+					chain.tween_callback(_play_fire.bind(ev["att"], ev["def"], "melee"))
+					chain.tween_interval(0.2)
+					waited += 0.2
+				else:
+					chain.tween_callback(_face_and_lunge.bind(ev["att"], ev["def"]))
+					chain.tween_interval(0.09)
+					chain.tween_callback(_play_fire.bind(ev["att"], ev["def"], str(ev["result"])))
+					chain.tween_interval(0.24 if ev["result"] == "hit" else 0.34)
+					waited += 0.43
 			"hit":
 				chain.tween_callback(_play_hit.bind(ev["u"], int(ev["dmg"]), bool(ev["crit"]), bool(ev["dead"])))
 				var beat2: float = 0.55 if ev["dead"] else 0.14
@@ -865,7 +882,7 @@ func _play_events() -> void:
 				chain.tween_interval(0.12)
 				waited += 0.12
 			"charge":
-				chain.tween_callback(_play_charge.bind(int(ev["q"]), int(ev["r"]), bool(ev["lit"])))
+				chain.tween_callback(_play_charge.bind(int(ev["q"]), int(ev["r"]), bool(ev["lit"]), str(ev.get("src", ""))))
 				chain.tween_interval(0.26 if ev["lit"] else 0.12)
 				waited += 0.26
 			"blast":
@@ -921,6 +938,7 @@ func _playback_done() -> void:
 	_pending_reveal.clear()
 	if _check_end():
 		return
+	core.begin_phase(battle, "p")  # Session #3: enemies get their punches back
 	var alive: Array = battle["players"].filter(func(p): return p["alive"])
 	if alive.size() > 0:
 		_select(alive[0])
@@ -958,7 +976,10 @@ func _set_hover_tile(q: int, r: int) -> void:
 	var y := _top_y(int(grid[r][q]["h"]))
 	_hover_tile.position = Vector3(_tx(q), y + 0.03, _tz(r))
 	_hover_tile.visible = true
-	_hover_cost.text = "%d AP" % int(reach_map[key])
+	# Session #3: warn about the free punch for ending next to an enemy
+	var tax: int = core.melee_tax(battle, sel, q, r)
+	_hover_cost.text = ("%d AP  PUNCH -%d" % [int(reach_map[key]), tax]) if tax > 0 else "%d AP" % int(reach_map[key])
+	_hover_cost.modulate = Color("#ff7a5c") if tax > 0 else Color("#ffcf3f")
 	_hover_cost.position = Vector3(_tx(q), y + 0.55, _tz(r))
 	_hover_cost.visible = true
 
@@ -1880,7 +1901,10 @@ func _do_move(q: int, r: int) -> void:
 	if int(sel["status"]["bleed"]) > 0:
 		core.apply_damage(battle, sel, 2)
 		sel["status"]["bleed"] = int(sel["status"]["bleed"]) - 1
-	# a bleed-out on the move can be the last rider standing: reselect + end check
+	# Session #3: ending the move next to an enemy eats their free punch
+	# (gunslinger cqc perk is immune). on_fire("melee") + on_damage do the FX.
+	core.resolve_melee_snap(battle, sel)
+	# a bleed-out / punch on the move can be the last rider standing: reselect + end check
 	_after_action()
 
 # The enemy phase resolves in full inside core.enemy_phase (synchronous, parity

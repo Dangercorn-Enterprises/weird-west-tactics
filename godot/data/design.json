@@ -10,6 +10,7 @@
         "deftness": 2,
         "quickness": 1
       },
+      "cqc": true,
       "weapons": [
         {
           "name": "Peacemaker",
@@ -694,7 +695,13 @@
       "wmin": 6,
       "wmax": 10,
       "behavior": "boss-turret",
-      "boss": true
+      "boss": true,
+      "bossRule": {
+        "id": "conducting_cover",
+        "maxPending": 1,
+        "preEnrageOnly": true,
+        "heavyOnly": false
+      }
     },
     {
       "id": "hollow_man",
@@ -759,6 +766,7 @@
       ],
       "accuracy": 75,
       "cost": 60,
+      "tier": 1,
       "note": "Reliable, cheap."
     },
     {
@@ -771,6 +779,7 @@
       ],
       "accuracy": 70,
       "cost": 120,
+      "tier": 1,
       "note": "Long range, slow."
     },
     {
@@ -783,6 +792,7 @@
       ],
       "accuracy": 65,
       "cost": 110,
+      "tier": 1,
       "note": "Devastating close, bad far."
     },
     {
@@ -795,6 +805,7 @@
       ],
       "accuracy": 80,
       "cost": 100,
+      "tier": 1,
       "note": "Fast, light."
     },
     {
@@ -807,6 +818,7 @@
       ],
       "accuracy": 58,
       "cost": 200,
+      "tier": 3,
       "note": "Ashfall, armor-piercing."
     },
     {
@@ -819,6 +831,7 @@
       ],
       "accuracy": 55,
       "cost": 260,
+      "tier": 3,
       "note": "Heavy, Tinkerer only.",
       "archetype": "tinkerer"
     },
@@ -832,6 +845,7 @@
       ],
       "accuracy": 70,
       "cost": 140,
+      "tier": 2,
       "note": "Ignores cover, Hexslinger only.",
       "archetype": "hexslinger",
       "ignoreCover": true
@@ -843,21 +857,24 @@
       "name": "Leather Duster",
       "def": 2,
       "speed": 0,
-      "cost": 50
+      "cost": 50,
+      "tier": 1
     },
     {
       "id": "reinforced_vest",
       "name": "Reinforced Vest",
       "def": 4,
       "speed": -1,
-      "cost": 120
+      "cost": 120,
+      "tier": 1
     },
     {
       "id": "ashfall_plating",
       "name": "Ashfall Plating",
       "def": 6,
       "speed": -2,
-      "cost": 240
+      "cost": 240,
+      "tier": 1
     },
     {
       "id": "blessed_vestments",
@@ -865,6 +882,7 @@
       "def": 3,
       "speed": 0,
       "cost": 160,
+      "tier": 2,
       "note": "+10% vs divine"
     },
     {
@@ -873,6 +891,7 @@
       "def": 5,
       "speed": 0,
       "cost": 400,
+      "tier": 3,
       "faction": "vulcan",
       "note": "Vulcan-aligned only"
     }
@@ -882,6 +901,7 @@
       "id": "bandages",
       "name": "Bandages",
       "cost": 15,
+      "tier": 1,
       "effect": "heal",
       "amount": 8
     },
@@ -889,6 +909,7 @@
       "id": "ashfall_charge",
       "name": "Ashfall Charge",
       "cost": 40,
+      "tier": 1,
       "effect": "aoe",
       "amount": [
         6,
@@ -900,6 +921,7 @@
       "id": "smelling_salts",
       "name": "Smelling Salts",
       "cost": 25,
+      "tier": 1,
       "effect": "revive",
       "amount": 5
     },
@@ -907,6 +929,8 @@
       "id": "tonic_vigor",
       "name": "Tonic of Vigor",
       "cost": 30,
+      "tier": 2,
+      "unimplemented": true,
       "effect": "buff",
       "stat": "vigor",
       "amount": 2
@@ -915,12 +939,16 @@
       "id": "holy_water",
       "name": "Holy Water",
       "cost": 35,
+      "tier": 2,
+      "unimplemented": true,
       "effect": "antiundead"
     },
     {
       "id": "coyote_dust",
       "name": "Coyote Dust",
       "cost": 50,
+      "tier": 3,
+      "unimplemented": true,
       "effect": "invis",
       "turns": 1
     }
