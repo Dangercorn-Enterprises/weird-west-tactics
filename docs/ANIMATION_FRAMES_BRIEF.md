@@ -70,3 +70,14 @@ done; this is purely an art-pipeline pick.
 1. Pipeline: A pilot first (recommended) / B straight away / C.
 2. Frame count for the walk: 4 or 6.
 3. Views: side only for the first pass (recommended) or all four.
+
+## Pilot result (2026-10-09, Tim picked "A pilot, then B")
+Ran `gen_walk_pilot.py gunslinger` (walk x4) and `--anim attack` (x2) against
+the fleet SDXL on Huginn :8710. Both sheets FAILED the eye test: the model drew
+one large idle figure, a back view, and a column/grid of jumbled miniatures
+instead of a row of frames; the gap slicer found 1 span instead of 4 and fell
+back to equal columns, producing nonsense frames (removed from
+`godot/assets/sprites` so the engine stays on procedural motion). Raw sheets
+and QA strips kept in `assets_raw/walk_pilot/` as the receipt. **Verdict: A is
+out; B (sorceress.games) for the roster.** Tim sets up the account; the frame
+spec above and the engine consumer are unchanged.
