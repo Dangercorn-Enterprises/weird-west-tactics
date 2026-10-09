@@ -66,6 +66,17 @@ var on_damage: Callable = Callable() # optional UI hook (dmg floaters/flash)
 var on_cover_hit: Callable = Callable()
 var on_charge: Callable = Callable() # UI hook (q, r, lit) — lit=true plant, false boom
 var on_summon: Callable = Callable() # UI hook (unit) — a boss kit raised a unit
+# v1.4 feel-pass hooks (2026-10-08). Pure notifications: none of them draws from
+# the RNG or touches state, so parity with the Node harness stays bit-exact.
+#   on_fire(att, def, result)  result = "hit" | "cover" | "miss"; fires BEFORE
+#                              the damage lands so the UI can show the shot first
+#   on_move(u, from_q, from_r, reach)  after a unit's logic position changed;
+#                              reach = the BFS map it was chosen from ({} for a
+#                              blink teleport) so the UI can rebuild the path
+#   on_blast(center)           an area blast is about to resolve at center {q,r}
+var on_fire: Callable = Callable()
+var on_move: Callable = Callable()
+var on_blast: Callable = Callable()
 
 # ---- seeded RNG: exact mulberry32 port so runs are reproducible -------------
 var _rng_state: int = 0
@@ -400,6 +411,8 @@ func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> boo
 	var r: float = rnd() * 100.0
 	if r < float(hit_thru):
 		# HIT UNIT — RNG order preserved: roll_dmg() then crit chance().
+		if on_fire.is_valid():
+			on_fire.call(att, def, "hit")
 		var base_dmg := roll_dmg(att)
 		var is_crit := chance(10.0)
 		var dmg := roundi(float(base_dmg) * float(opts.get("mult", 1.0)) * (1.5 if is_crit else 1.0))
@@ -418,7 +431,11 @@ func do_fire(b: Dictionary, att: Dictionary, def: Dictionary, opts := {}) -> boo
 		# STRIKES COVER — the would-have-hit-bare band. Cover eats the shot and
 		# degrades (light only); the unit is untouched. Misses (r>=bare) touch
 		# nothing, so accuracy-spam can never strip cover.
+		if on_fire.is_valid():
+			on_fire.call(att, def, "cover")
 		strike_cover(b, def["q"], def["r"])
+	elif on_fire.is_valid():
+		on_fire.call(att, def, "miss")
 	return false
 
 # Degrade cover on an absorbed hit. Heavy (chp<0) shrugs off small arms; light
@@ -447,6 +464,8 @@ func tick_status(b: Dictionary, u: Dictionary) -> void:
 			u["status"][k] -= 1
 
 func do_blast(b: Dictionary, center: Dictionary) -> void:
+	if on_blast.is_valid():
+		on_blast.call(center)
 	# Snapshot the caught units BEFORE any damage lands (mirror of doBlast's
 	# filter-then-forEach). apply_damage -> check_boss_phase can append enrage
 	# Risen Dead to b["units"] mid-blast, and a for-in over the live array
@@ -567,8 +586,12 @@ func move_unit_toward(b: Dictionary, u: Dictionary, tgt: Dictionary) -> bool:
 			best = [q, r]
 	if best.size() == 2:
 		u["ap"] -= int(rc["%d,%d" % [best[0], best[1]]])
+		var from_q: int = u["q"]
+		var from_r: int = u["r"]
 		u["q"] = best[0]
 		u["r"] = best[1]
+		if on_move.is_valid():
+			on_move.call(u, from_q, from_r, rc)
 		if u["status"]["bleed"] > 0:
 			apply_damage(b, u, STATUS_DOT["bleed"])
 			u["status"]["bleed"] -= 1
@@ -713,9 +736,13 @@ func enemy_phase(b: Dictionary) -> void:
 							spots.append([q, r])
 				if spots.size() > 0:
 					var s: Array = spots[int(rnd() * spots.size())]
+					var bq: int = e["q"]
+					var br: int = e["r"]
 					e["q"] = s[0]
 					e["r"] = s[1]
 					e["ap"] -= 1
+					if on_move.is_valid():
+						on_move.call(e, bq, br, {}) # {} = blink, no walkable path
 					continue
 			if int(e["ap"]) > 0 and move_unit_toward(b, e, tgt):
 				continue

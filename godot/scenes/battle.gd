@@ -43,6 +43,28 @@ var preview_panel: PanelContainer
 var preview_label: Label
 var _hover_id: Variant = null # unit id currently previewed, to skip redundant rebuilds
 
+# ---- v1.4 feel pass (2026-10-08) state ------------------------------------------
+# CombatCore.enemy_phase resolves the whole enemy turn in one call. Before this
+# pass every floater spawned in that single frame and each enemy then slid in a
+# straight line to wherever it ended up. Now the core's UI hooks RECORD events
+# while it runs, and _play_events() replays them one at a time: walk the real
+# path, lunge, tracer, impact (hit / MISS / COVER), death, blast, summon,
+# charge. Sprites and HP labels are FROZEN during playback so the board never
+# shows the outcome before the shot lands. Nothing here touches combat math.
+var _recording := false
+var _events: Array = []
+var _frozen := {}            # unit id -> true: playback owns sprite + labels
+var _busy := false           # enemy phase playing back: input is blocked
+var _live_tweens: Array = [] # playback tweens, for fast-forward
+var _ff_scale := 1.0
+var _cam_base := Vector3.ZERO
+var _shake_amt := 0.0
+var _hover_tile: MeshInstance3D
+var _hover_cost: Label3D
+var _turn_label: Label
+var _fade: ColorRect
+var _pending_reveal: Array = [] # unit ids built hidden mid-playback (enrage adds)
+
 func _tx(q: int) -> float: return (float(q) - 4.5) * TILE
 func _tz(r: int) -> float: return (float(r) - 4.5) * TILE
 func _top_y(h: int) -> float: return BASE + float(h) * STEP
@@ -55,7 +77,10 @@ func _ready() -> void:
 	core.on_damage = _on_unit_damaged
 	core.on_cover_hit = _on_cover_hit
 	core.on_charge = _on_charge
-	core.on_summon = func(m: Dictionary): _log("%s claws out of the dust!" % m["name"])
+	core.on_summon = _on_summon
+	core.on_fire = _on_fire
+	core.on_move = _on_move
+	core.on_blast = _on_blast
 	params = GS.pending_battle if not GS.pending_battle.is_empty() else {
 		"title": "Skirmish at the Crossing", "biome": "mesa",
 		"enemies": GS.enemies_by_ids(["walkin_dead", "coyote_beast", "forge_sentry", "dust_devil"]),
@@ -70,6 +95,8 @@ func _ready() -> void:
 	_apply_blessing()
 	_select(battle["players"][0])
 	_log("— Your move — (Q/E rotate · Enter end turn)")
+	_fade_in()
+	_show_turn_banner("YOUR TURN", Color("#d4a843"))
 	# boss-aware battle music (mirrors web scene_battle enter(): boss fights get
 	# the tighter, lower "boss" mood; normal skirmishes get "battle").
 	var abus := get_node_or_null("/root/Audio")
@@ -180,8 +207,9 @@ func _build_camera_and_light() -> void:
 func _place_camera() -> void:
 	var dist := 26.0
 	var elev := 0.62
-	cam.position = Vector3(sin(cam_azimuth) * cos(elev) * dist, sin(elev) * dist,
+	_cam_base = Vector3(sin(cam_azimuth) * cos(elev) * dist, sin(elev) * dist,
 		cos(cam_azimuth) * cos(elev) * dist)
+	cam.position = _cam_base
 	cam.look_at(Vector3(0, 0.8, 0))
 
 func _tile_materials(biome_id: String) -> Array:
@@ -307,6 +335,12 @@ func _add_prop(deco: String, q: int, r: int, h: float, big: bool) -> void:
 # still granting cover, so it stays put, only darker and smaller. Deleting on
 # -1 used to lie: the rock vanished while the tile still gave 20%.
 func _on_cover_hit(q: int, r: int, chp_left: int) -> void:
+	if _recording:
+		_events.append({"t": "cover", "q": q, "r": r, "left": chp_left})
+		return
+	_play_cover_hit(q, r, chp_left)
+
+func _play_cover_hit(q: int, r: int, chp_left: int) -> void:
 	var node: Node3D = _cover_props.get("%d,%d" % [q, r])
 	if node == null or not is_instance_valid(node):
 		return
@@ -355,7 +389,7 @@ func _spawn_puff(pos: Vector3, tint: Color) -> void:
 		p.position = pos
 		add_child(p)
 		var dst := pos + Vector3(cos(ang) * 0.35, 0.15 + 0.2 * float(i % 2), sin(ang) * 0.35)
-		var tw := create_tween().set_parallel(true)
+		var tw := _tw().set_parallel(true)
 		tw.tween_property(p, "position", dst, 0.45).set_trans(Tween.TRANS_SINE)
 		tw.tween_property(p, "modulate:a", 0.0, 0.45)
 		tw.tween_property(p, "scale", Vector3(2.2, 2.2, 2.2), 0.45)
@@ -378,6 +412,12 @@ func _blob_texture() -> ImageTexture:
 var _charge_props := {}
 
 func _on_charge(q: int, r: int, lit: bool) -> void:
+	if _recording:
+		_events.append({"t": "charge", "q": q, "r": r, "lit": lit})
+		return
+	_play_charge(q, r, lit)
+
+func _play_charge(q: int, r: int, lit: bool) -> void:
 	var key := "%d,%d" % [q, r]
 	if lit:
 		var mi := MeshInstance3D.new()
@@ -406,6 +446,7 @@ func _on_charge(q: int, r: int, lit: bool) -> void:
 			tw.tween_callback(node.queue_free)
 		_charge_props.erase(key)
 		_log("The dynamite goes off!")
+		# the blast burst itself (puff, shake, sfx) comes from on_blast right after
 
 func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -423,33 +464,48 @@ func _add_ground_shadow(pos: Vector3, size: float) -> MeshInstance3D:
 	return mi
 
 # ---- damage feedback: floaters + hit flash ------------------------------------
+# apply_damage has already subtracted hp when this fires, so hp <= 0 here means
+# this hit is the killing one (the core flips alive=false right after).
 func _on_unit_damaged(u: Dictionary, dmg: int, crit := false) -> void:
+	var dead: bool = int(u["hp"]) <= 0
+	if _recording:
+		_events.append({"t": "hit", "u": u, "dmg": dmg, "crit": crit, "dead": dead})
+		return
+	_play_hit(u, dmg, crit, dead)
+
+func _play_hit(u: Dictionary, dmg: int, crit: bool, dead: bool) -> void:
 	var abus := get_node_or_null("/root/Audio")
-	if abus:
-		abus.sfx("shot")
-		if dmg > 0:
-			abus.sfx("hit")
-			if crit:
-				abus.sfx("blast") # extra punch on a crit
+	if abus and dmg > 0:
+		abus.sfx("hit")
+		if crit:
+			abus.sfx("blast", 0.6) # extra punch on a crit
 	var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
 	# Crit: amber "CRIT -N" floater regardless of side; normal hits keep the
 	# red(player)/gold(enemy) convention.
 	var col := Color("#ffcf3f") if crit else (Color("#c0392b") if u["side"] == "p" else Color("#d4a843"))
 	_floater(("CRIT -%d" % dmg) if crit else "-%d" % dmg,
 		Vector3(_tx(u["q"]), y + 1.7, _tz(u["r"])), col, crit)
+	_shake(0.12 if crit else 0.05)
+	if crit or dead:
+		_hitstop(0.07 if crit else 0.05)
 	if unit_nodes.has(u["id"]):
-		var spr: Sprite3D = unit_nodes[u["id"]]["sprite"]
+		var n: Dictionary = unit_nodes[u["id"]]
+		var spr: Sprite3D = n["sprite"]
+		if _frozen.has(u["id"]):
+			n["label"].text = "%d" % maxi(0, int(u["hp"])) # playback keeps the HP honest
 		spr.modulate = Color(5, 4.2, 2) if crit else Color(3, 3, 3) # brighter amber flash on crit
-		var tw := create_tween()
+		var tw := _tw()
 		tw.tween_property(spr, "modulate", Color.WHITE, 0.42 if crit else 0.28)
 		if crit:
 			# localized hitstop feel: a quick scale-punch on the struck sprite
 			# (no global time_scale, so it never fights the tween-based movement)
 			var base_scale: Vector3 = spr.scale if not spr.has_meta("base_scale") else spr.get_meta("base_scale")
 			spr.set_meta("base_scale", base_scale)
-			var pt := create_tween()
+			var pt := _tw()
 			pt.tween_property(spr, "scale", base_scale * 1.28, 0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			pt.tween_property(spr, "scale", base_scale, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		if dead:
+			_animate_death(u)
 
 func _floater(text: String, pos: Vector3, col: Color, crit := false) -> void:
 	var l := Label3D.new()
@@ -463,11 +519,463 @@ func _floater(text: String, pos: Vector3, col: Color, crit := false) -> void:
 	add_child(l)
 	var rise := 1.2 if crit else 0.9
 	var dur := 1.15 if crit else 0.9
-	var tw := create_tween()
+	var tw := _tw()
 	tw.set_parallel(true)
 	tw.tween_property(l, "position:y", pos.y + rise, dur)
 	tw.tween_property(l, "modulate:a", 0.0, dur).set_delay(0.3 if crit else 0.25)
 	tw.chain().tween_callback(l.queue_free)
+
+# ---- v1.4 feel pass: shot / move / blast / summon feedback ------------------------
+# Every create_tween() that belongs to battle feedback goes through _tw() so
+# fast-forward (any key or click during the enemy phase) can speed them all up.
+func _tw() -> Tween:
+	var t := create_tween()
+	if _busy:
+		t.set_speed_scale(_ff_scale)
+		_live_tweens.append(t)
+	return t
+
+func _unit_world(u: Dictionary) -> Vector3:
+	# the sprite's CURRENT world spot when playback owns it (it may be mid-path),
+	# else the logic tile
+	if unit_nodes.has(u["id"]) and _frozen.has(u["id"]):
+		var spr: Sprite3D = unit_nodes[u["id"]]["sprite"]
+		var half := float(unit_nodes[u["id"]].get("half", 0.7))
+		return Vector3(spr.position.x, spr.position.y - half, spr.position.z)
+	return Vector3(_tx(int(u["q"])), _top_y(int(grid[int(u["r"])][int(u["q"])]["h"])), _tz(int(u["r"])))
+
+# CombatCore.on_fire(att, def, result): a shot has been resolved (hit/cover/miss)
+# but the damage, if any, has not landed yet.
+func _on_fire(att: Dictionary, def: Dictionary, result: String) -> void:
+	if _recording:
+		_events.append({"t": "fire", "att": att, "def": def, "result": result})
+		return
+	_play_fire(att, def, result)
+
+func _play_fire(att: Dictionary, def: Dictionary, result: String) -> void:
+	var a := _unit_world(att)
+	var b := _unit_world(def)
+	var ah := 0.95 if att.get("boss", false) else 0.8
+	var bh := 0.95 if def.get("boss", false) else 0.8
+	_spawn_muzzle(a + Vector3(0, ah, 0) + (b - a).normalized() * 0.3)
+	_spawn_tracer(a + Vector3(0, ah, 0), b + Vector3(0, bh, 0))
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		abus.sfx("shot")
+	if result == "miss":
+		_floater("MISS", b + Vector3(0, 1.7, 0), Color("#b8b0a4"))
+		if abus:
+			abus.sfx("miss")
+	elif result == "cover":
+		# heavy cover absorbing a shot had NO feedback at all before (strike_cover
+		# returns early for chp<0, so on_cover_hit never fires for rock/wall)
+		_floater("COVER", b + Vector3(0, 1.7, 0), Color("#c9b89a"))
+		_spawn_puff(b + Vector3(0, 0.35, 0), Color("#8a8078"))
+		if abus:
+			abus.sfx("miss", 0.7)
+
+func _spawn_tracer(a: Vector3, b: Vector3) -> void:
+	var len := a.distance_to(b)
+	if len < 0.05:
+		return
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.035, 0.035, len)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.93, 0.62, 0.95)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.8, 0.4)
+	mat.emission_energy_multiplier = 1.6
+	bm.material = mat
+	mi.mesh = bm
+	add_child(mi)
+	mi.position = (a + b) * 0.5
+	mi.look_at(b, Vector3.UP)
+	mi.scale = Vector3(1, 1, 0.15)
+	var tw := _tw()
+	tw.tween_property(mi, "scale", Vector3.ONE, 0.05)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.14)
+	tw.tween_callback(mi.queue_free)
+
+func _spawn_muzzle(pos: Vector3) -> void:
+	var p := Sprite3D.new()
+	p.texture = _blob_texture()
+	p.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	p.shaded = false
+	p.modulate = Color(1.0, 0.9, 0.5, 1.0)
+	p.pixel_size = 0.004
+	p.position = pos
+	p.scale = Vector3(0.6, 0.6, 0.6)
+	add_child(p)
+	var tw := _tw().set_parallel(true)
+	tw.tween_property(p, "scale", Vector3(1.6, 1.6, 1.6), 0.09)
+	tw.tween_property(p, "modulate:a", 0.0, 0.11)
+	tw.chain().tween_callback(p.queue_free)
+
+# CombatCore.on_move(u, from_q, from_r, reach): the unit's logic tile changed.
+func _on_move(u: Dictionary, from_q: int, from_r: int, reach: Dictionary) -> void:
+	var path: Array = []
+	if not reach.is_empty():
+		path = path_from_reach(reach, from_q, from_r, int(u["q"]), int(u["r"]))
+	_moved_ids[u["id"]] = true
+	if _recording:
+		_events.append({"t": "move", "u": u, "from": [from_q, from_r],
+			"to": [int(u["q"]), int(u["r"])], "path": path, "blink": reach.is_empty()})
+		return
+	_play_move(u, from_q, from_r, path, reach.is_empty())
+
+var _moved_ids := {} # enemy ids that moved this phase (facing fix-up at the end)
+
+func _play_move(u: Dictionary, from_q: int, from_r: int, path: Array, blink: bool) -> void:
+	if blink or path.is_empty():
+		_animate_blink(u, from_q, from_r)
+		return
+	_animate_move(u, from_q, from_r, path)
+
+# A blinker (Dust Devil) vanishes in a puff and reappears on its new tile.
+func _animate_blink(u: Dictionary, from_q: int, from_r: int) -> void:
+	if not unit_nodes.has(u["id"]):
+		return
+	var id: Variant = u["id"]
+	var n: Dictionary = unit_nodes[id]
+	var spr: Sprite3D = n["sprite"]
+	var half := float(n.get("half", 0.7))
+	var a := Vector3(_tx(from_q), _top_y(int(grid[from_r][from_q]["h"])), _tz(from_r))
+	var b := Vector3(_tx(int(u["q"])), _top_y(int(grid[int(u["r"])][int(u["q"])]["h"])), _tz(int(u["r"])))
+	_animating[id] = true
+	_spawn_puff(a + Vector3(0, 0.4, 0), Color("#b07de0"))
+	var tw := _tw()
+	tw.tween_property(spr, "modulate:a", 0.0, 0.1)
+	tw.tween_callback(func():
+		_anim_glide(1.0, id, a, b, 0.0)
+		n["base_y"] = b.y + half
+		_spawn_puff(b + Vector3(0, 0.4, 0), Color("#b07de0")))
+	tw.tween_interval(0.06)
+	tw.tween_property(spr, "modulate:a", 1.0, 0.1)
+	tw.tween_callback(func():
+		_animating.erase(id)
+		_sync_units())
+
+# CombatCore.on_blast(center): an area blast resolves here.
+func _on_blast(center: Dictionary) -> void:
+	if _recording:
+		_events.append({"t": "blast", "q": int(center["q"]), "r": int(center["r"])})
+		return
+	_play_blast(int(center["q"]), int(center["r"]))
+
+func _play_blast(q: int, r: int) -> void:
+	var pos := Vector3(_tx(q), _top_y(int(grid[r][q]["h"])) + 0.3, _tz(r))
+	_spawn_burst(pos)
+	_shake(0.14)
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		abus.sfx("blast")
+
+func _spawn_burst(pos: Vector3) -> void:
+	var flash := Sprite3D.new()
+	flash.texture = _blob_texture()
+	flash.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	flash.shaded = false
+	flash.modulate = Color(1.0, 0.85, 0.45, 1.0)
+	flash.pixel_size = 0.012
+	flash.position = pos
+	flash.scale = Vector3(0.5, 0.5, 0.5)
+	add_child(flash)
+	var ft := _tw().set_parallel(true)
+	ft.tween_property(flash, "scale", Vector3(2.6, 2.6, 2.6), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ft.tween_property(flash, "modulate:a", 0.0, 0.22)
+	ft.chain().tween_callback(flash.queue_free)
+	for i in 9:
+		var p := Sprite3D.new()
+		p.texture = _blob_texture()
+		p.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		p.shaded = false
+		p.modulate = Color("#e8823a") if i % 3 == 0 else Color("#7a6a5a")
+		p.pixel_size = 0.007
+		p.position = pos
+		add_child(p)
+		var ang := float(i) * TAU / 9.0
+		var dst := pos + Vector3(cos(ang) * 0.9, 0.3 + 0.35 * float(i % 3), sin(ang) * 0.9)
+		var tw := _tw().set_parallel(true)
+		tw.tween_property(p, "position", dst, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(p, "modulate:a", 0.0, 0.5)
+		tw.tween_property(p, "scale", Vector3(2.4, 2.4, 2.4), 0.5)
+		tw.chain().tween_callback(p.queue_free)
+
+# CombatCore.on_summon(unit): a boss kit raised a unit mid-phase.
+func _on_summon(m: Dictionary) -> void:
+	if _recording:
+		# build it now (so _sync_units never pops it in early) but keep it hidden
+		# and frozen until its event plays
+		if not unit_nodes.has(m["id"]):
+			_build_unit_node(m)
+		_hide_unit_node(m["id"])
+		_frozen[m["id"]] = true
+		_events.append({"t": "summon", "u": m})
+		return
+	_play_summon(m)
+
+func _hide_unit_node(id: Variant) -> void:
+	var n: Dictionary = unit_nodes[id]
+	for k in ["sprite", "label", "status", "shadow"]:
+		if n.has(k):
+			n[k].visible = false
+
+func _play_summon(m: Dictionary) -> void:
+	_log("%s claws out of the dust!" % m["name"])
+	if not unit_nodes.has(m["id"]):
+		_build_unit_node(m)
+	var n: Dictionary = unit_nodes[m["id"]]
+	var spr: Sprite3D = n["sprite"]
+	var y := _top_y(int(grid[int(m["r"])][int(m["q"])]["h"]))
+	var half := float(n.get("half", 0.7))
+	spr.position = Vector3(_tx(int(m["q"])), y + half, _tz(int(m["r"])))
+	n["base_y"] = spr.position.y
+	n["label"].position = Vector3(_tx(int(m["q"])), y + 1.6, _tz(int(m["r"])))
+	n["label"].text = "%d" % maxi(0, int(m["hp"]))
+	if n.has("shadow"):
+		n["shadow"].position = Vector3(_tx(int(m["q"])), y + 0.012, _tz(int(m["r"])))
+		n["shadow"].visible = true
+	_spawn_puff(Vector3(_tx(int(m["q"])), y + 0.3, _tz(int(m["r"]))), Color("#6a5a4a"))
+	spr.visible = true
+	n["label"].visible = true
+	var base: Vector3 = spr.get_meta("base_scale") if spr.has_meta("base_scale") else spr.scale
+	spr.set_meta("base_scale", base)
+	spr.scale = Vector3(base.x, 0.05, base.z)
+	var tw := _tw()
+	tw.tween_property(spr, "scale", base, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+# Death: the sprite used to vanish on the same frame as the floater. Now it
+# flashes, drops, squashes flat and fades while its shadow shrinks; the
+# animation lock keeps _sync_units from hiding it early. Works for revives too
+# (modulate/scale restored before the hide).
+func _animate_death(u: Dictionary) -> void:
+	if not unit_nodes.has(u["id"]):
+		return
+	var id: Variant = u["id"]
+	var n: Dictionary = unit_nodes[id]
+	var spr: Sprite3D = n["sprite"]
+	_animating[id] = true
+	n["label"].visible = false
+	if n.has("status"):
+		n["status"].visible = false
+	n["ring"].visible = false
+	var base: Vector3 = spr.get_meta("base_scale") if spr.has_meta("base_scale") else spr.scale
+	spr.set_meta("base_scale", base)
+	var foot := spr.position
+	foot.y -= float(n.get("half", 0.7))
+	_spawn_puff(foot + Vector3(0, 0.25, 0), Color("#7a6a5a"))
+	_shake(0.07)
+	var tw := _tw().set_parallel(true)
+	tw.tween_property(spr, "scale", Vector3(base.x * 1.25, base.y * 0.12, base.z), 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN).set_delay(0.1)
+	tw.tween_property(spr, "position:y", spr.position.y - float(n.get("half", 0.7)) * 0.85, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN).set_delay(0.1)
+	tw.tween_property(spr, "modulate", Color(0.35, 0.3, 0.3, 0.0), 0.5).set_delay(0.15)
+	if n.has("shadow"):
+		tw.tween_property(n["shadow"], "scale", Vector3(0.05, 1.0, 0.05), 0.5)
+	tw.chain().tween_callback(func():
+		spr.visible = false
+		spr.modulate = Color.WHITE
+		spr.scale = base
+		if n.has("shadow"):
+			n["shadow"].scale = Vector3.ONE
+			n["shadow"].visible = false
+		_animating.erase(id)
+		_sync_units())
+
+# ---- camera shake + hit-stop --------------------------------------------------------
+func _shake(amount: float) -> void:
+	_shake_amt = maxf(_shake_amt, amount)
+
+# A few frames of near-freeze on crits and kills. SceneTreeTimer with
+# ignore_time_scale so the release never depends on the slowed clock.
+func _hitstop(sec: float) -> void:
+	if Engine.time_scale < 0.99:
+		return # one at a time
+	Engine.time_scale = 0.06
+	var t := get_tree().create_timer(sec, true, false, true)
+	t.timeout.connect(func(): Engine.time_scale = 1.0)
+
+# ---- turn banner / scene fade ---------------------------------------------------------
+func _show_turn_banner(text: String, col: Color) -> void:
+	if _turn_label == null:
+		return
+	_turn_label.text = text
+	_turn_label.modulate = Color(col.r, col.g, col.b, 0.0)
+	_turn_label.visible = true
+	_turn_label.pivot_offset = _turn_label.size * 0.5
+	_turn_label.scale = Vector2(0.9, 0.9)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(_turn_label, "modulate:a", 1.0, 0.16)
+	tw.tween_property(_turn_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_interval(0.55)
+	tw.chain().tween_property(_turn_label, "modulate:a", 0.0, 0.3)
+	tw.chain().tween_callback(func(): _turn_label.visible = false)
+
+func _fade_in() -> void:
+	if _fade == null:
+		return
+	_fade.visible = true
+	_fade.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_property(_fade, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(func(): _fade.visible = false)
+
+func _fade_out_then(cb: Callable) -> void:
+	if _fade == null:
+		cb.call()
+		return
+	_fade.visible = true
+	_fade.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(_fade, "modulate:a", 1.0, 0.3)
+	tw.tween_callback(cb)
+
+# ---- enemy-phase playback ------------------------------------------------------------
+# Walk the recorded event list with one chained tween: each event starts its
+# own effect and the chain waits the right beat before the next one.
+func _play_events() -> void:
+	_busy = true
+	_ff_scale = 1.0
+	_live_tweens.clear()
+	var chain := create_tween()
+	_live_tweens.append(chain)
+	var waited := 0.0
+	for ev in _events:
+		match str(ev["t"]):
+			"move":
+				chain.tween_callback(_play_move.bind(ev["u"], ev["from"][0], ev["from"][1], ev["path"], ev["blink"]))
+				var beat: float = 0.3 if ev["blink"] or ev["path"].is_empty() else 0.13 * float(ev["path"].size()) + 0.06
+				chain.tween_interval(beat)
+				waited += beat
+			"fire":
+				chain.tween_callback(_face_and_lunge.bind(ev["att"], ev["def"]))
+				chain.tween_interval(0.09)
+				chain.tween_callback(_play_fire.bind(ev["att"], ev["def"], str(ev["result"])))
+				chain.tween_interval(0.24 if ev["result"] == "hit" else 0.34)
+				waited += 0.43
+			"hit":
+				chain.tween_callback(_play_hit.bind(ev["u"], int(ev["dmg"]), bool(ev["crit"]), bool(ev["dead"])))
+				var beat2: float = 0.55 if ev["dead"] else 0.14
+				chain.tween_interval(beat2)
+				waited += beat2
+			"cover":
+				chain.tween_callback(_play_cover_hit.bind(int(ev["q"]), int(ev["r"]), int(ev["left"])))
+				chain.tween_interval(0.12)
+				waited += 0.12
+			"charge":
+				chain.tween_callback(_play_charge.bind(int(ev["q"]), int(ev["r"]), bool(ev["lit"])))
+				chain.tween_interval(0.26 if ev["lit"] else 0.12)
+				waited += 0.26
+			"blast":
+				chain.tween_callback(_play_blast.bind(int(ev["q"]), int(ev["r"])))
+				chain.tween_interval(0.3)
+				waited += 0.3
+			"summon":
+				chain.tween_callback(_play_summon.bind(ev["u"]))
+				chain.tween_interval(0.36)
+				waited += 0.36
+	if waited <= 0.0:
+		chain.tween_interval(0.05)
+	chain.tween_callback(_playback_done)
+
+func _face_and_lunge(att: Dictionary, def: Dictionary) -> void:
+	att["facing"] = Vector2(int(def["q"]) - int(att["q"]), int(def["r"]) - int(att["r"])).normalized()
+	if int(def["q"]) == int(att["q"]) and int(def["r"]) == int(att["r"]):
+		att["facing"] = Vector2(-1, 0)
+	_animate_lunge(att, def)
+
+func _fast_forward() -> void:
+	if not _busy:
+		return
+	_ff_scale = 4.0
+	for t in _live_tweens:
+		if is_instance_valid(t) and t.is_valid():
+			t.set_speed_scale(_ff_scale)
+
+func _playback_done() -> void:
+	_events.clear()
+	_frozen.clear()
+	_live_tweens.clear()
+	_busy = false
+	_ff_scale = 1.0
+	# enemies that never moved square up to the nearest rider
+	for e in battle["enemies"]:
+		if not e["alive"] or _moved_ids.has(e["id"]):
+			continue
+		var best := {}
+		var bd := 9999
+		for pl in battle["players"]:
+			if pl["alive"] and core.dist(e, pl) < bd:
+				bd = core.dist(e, pl)
+				best = pl
+		if not best.is_empty():
+			e["facing"] = Vector2(int(best["q"]) - int(e["q"]), int(best["r"]) - int(e["r"])).normalized()
+	_sync_units()
+	for id in _pending_reveal:
+		if unit_nodes.has(id):
+			for u in battle["units"]:
+				if u["id"] == id and u["alive"]:
+					_play_summon(u)
+	_pending_reveal.clear()
+	if _check_end():
+		return
+	var alive: Array = battle["players"].filter(func(p): return p["alive"])
+	if alive.size() > 0:
+		_select(alive[0])
+		_log("— Your move —")
+		_show_turn_banner("YOUR TURN", Color("#d4a843"))
+
+# ---- hover tile (reachable tile under the mouse + its AP cost) -------------------------
+func _build_feel_nodes() -> void:
+	_hover_tile = MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(0.94, 0.94)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.83, 0.66, 0.26, 0.55)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pm.material = mat
+	_hover_tile.mesh = pm
+	_hover_tile.visible = false
+	add_child(_hover_tile)
+	_hover_cost = Label3D.new()
+	_hover_cost.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_hover_cost.font_size = 34
+	_hover_cost.pixel_size = 0.006
+	_hover_cost.outline_size = 8
+	_hover_cost.modulate = Color("#ffcf3f")
+	_hover_cost.visible = false
+	add_child(_hover_cost)
+
+func _set_hover_tile(q: int, r: int) -> void:
+	var key := "%d,%d" % [q, r]
+	if _hover_tile == null or sel.is_empty() or pending_ability != "" or pending_item != "" \
+		or _busy or not reach_map.has(key):
+		_clear_hover_tile()
+		return
+	var y := _top_y(int(grid[r][q]["h"]))
+	_hover_tile.position = Vector3(_tx(q), y + 0.03, _tz(r))
+	_hover_tile.visible = true
+	_hover_cost.text = "%d AP" % int(reach_map[key])
+	_hover_cost.position = Vector3(_tx(q), y + 0.55, _tz(r))
+	_hover_cost.visible = true
+
+func _clear_hover_tile() -> void:
+	if _hover_tile:
+		_hover_tile.visible = false
+	if _hover_cost:
+		_hover_cost.visible = false
+
+func _tile_at_screen(screen_pos: Vector2) -> Array:
+	var from := cam.project_ray_origin(screen_pos)
+	var dir := cam.project_ray_normal(screen_pos)
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 100.0)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or not hit["collider"].has_meta("q"):
+		return []
+	return [int(hit["collider"].get_meta("q")), int(hit["collider"].get_meta("r"))]
 
 # ---- movement / attack animation (v1.3 juice pass) --------------------------------
 # Procedural motion on the existing facing sprites: tiled walk with a hop arc,
@@ -517,14 +1025,16 @@ func _animate_move(u: Dictionary, from_q: int, from_r: int, path: Array) -> void
 	var id: Variant = u["id"]
 	_animating[id] = true
 	unit_nodes[id]["ring"].visible = false
-	var tw := create_tween()
+	var tw := _tw()
 	var pq := from_q
 	var pr := from_r
+	var last := Vector3.ZERO
 	for step in path:
 		var sq: int = step[0]
 		var sr: int = step[1]
 		var a := Vector3(_tx(pq), _top_y(int(grid[pr][pq]["h"])), _tz(pr))
 		var b := Vector3(_tx(sq), _top_y(int(grid[sr][sq]["h"])), _tz(sr))
+		last = b
 		var fdir := Vector2(sq - pq, sr - pr)
 		tw.tween_callback(func(): u["facing"] = fdir)
 		tw.tween_method(_anim_glide.bind(id, a, b, 0.14), 0.0, 1.0, 0.13)
@@ -532,6 +1042,10 @@ func _animate_move(u: Dictionary, from_q: int, from_r: int, path: Array) -> void
 		pr = sr
 	tw.tween_callback(func():
 		_animating.erase(id)
+		if _frozen.has(id) and unit_nodes.has(id):
+			# playback owns the sprite: _sync_units won't touch it, so the idle
+			# bob needs the rest height of the tile it just reached
+			unit_nodes[id]["base_y"] = last.y + float(unit_nodes[id].get("half", 0.7))
 		_sync_units())
 
 func _animate_lunge(att: Dictionary, tgt: Dictionary) -> void:
@@ -548,26 +1062,10 @@ func _animate_lunge(att: Dictionary, tgt: Dictionary) -> void:
 	var dirv := to - origin
 	dirv.y = 0.0
 	var push := dirv.normalized() * 0.26 if dirv.length() > 0.01 else Vector3.ZERO
-	var tw := create_tween()
+	var tw := _tw()
 	tw.tween_property(spr, "position", origin + push, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(spr, "position", origin, 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func(): _animating.erase(id))
-
-func _animate_enemy_slide(e: Dictionary, from_q: int, from_r: int, delay: float) -> void:
-	if not unit_nodes.has(e["id"]) or _animating.has(e["id"]):
-		return
-	var id: Variant = e["id"]
-	_animating[id] = true
-	var a := Vector3(_tx(from_q), _top_y(int(grid[from_r][from_q]["h"])), _tz(from_r))
-	var b := Vector3(_tx(int(e["q"])), _top_y(int(grid[int(e["r"])][int(e["q"])]["h"])), _tz(int(e["r"])))
-	var tw := create_tween()
-	if delay > 0.0:
-		tw.tween_interval(delay)
-	var dur := clampf(0.11 * a.distance_to(b), 0.14, 0.5)
-	tw.tween_method(_anim_glide.bind(id, a, b, 0.1), 0.0, 1.0, dur)
-	tw.tween_callback(func():
-		_animating.erase(id)
-		_sync_units())
 
 # ---- status effect readout ----------------------------------------------------
 # Neither the web nor the old Godot build showed WHO is burning/bleeding/
@@ -691,6 +1189,9 @@ func _sync_units() -> void:
 			continue # boss-phase summons get nodes on demand below
 		if _animating.has(u["id"]):
 			continue # a tween owns this sprite right now
+		if _frozen.has(u["id"]):
+			unit_nodes[u["id"]]["ring"].visible = false
+			continue # enemy-phase playback owns sprite, label and status readout
 		var n: Dictionary = unit_nodes[u["id"]]
 		var y := _top_y(int(grid[u["r"]][u["q"]]["h"]))
 		var half := 1.07 if u.get("boss", false) else 0.7
@@ -713,10 +1214,16 @@ func _sync_units() -> void:
 			slbl.visible = u["alive"] and sd["text"] != ""
 		n["ring"].position = Vector3(_tx(u["q"]), y + 0.03, _tz(u["r"]))
 		n["ring"].visible = u["alive"] and not sel.is_empty() and u["id"] == sel.get("id")
-	# boss-phase summons (Risen Dead) appear mid-fight
+	# boss-phase summons (Risen Dead) appear mid-fight. Enrage adds have no
+	# on_summon event: built here, and during playback kept hidden + frozen
+	# until _playback_done pops them in.
 	for u in battle["units"]:
 		if not unit_nodes.has(u["id"]):
 			_build_unit_node(u)
+			if _busy:
+				_hide_unit_node(u["id"])
+				_frozen[u["id"]] = true
+				_pending_reveal.append(u["id"])
 
 func _build_unit_node(u: Dictionary) -> void:
 	u["facing"] = Vector2(-1, 0)
@@ -741,7 +1248,9 @@ func _build_unit_node(u: Dictionary) -> void:
 	add_child(ring)
 	var status := _make_status_label()
 	add_child(status)
-	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "status": status, "half": 0.7}
+	var shadow := _add_ground_shadow(Vector3.ZERO, 0.5)
+	unit_nodes[u["id"]] = {"sprite": spr, "label": lbl, "ring": ring, "status": status,
+		"shadow": shadow, "half": 0.7}
 
 # ---- HUD ---------------------------------------------------------------------------
 func _build_hud() -> void:
@@ -798,6 +1307,27 @@ func _build_hud() -> void:
 	preview_label.add_theme_font_size_override("font_size", 16)
 	preview_panel.add_child(preview_label)
 	hud.add_child(preview_panel)
+	# turn banner: a headline that pops in on every phase change, upper third
+	_turn_label = Label.new()
+	_turn_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_turn_label.offset_top = 112.0
+	_turn_label.offset_bottom = 172.0
+	_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_turn_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_turn_label.visible = false
+	GS.headline(_turn_label, 44)
+	hud.add_child(_turn_label)
+	# scene fade (own layer above the HUD)
+	var fl := CanvasLayer.new()
+	fl.layer = 10
+	add_child(fl)
+	_fade = ColorRect.new()
+	_fade.color = Color(0.03, 0.02, 0.01, 1.0)
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.visible = false
+	fl.add_child(_fade)
+	_build_feel_nodes()
 	# story beat intro (narrative overlay shown before the first move)
 	if params.get("intro", "") != "":
 		intro_open = true
@@ -914,6 +1444,10 @@ func _choose_ability(aname: String) -> void:
 			who = alive[0]
 		sel["ap"] = int(sel["ap"]) - 2
 		var amt: int = 6 + core.randint(0, 4)
+		var abus := get_node_or_null("/root/Audio")
+		if abus:
+			abus.sfx("heal")
+		_floater("+%d" % amt, _unit_world(who) + Vector3(0, 1.7, 0), Color("#4ecdc4"))
 		if not who["alive"]:
 			who["alive"] = true
 			who["hp"] = amt
@@ -935,6 +1469,10 @@ func _use_item(id: String) -> void:
 		GS.state["inventory"][id] = int(GS.state["inventory"][id]) - 1
 		sel["hp"] = mini(int(sel["maxHp"]), int(sel["hp"]) + 8)
 		GS.save_game()
+		var abus := get_node_or_null("/root/Audio")
+		if abus:
+			abus.sfx("heal")
+		_floater("+8", _unit_world(sel) + Vector3(0, 1.7, 0), Color("#4ecdc4"))
 		_log("%s ties off the wound (+8)." % sel["name"])
 		_after_action()
 	elif id == "smelling_salts":
@@ -1018,6 +1556,10 @@ func _cast_divine(target: Dictionary) -> void:
 	_sync_favor(battle["players"])
 	var a: String = sel["divine"]
 	_log("%s channels %s%s" % [sel["name"], a, " — EMPOWERED!" if emp else "!"])
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		abus.sfx("divine")
+	_shake(0.1)
 	if core.DIVINE_BLAST.has(a):
 		core.do_blast(battle, target)
 		core.do_blast(battle, target)
@@ -1114,14 +1656,25 @@ func _preview_text(p: Dictionary) -> String:
 func _update_preview(screen_pos: Vector2) -> void:
 	if preview_panel == null:
 		return
-	var hide: bool = ended or intro_open or sel.is_empty() or not sel.get("alive", false) or sel.get("side") != "p"
+	var hide: bool = ended or intro_open or _busy or sel.is_empty() or not sel.get("alive", false) or sel.get("side") != "p"
 	var occ := {}
+	var tile: Array = []
 	if not hide:
-		occ = _unit_at_screen(screen_pos)
+		tile = _tile_at_screen(screen_pos)
+		if not tile.is_empty():
+			for u in battle["units"]:
+				if u["alive"] and u["q"] == tile[0] and u["r"] == tile[1]:
+					occ = u
+					break
 	if occ.is_empty() or occ.get("side") != "e" or not occ.get("alive", false):
 		preview_panel.visible = false
 		_hover_id = null
+		if not hide and not tile.is_empty() and occ.is_empty():
+			_set_hover_tile(tile[0], tile[1])
+		else:
+			_clear_hover_tile()
 		return
+	_clear_hover_tile()
 	var p := combat_preview(sel, occ, pending_ability)
 	preview_label.text = _preview_text(p)
 	preview_panel.visible = true
@@ -1179,6 +1732,17 @@ func _refresh_highlights() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if ended or intro_open:
 		return
+	if _busy:
+		# enemy phase playing back: any key or click fast-forwards it (Q/E still turn)
+		if event is InputEventKey and event.pressed and not event.echo:
+			match event.keycode:
+				KEY_Q: cam_target_azimuth -= PI / 2
+				KEY_E: cam_target_azimuth += PI / 2
+				KEY_ESCAPE: pass # falls through to the PauseMenu autoload
+				_: _fast_forward()
+		elif event is InputEventMouseButton and event.pressed:
+			_fast_forward()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_Q: cam_target_azimuth -= PI / 2
@@ -1200,8 +1764,17 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	var d := cam_target_azimuth - cam_azimuth
 	if absf(d) > 0.0005:
-		cam_azimuth += d * 0.14
+		# frame-rate independent exponential approach (was a fixed 0.14/frame:
+		# twice as fast at 120 Hz as at 60)
+		cam_azimuth += d * (1.0 - exp(-9.0 * _delta))
 		_place_camera()
+	if _shake_amt > 0.004:
+		var j := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake_amt
+		cam.position = _cam_base + j
+		_shake_amt *= exp(-11.0 * _delta)
+	elif _shake_amt > 0.0:
+		_shake_amt = 0.0
+		cam.position = _cam_base
 	_update_facings()
 	# idle breathing: subtle bob around the synced rest height, phase per unit
 	_anim_time += _delta
@@ -1249,14 +1822,14 @@ func _update_facings() -> void:
 			spr.set_meta("view", view)
 
 func _click(screen_pos: Vector2) -> void:
-	var from := cam.project_ray_origin(screen_pos)
-	var dir := cam.project_ray_normal(screen_pos)
-	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 100.0)
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty() or not hit["collider"].has_meta("q"):
+	if _busy:
 		return
-	var q: int = hit["collider"].get_meta("q")
-	var r: int = hit["collider"].get_meta("r")
+	var tile := _tile_at_screen(screen_pos)
+	if tile.is_empty():
+		return
+	var q: int = tile[0]
+	var r: int = tile[1]
+	_clear_hover_tile()
 	var occ := {}
 	for u in battle["units"]:
 		if u["alive"] and u["q"] == q and u["r"] == r:
@@ -1310,50 +1883,34 @@ func _do_move(q: int, r: int) -> void:
 	# a bleed-out on the move can be the last rider standing: reselect + end check
 	_after_action()
 
+# The enemy phase resolves in full inside core.enemy_phase (synchronous, parity
+# tested). The UI hooks record every move / shot / hit / blast / summon while it
+# runs, then _play_events replays them in order. Player AP refill and status
+# ticks (burn floaters) happen inside the recording window too, so they play in
+# sequence; _playback_done does the end check and hands the turn back.
 func _end_turn() -> void:
-	if ended:
+	if ended or _busy:
 		return
 	_log("Enemies stir...")
-	var pre := {}
-	for e in battle["enemies"]:
-		pre[e["id"]] = Vector2(e["q"], e["r"])
+	_clear_hover_tile()
+	_show_turn_banner("ENEMY TURN", Color("#c0392b"))
+	_events.clear()
+	_moved_ids.clear()
+	_frozen.clear()
+	for u in battle["units"]:
+		if unit_nodes.has(u["id"]):
+			_frozen[u["id"]] = true
+			unit_nodes[u["id"]]["ring"].visible = false
+	_busy = true
+	_recording = true
 	core.enemy_phase(battle)
-	for e in battle["enemies"]:
-		if not e["alive"]:
-			continue
-		var moved: Vector2 = Vector2(e["q"], e["r"]) - pre.get(e["id"], Vector2(e["q"], e["r"]))
-		if moved.length() > 0.1:
-			e["facing"] = moved.normalized()
-		else:
-			var best := {}
-			var bd := 9999
-			for pl in battle["players"]:
-				if pl["alive"] and core.dist(e, pl) < bd:
-					bd = core.dist(e, pl)
-					best = pl
-			if not best.is_empty():
-				e["facing"] = Vector2(int(best["q"]) - int(e["q"]), int(best["r"]) - int(e["r"])).normalized()
-	# staggered slide animation for every enemy that moved this phase
-	var slide_delay := 0.0
-	for e in battle["enemies"]:
-		if not e["alive"]:
-			continue
-		var p: Vector2 = pre.get(e["id"], Vector2(e["q"], e["r"]))
-		if Vector2(e["q"], e["r"]) != p:
-			_animate_enemy_slide(e, int(p.x), int(p.y), slide_delay)
-			slide_delay += 0.07
 	for p in battle["players"]:
 		if p["alive"]:
 			p["ap"] = p["maxAp"]
 			p["attacked"] = false  # 2b mutex: fresh turn, brace available again
 			core.tick_status(battle, p)
-	_sync_units()
-	if _check_end():
-		return
-	var alive: Array = battle["players"].filter(func(p): return p["alive"])
-	if alive.size() > 0:
-		_select(alive[0])
-		_log("— Your move —")
+	_recording = false
+	_play_events()
 
 func _after_action() -> void:
 	_sync_units()
@@ -1380,6 +1937,10 @@ func _check_end() -> bool:
 		return false
 	ended = true
 	var win := p_alive
+	_clear_hover_tile()
+	var abus := get_node_or_null("/root/Audio")
+	if abus:
+		abus.sfx("win" if win else "lose")
 	# XP pays on xpKills (raised adds excluded — P0 farm closure); the banner's
 	# kill count below stays the truthful total body count.
 	var summary: Dictionary = GS.apply_battle_result(battle, win, int(battle.get("xpKills", battle["kills"])))
@@ -1405,4 +1966,4 @@ func _check_end() -> bool:
 	return true
 
 func _finish_and_return() -> void:
-	get_tree().change_scene_to_file("res://scenes/worldmap.tscn")
+	_fade_out_then(func(): get_tree().change_scene_to_file("res://scenes/worldmap.tscn"))

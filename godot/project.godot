@@ -20,6 +20,11 @@ PauseMenu="*res://scripts/pause_menu.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+; v1.4: the HUD is pixel-positioned for 1280x720; without a stretch mode it sat
+; in the top-left corner of any larger window. canvas_items scales the 2D layer
+; with the window, expand keeps wider aspects from letterboxing the 3D board.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [rendering]
 

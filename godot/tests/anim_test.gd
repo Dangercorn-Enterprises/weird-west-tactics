@@ -188,9 +188,11 @@ func _tick() -> void:
 			battle_scene._end_turn()
 			_next_stage()
 		5:
-			if not battle_scene._animating.is_empty():
-				if _elapsed() > 5.0:
-					_fail("enemy slide locks never cleared: %s" % str(battle_scene._animating))
+			# v1.4: the enemy phase plays back event by event (_busy), and the
+			# animation locks come and go between events — wait for both
+			if battle_scene._busy or not battle_scene._animating.is_empty():
+				if _elapsed() > 12.0:
+					_fail("enemy phase playback never finished: busy=%s locks=%s" % [str(battle_scene._busy), str(battle_scene._animating)])
 					_finish()
 				return
 			for u in battle_scene.battle["units"]:

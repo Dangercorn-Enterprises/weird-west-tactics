@@ -22,7 +22,12 @@ var _muted := false
 var music_vol := 1.0                   # 0..1 user volume (persisted in settings)
 var sfx_vol := 1.0
 var _sfx: Dictionary = {}              # name -> AudioStreamWAV
-var _sfx_player: AudioStreamPlayer
+# v1.4: a small round-robin pool instead of one player. With a single
+# AudioStreamPlayer, "shot" immediately followed by "hit" restarted the player
+# and only the last sound was ever heard; enemy-phase volleys cut each other off.
+const SFX_POOL := 8
+var _sfx_players: Array = []
+var _sfx_next := 0
 var _music_player: AudioStreamPlayer
 var _pluck_timer: Timer
 var _mood := ""
@@ -52,9 +57,11 @@ func _ready() -> void:
 		_muted = bool(gs.get_setting("audio_muted", false))
 		music_vol = clampf(float(gs.get_setting("music_vol", 1.0)), 0.0, 1.0)
 		sfx_vol = clampf(float(gs.get_setting("sfx_vol", 1.0)), 0.0, 1.0)
-	_sfx_player = AudioStreamPlayer.new()
-	_sfx_player.bus = "Master"
-	add_child(_sfx_player)
+	for i in SFX_POOL:
+		var p := AudioStreamPlayer.new()
+		p.bus = "Master"
+		add_child(p)
+		_sfx_players.append(p)
 	_music_player = AudioStreamPlayer.new()
 	_music_player.bus = "Master"
 	_music_player.volume_db = _db(MASTER_MUSIC * music_vol)
@@ -179,12 +186,29 @@ func _build_sfx() -> void:
 
 # ---- public SFX API (Audio.sfx("shot")) ----
 
-func sfx(name: String) -> void:
+# Next free player in the pool (an idle one if any, else round-robin so the
+# oldest voice is the one stolen). Exposed for the audio test.
+func _next_player() -> AudioStreamPlayer:
+	if _sfx_players.is_empty():
+		return null
+	for i in _sfx_players.size():
+		var p: AudioStreamPlayer = _sfx_players[(_sfx_next + i) % _sfx_players.size()]
+		if not p.playing:
+			_sfx_next = (_sfx_next + i + 1) % _sfx_players.size()
+			return p
+	var p: AudioStreamPlayer = _sfx_players[_sfx_next]
+	_sfx_next = (_sfx_next + 1) % _sfx_players.size()
+	return p
+
+func sfx(name: String, volume := 1.0) -> void:
 	if _muted or not _sfx.has(name):
 		return
-	_sfx_player.stream = _sfx[name]
-	_sfx_player.volume_db = _db(MASTER_SFX * sfx_vol)
-	_sfx_player.play()
+	var p := _next_player()
+	if p == null:
+		return
+	p.stream = _sfx[name]
+	p.volume_db = _db(MASTER_SFX * sfx_vol * clampf(volume, 0.0, 1.0))
+	p.play()
 
 
 # ---- generative ambient music: looping drone bed + timed plucks ----
